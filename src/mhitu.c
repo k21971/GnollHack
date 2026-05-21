@@ -21,7 +21,7 @@ STATIC_DCL int FDECL(gulpmu, (struct monst *, struct attack *));
 STATIC_DCL int FDECL(explmu, (struct monst *, struct attack *, BOOLEAN_P));
 STATIC_DCL void FDECL(missmu, (struct monst *, BOOLEAN_P, struct attack *));
 STATIC_DCL void FDECL(mswings, (struct monst *, struct obj *, int));
-STATIC_DCL void FDECL(wildmiss, (struct monst *, struct attack *));
+STATIC_DCL void FDECL(wildmiss, (struct monst *, struct attack *, BOOLEAN_P));
 STATIC_DCL void FDECL(hitmsg, (struct monst *, struct attack *, int, BOOLEAN_P));
 STATIC_DCL boolean FDECL(u_slip_free_core, (struct monst*, struct attack*, BOOLEAN_P));
 
@@ -217,6 +217,7 @@ struct attack *mattk;
     }
 }
 
+#if 0
 /* called when your intrinsic speed is taken away */
 void
 u_slow_down()
@@ -229,12 +230,14 @@ u_slow_down()
         Your("quickness feels less natural.");
     exercise(A_DEX, FALSE);
 }
+#endif
 
 /* monster attacked your displaced image */
 STATIC_OVL void
-wildmiss(mtmp, mattk)
+wildmiss(mtmp, mattk, range_differs)
 struct monst *mtmp;
 struct attack *mattk;
+boolean range_differs;
 {
     int compat;
     const char *Monst_name; /* Monnam(mtmp) */
@@ -251,7 +254,7 @@ struct attack *mattk;
               ? could_seduce(mtmp, &youmonst, mattk) : 0);
     Monst_name = Monnam(mtmp);
 
-    if (m_cannotsenseu(mtmp)) 
+    if (m_cannotsenseu(mtmp) || (range_differs && !Displaced && !Underwater))
     {
         const char *swings = (mattk->aatyp == AT_BITE) ? "snaps"
                              : (mattk->aatyp == AT_KICK) ? "kicks"
@@ -391,7 +394,7 @@ struct attack *alt_attk_buf;
        from hitting with both of them on the same turn; if the first has
        already hit, switch to a stun attack for the second */
     if (indx > 0 && prev_result[indx - 1] > 0
-        && (attk->adtyp == AD_DISE || attk->adtyp == AD_ROTS || attk->adtyp == AD_PEST
+        && (((attk->adtyp == AD_DISE || attk->adtyp == AD_ROTS || attk->adtyp == AD_PEST) && !Sick_resistance)
             || attk->adtyp == AD_FAMN)
         && attk->adtyp == mptr->mattk[indx - 1].adtyp) {
         *alt_attk_buf = *attk;
@@ -481,6 +484,7 @@ register struct monst *mtmp;
      */
     boolean skipnonmagc = FALSE;
     /* Are further physical attack attempts useless? */
+    debugprint("mattacku 1: mnum=%d, ranged=%d, range2=%d, foundyou=%d, mux=%d, muy=%d, ux=%d, uy=%d", mtmp->mnum, ranged, range2, foundyou, (int)mtmp->mux, (int)mtmp->muy, (int)u.ux, (int)u.uy);
 
     if (!ranged)
         nomul(0);
@@ -495,6 +499,7 @@ register struct monst *mtmp;
         u.ustuck->muy = u.uy;
         range2 = 0;
         foundyou = 1;
+        debugprint("mattacku ustuck: mnum=%d, ranged=%d, range2=%d, foundyou=%d, mux=%d, muy=%d, ux=%d, uy=%d", mtmp->mnum, ranged, range2, foundyou, (int)mtmp->mux, (int)mtmp->muy, (int)u.ux, (int)u.uy);
         if (u.uinvulnerable)
             return 0; /* stomachs can't hurt you! */
 
@@ -518,7 +523,10 @@ register struct monst *mtmp;
             /* Let your steed retaliate */
             bhitpos.x = mtmp->mx;
             bhitpos.y = mtmp->my;
-            return !!(mattackm(u.usteed, mtmp) & MM_DEF_DIED);
+            if (check_mon_wants_to_attack_target(u.usteed, mtmp))
+                return !!(mattackm(u.usteed, mtmp) & MM_DEF_DIED);
+            else
+                return 0;
         }
     }
 
@@ -549,6 +557,7 @@ register struct monst *mtmp;
                    message and keep both mtmp and hero at their
                    original positions; hero has become unconcealed
                    so mtmp's next move will be a regular attack */
+                debugprint_pos();
                 place_monster(mtmp, mtmp->mx, mtmp->my); /* put back */
                 newsym(u.ux, u.uy); /* u.uundetected was toggled */
                 pline("%s draws back as you drop!", Monnam(mtmp));
@@ -557,6 +566,7 @@ register struct monst *mtmp;
 
             /* put mtmp at hero's spot and move hero to <cc.x,.y> */
             newsym(mtmp->mx, mtmp->my); /* finish removal */
+            debugprint_pos();
             place_monster(mtmp, u.ux, u.uy);
             if (mtmp->wormno) {
                 worm_move(mtmp);
@@ -768,7 +778,7 @@ register struct monst *mtmp;
         case AT_BUTT:
         case AT_TAIL:
         case AT_TENT:
-            if (!range2 && (!MON_WEP(mtmp) || is_confused(mtmp) || Conflict || is_crazed(mtmp) || !touch_petrifies(youmonst.data)))
+            if (!range2 && (!MON_WEP(mtmp) || !touch_petrifies(youmonst.data) || is_confused(mtmp) || Conflict || is_crazed(mtmp)))
             {
                 if (first_attack)
                 {
@@ -790,7 +800,8 @@ register struct monst *mtmp;
                 }
                 else
                 {
-                    wildmiss(mtmp, mattk);
+                    debugprint("mattacku 2: mnum=%d, ranged=%d, range2=%d, foundyou=%d, mux=%d, muy=%d, ux=%d, uy=%d", mtmp->mnum, ranged, range2, foundyou, (int)mtmp->mux, (int)mtmp->muy, (int)u.ux, (int)u.uy);
+                    wildmiss(mtmp, mattk, range2 != ranged);
                     /* skip any remaining non-spell attacks */
                     skipnonmagc = TRUE;
                 }
@@ -1024,7 +1035,8 @@ register struct monst *mtmp;
                 } 
                 else
                 {
-                    wildmiss(mtmp, mattk);
+                    debugprint("mattacku 3: mnum=%d, ranged=%d, range2=%d, foundyou=%d, mux=%d, muy=%d, ux=%d, uy=%d", mtmp->mnum, ranged, range2, foundyou, (int)mtmp->mux, (int)mtmp->muy, (int)u.ux, (int)u.uy);
+                    wildmiss(mtmp, mattk, range2 != ranged);
                     /* skip any remaining non-spell attacks */
                     skipnonmagc = TRUE;
                 }
@@ -1067,6 +1079,7 @@ register struct monst *mtmp;
                         if (!is_cancelled(mtmp) && rn2(100) < chance && !item_prevents_summoning(mtmp->mnum))
                         {
                             pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s gates in some help.", Monnam(mtmp));
+                            debugprint_pos();
                             (void)msummon(mtmp);
                             sum[i] = 1;
                             mtmp->mdemonsummon_used = 30;
@@ -1104,6 +1117,7 @@ register struct monst *mtmp;
                             char buf[BUFSZ], genericwere[BUFSZ];
 
                             Strcpy(genericwere, "creature");
+                            debugprint_pos();
                             numhelp = were_summon(mdat, FALSE, &numseen, genericwere);
                             mtmp->mdemonsummon_used = 30;
                             if (youseeit)
@@ -1157,6 +1171,7 @@ register struct monst *mtmp;
                         int chance = mattk->mlevel;
                         if (!is_cancelled(mtmp) && rn2(100) < chance && !item_prevents_summoning(mtmp->mnum))
                         {
+                            debugprint_pos();
                             (void)yeenaghu_gnoll_summon(mtmp);
                             sum[i] = 1;
                             mtmp->mspecialsummon_used = 45;
@@ -1186,6 +1201,7 @@ register struct monst *mtmp;
                         int chance = mattk->mlevel;
                         if (!is_cancelled(mtmp) && rn2(100) < chance && !item_prevents_summoning(mtmp->mnum))
                         {
+                            debugprint_pos();
                             (void)yeenaghu_ghoul_summon(mtmp);
                             sum[i] = 1;
                             mtmp->mspecialsummon2_used = 45;
@@ -1216,6 +1232,7 @@ register struct monst *mtmp;
                         if (!is_cancelled(mtmp) && rn2(100) < chance && !item_prevents_summoning(mtmp->mnum))
                         {
                             pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s summons some bison!", Monnam(mtmp));
+                            debugprint_pos();
                             (void)yacc_bison_summon();
                             sum[i] = 1;
                             mtmp->mspecialsummon_used = 45;
@@ -1240,6 +1257,7 @@ register struct monst *mtmp;
                         if (!is_cancelled(mtmp) && rn2(100) < chance && !item_prevents_summoning(mtmp->mnum))
                         {
                             pline_ex(ATR_NONE, CLR_MSG_SPELL, "%s summons some undead!", Monnam(mtmp));
+                            debugprint_pos();
                             (void)orcus_undead_summon();
                             sum[i] = 1;
                             mtmp->mspecialsummon_used = 90;
@@ -2147,6 +2165,7 @@ register struct obj* omonwep;
                 destroy_item(SPBOOK_CLASS, AD_FIRE);
             burn_away_slime();
             item_destruction_hint(AD_FIRE, FALSE);
+            clear_bypasses();
         }
         //else
         //    damage = 0;
@@ -2267,7 +2286,7 @@ register struct obj* omonwep;
             Sprintf(buf, "%s %s", s_suffix(Monnam(mtmp)),
                     mpoisons_subj(mtmp, mattk));
 
-            poisoned(buf, ptmp, mon_monster_name(mtmp), mtmp->m_lev <= 8 ? 0 : 10, FALSE, mtmp->m_lev <= 2 ? 1 : mtmp->m_lev <= 5 ? 2 : 3);
+            poisoned(buf, ptmp, mon_monster_name(mtmp), mtmp->m_lev <= 8 ? 0 : 10, FALSE, mtmp->m_lev <= 2 ? 1 : mtmp->m_lev <= 5 ? 2 : 3, mtmp);
         }
         else if(damagedealt > 0)
             display_u_being_hit(HIT_GENERAL, damagedealt, 0UL);
@@ -2943,7 +2962,7 @@ register struct obj* omonwep;
     {
         pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s reaches out with its deadly touch.", Monnam(mtmp));
         //boolean magic_resistance_success = check_magic_resistance_and_inflict_damage(&youmonst, (struct obj*)0, mtmp->m_lev, 0, 0, NOTELL);
-        if (resists_death(&youmonst) || Death_resistance) //  || magic_resistance_success
+        if (resists_death(&youmonst) || Death_resistance || Invulnerable) //  || magic_resistance_success
         {
             /* Still does normal damage */
             pline("Was that the touch of death?");
@@ -2953,7 +2972,7 @@ register struct obj* omonwep;
         case 19:
         case 18:
         case 17:
-            if (!Death_resistance) // && !check_magic_cancellation_success(&youmonst, mcadj)) 
+            if (!(Death_resistance || is_not_living(youmonst.data) || is_demon(youmonst.data))) // && !check_magic_cancellation_success(&youmonst, mcadj)) 
             {
                 display_u_being_hit(HIT_DEATH, damagedealt, 0UL);
                 killer.format = KILLED_BY_AN;
@@ -3259,7 +3278,7 @@ register struct obj* omonwep;
             Strcpy(onmbuf, xname(mweapon));
             Sprintf(knmbuf, "%s wielded by %s", killer_xname(mweapon), a_monnam(mtmp));
 
-            extra_enchantment_damage(onmbuf, omonwep->elemental_enchantment, knmbuf, (u.umortality > oldumort));
+            extra_enchantment_damage(onmbuf, omonwep->elemental_enchantment, knmbuf, (u.umortality > oldumort), mtmp);
 
             switch (omonwep->elemental_enchantment)
             {
@@ -3292,13 +3311,13 @@ register struct obj* omonwep;
         )
     ))
     {
-        Sprintf(priority_debug_buf_4, "hitmu: %d", omonwep->otyp);
+        debugprint("hitmu1: %d", omonwep->otyp);
         if(omonwep->where == OBJ_MINVENT)
             m_useup(mtmp, omonwep);
         else if (omonwep->where == OBJ_FLOOR)
         {
             int x = omonwep->ox, y = omonwep->oy;
-            Sprintf(priority_debug_buf_3, "hitmu: %d", omonwep->otyp);
+            debugprint("hitmu2: %d", omonwep->otyp);
             delobj(omonwep);
             newsym(x, y);
         }
@@ -3416,6 +3435,7 @@ struct attack *mattk;
         }
 
         display_nhwindow(WIN_MESSAGE, FALSE);
+        debugprint_pos();
         vision_recalc(2); /* hero can't see anything */
         u.uswallow = 1;
         /* for digestion, shorter time is more dangerous;
@@ -3742,6 +3762,7 @@ boolean ufound;
                 destroy_item(WAND_CLASS, (int)mattk->adtyp);
 
                 item_destruction_hint((int)mattk->adtyp, FALSE);
+                clear_bypasses();
             }
             break;
 
@@ -4039,6 +4060,7 @@ struct attack *mattk;
                 if (damage > 0)
                     mdamageu_with_hit_tile(mtmp, damage, TRUE, HIT_ON_FIRE);
                 item_destruction_hint(AD_FIRE, FALSE);
+                clear_bypasses();
             }
         }
         break;
@@ -4283,11 +4305,15 @@ struct monst *mon;
                       Who, yname(ring));
             makeknown(RIN_ADORNMENT);
             /* might be in left or right ring slot or weapon/alt-wep/quiver */
+            boolean ogone = FALSE;
             if (ring->owornmask)
-                remove_worn_item(ring, FALSE);
-            freeinv(ring);
-            (void) mpickobj(mon, ring);
-            play_sfx_sound(SFX_STEAL_GOLD);
+                ogone = remove_worn_item_ex(ring, FALSE, TRUE);
+            if (!ogone)
+            {
+                freeinv(ring);
+                ogone = mpickobj(mon, ring);
+                play_sfx_sound(SFX_STEAL_GOLD);
+            }
         } else {
             if (uleft && uright && uleft->otyp == RIN_ADORNMENT
                 && uright->otyp == RIN_ADORNMENT)
@@ -4587,7 +4613,7 @@ const char *str;
                                  /* obj == uarmh */
                                  : hairbuf);
     }
-    remove_worn_item(obj, TRUE);
+    (void)remove_worn_item_ex(obj, TRUE, TRUE);
 }
 
 /* FIXME:

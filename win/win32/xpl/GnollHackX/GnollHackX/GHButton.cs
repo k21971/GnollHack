@@ -56,6 +56,48 @@ namespace GnollHackX
             set => SetValue(GHButton.RawCommandProperty, value);
         }
 
+        public char MappedLetter
+        {
+            get
+            {
+                int mappedCmd = MappedGHCommand;
+                if (mappedCmd <= 0)
+                    return (char)0;
+                else
+                    return (char)GHUtils.UnMetaCtrl(mappedCmd);
+            }
+        }
+        public bool MappedMeta
+        {
+            get
+            {
+                int mappedCmd = MappedGHCommand;
+                if (mappedCmd <= 0)
+                    return false;
+                else
+                    return GHUtils.IsMeta(mappedCmd);
+            }
+        }
+        public bool MappedCtrl
+        {
+            get
+            {
+                int mappedCmd = MappedGHCommand;
+                if (mappedCmd <= 0)
+                    return false;
+                else
+                    return GHUtils.IsCtrl(mappedCmd);
+            }
+        }
+        public int MappedRawCommand
+        {
+            get => GHApp.MapCommand(RawCommand);
+        }
+        public int MappedGHCommand
+        {
+            get => GHApp.MapCommand(GHCommand);
+        }
+
         public GHButton()
         {
 

@@ -474,6 +474,17 @@ struct objclass {
 #define is_material_flimsy(otmp)  (material_definitions[(otmp)->material].flimsy != 0) 
 #define is_fragile(otmp)  (material_definitions[(otmp)->material].fragile != 0) 
 #define is_obj_stony(otmp)  (material_definitions[(otmp)->material].mineral != 0) 
+#define is_obj_gas(otmp)  (material_definitions[(otmp)->material].phase == PHASE_GAS) 
+#define is_obj_liquid(otmp)  (material_definitions[(otmp)->material].phase == PHASE_LIQUID) 
+#define is_obj_energy(otmp)  (material_definitions[(otmp)->material].phase == PHASE_ENERGY) 
+#define is_obj_void(otmp)  (material_definitions[(otmp)->material].phase == PHASE_VOID) 
+
+#define is_obj_edible_by_lithovore(o)  (is_obj_stony(o) || ((o)->material >= MAT_PLASTIC && (o)->material <= MAT_CRYSTAL) || (o)->material == MAT_MODRONITE) 
+#define is_obj_edible_by_chitinvore(o)  ((o)->material == MAT_CHITIN || ((o)->material >= MAT_PLASTIC && (o)->material <= MAT_CRYSTAL) || (o)->material == MAT_MODRONITE) 
+#define is_obj_edible_by_toothvore(o)  ((o)->material == MAT_TOOTH || ((o)->material >= MAT_PLASTIC && (o)->material <= MAT_CRYSTAL) || (o)->material == MAT_MODRONITE) 
+#define is_obj_edible_by_bonevore(o)  ((o)->material == MAT_BONE) 
+#define is_obj_edible_by_woodvore(o)  ((o)->material == MAT_WOOD) 
+#define is_obj_edible_by_magicvore(o)  ((o)->material == MAT_FORCEFIELD) 
 
 /* primary damage: fire/rust/--- */
 /* is_flammable(otmp), is_rottable(otmp) in mkobj.c */
@@ -764,6 +775,7 @@ struct objclass {
 #define EDIBLEFX_GAIN_LEVEL -15
 #define EDIBLEFX_CURE_PETRIFICATION -16
 #define EDIBLEFX_CURE_TELEPORTITIS -17
+#define EDIBLEFX_CURE_HALLUCINATION -18
 
 
 /* spells, wands, scrolls */
@@ -989,7 +1001,7 @@ struct objclass {
 #define O3_DOUBLE_DIGGING_EFFORT                       0x00000010UL  /* double normal digging effort */
 #define O3_BURIED_SEARCHABLE                           0x00000020UL  /* if buried, can be found by explicit searching */
 #define O3_CONTENT_DESCRIPTION_SHUFFLED                0x00000040UL  /* uses (shuffled) description index instead of name index for content description */
-#define O3_CONSUMES_NUTRITION_EVERY_20_ROUNDS          0x00000080UL  /* consumes nutrition every 20 rounds when worn. WORKS ONLY FOR MISCELLANEOUS MAGIC ITEMS */
+#define O3_CONSUMES_NUTRITION_EVERY_20_TURNS           0x00000080UL  /* consumes nutrition every 20 rounds when worn. WORKS ONLY FOR MISCELLANEOUS MAGIC ITEMS */
 #define O3_USES_FIXED_DAMAGE_BONUS_INSTEAD_OF_STRENGTH 0x00000100UL 
 
 #define O3_PREVENTS_REVIVAL_OF_PERMITTED_TARGETS       0x00000200UL  /* wielding or wearing prohibits the revival of permitted targets */
@@ -1098,6 +1110,7 @@ struct objclass {
 #define O6_NORMALLY_NON_EXCEPTIONAL    0x00000004UL
 #define O6_ALWAYS_FULL_INK_COST        0x00000008UL
 #define O6_THROWING_REQUIRES_STR_18_00 0x00000010UL
+#define O6_SEX_CHANGE_AND_DISINTEGRATE 0x00000020UL
 
 
 /* flag values for CONFERS_POWERS_TO_SPECIFIED_CHARACTERS_ONLY in nonspell_oc7 */

@@ -91,8 +91,8 @@ set_uasmon(VOID_ARGS)
     PROPSET(DRAIN_RESISTANCE, resists_drli(&youmonst));
     PROPSET(STUN_RESISTANCE, resists_stun(&youmonst));
     PROPSET(BISECTION_RESISTANCE, resists_bisection(&youmonst));
-    PROPSET(SLIME_RESISTANCE, resists_slime(&youmonst));
-    PROPSET(POLYMORPH_RESISTANCE, resists_polymorph(&youmonst));
+    PROPSET(SLIME_RESISTANCE, resists_slime_only(&youmonst));
+    PROPSET(POLYMORPH_RESISTANCE, resists_polymorph_only(&youmonst));
 
     PROPSET(FIRE_IMMUNITY, is_mon_immune_to_fire(&youmonst));
     PROPSET(COLD_IMMUNITY, is_mon_immune_to_cold(&youmonst));
@@ -295,6 +295,28 @@ newman(VOID_ARGS)
     if (u.ulevelmax < newlvl)
         u.ulevelmax = newlvl;
     u.ulevel = newlvl;
+
+    if (u.ulevel >= 5)
+        issue_achievement(GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_5);
+    if (u.ulevel >= 10)
+        issue_achievement(GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_10);
+    if (u.ulevel >= 15)
+        issue_achievement(GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_15);
+    if (u.ulevel >= 20)
+        issue_achievement(GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_20);
+    if (u.ulevel >= 25)
+        issue_achievement(GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_25);
+    if (u.ulevel >= 30)
+        issue_achievement(GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_30);
+    if (u.ulevel >= 35)
+        issue_achievement(GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_35);
+    if (u.ulevel >= 40)
+        issue_achievement(GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_40);
+    if (u.ulevel >= 45)
+        issue_achievement(GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_45);
+    if (u.ulevel >= 50)
+        issue_achievement(GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_50);
+
 
     if (sex_change_ok && !rn2(10))
         change_sex();
@@ -687,7 +709,7 @@ made_change:
     new_light = emitted_light_range(youmonst.data);
     if (old_light != new_light)
     {
-        Strcpy(debug_buf_4, "polyself");
+        debugprint("polyself");
         if (old_light)
             del_light_source(LS_MONSTER, monst_to_any(&youmonst));
         if (new_light == 1)
@@ -727,6 +749,7 @@ int mntmp;
     }
 
     /* KMH, conduct */
+    issue_achievement(GUI_ACHIEVEMENT_POLYMORPHED_FORM);
     if (!u.uconduct.polyselfs++)
         livelog_printf(LL_CONDUCT,
             "changed form for the first time, becoming %s",
@@ -1125,28 +1148,39 @@ break_armor()
     //Suit, cloak, robe, shirt
     if (breakarm(youmonst.data)) 
     {
-        Strcpy(priority_debug_buf_3, "break_armor");
-        Strcpy(priority_debug_buf_4, "break_armor");
+        debugprint("break_armor");
         if ((otmp = uarm) != 0)
         {
             if (donning(otmp))
                 cancel_don();
 
+            int trackidx = add_to_obj_tracking(otmp);
             if (otmp->oartifact || is_obj_indestructible(otmp))
             {
                 /* Luckily, you do not die, just the armor pops off, so having an indestructible armor is not life-threatening --JG */
                 pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s falls off!", Yname2(otmp));
                 (void)Armor_off();
-                dropxf(otmp);
+                boolean ogone = finish_obj_tracking(trackidx);
+                if (!ogone)
+                    (void)dropxf(otmp);
             }
             else
             {
                 play_simple_object_sound(otmp, OBJECT_SOUND_TYPE_BREAK);
                 You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "break out of %s!", yname(otmp));
                 exercise(A_STR, FALSE);
+                boolean had_stone_res = Stone_resistance;
+                otmp->in_use = 1;
+                otmp->item_flags |= ITEM_FLAGS_LAVA_EFFECTS_SKIP; /* Do not burn it in lava; it is already broken */
                 (void)Armor_gone();
-                Sprintf(priority_debug_buf_2, "break_armor: %d", otmp->otyp);
-                useup(otmp);
+                boolean ogone = finish_obj_tracking(trackidx);
+                if (!ogone)
+                {
+                    debugprint("break_armor: %d", otmp->otyp);
+                    useup(otmp);
+                }
+                boolean has_stone_res = Stone_resistance;
+                check_wielded_cockatrice(FALSE, FALSE, !has_stone_res && had_stone_res);
             }
         }
         if ((otmp = uarmc) != 0) 
@@ -1154,19 +1188,28 @@ break_armor()
             if (donning(otmp))
                 cancel_don();
 
+            int trackidx = add_to_obj_tracking(otmp);
             if (otmp->oartifact || is_obj_indestructible(otmp))
             {
                 Your_ex(ATR_NONE, CLR_MSG_WARNING, "%s falls off!", cloak_simple_name(otmp));
                 (void) Cloak_off();
-                dropxf(otmp);
+                boolean ogone = finish_obj_tracking(trackidx);
+                if (!ogone)
+                    (void)dropxf(otmp);
             } 
             else 
             {
                 play_simple_object_sound(otmp, OBJECT_SOUND_TYPE_BREAK);
                 Your_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s tears apart!", cloak_simple_name(otmp));
+                otmp->in_use = 1;
+                otmp->item_flags |= ITEM_FLAGS_LAVA_EFFECTS_SKIP; /* Do not burn it in lava; it is already broken */
                 (void) Cloak_off();
-                Sprintf(priority_debug_buf_2, "break_armor2: %d", otmp->otyp);
-                useup(otmp);
+                boolean ogone = finish_obj_tracking(trackidx);
+                if (!ogone)
+                {
+                    debugprint("break_armor2: %d", otmp->otyp);
+                    useup(otmp);
+                }
             }
         }
         if ((otmp = uarmo) != 0)
@@ -1174,20 +1217,29 @@ break_armor()
             if (donning(otmp))
                 cancel_don();
 
+            int trackidx = add_to_obj_tracking(otmp);
             if (otmp->oartifact || is_obj_indestructible(otmp))
             {
                 /* Not sure how this happens but at least it is not life-threatening */
                 Your_ex(ATR_NONE, CLR_MSG_WARNING, "%s falls off!", robe_simple_name(otmp));
                 (void)Robe_off();
-                dropxf(otmp);
+                boolean ogone = finish_obj_tracking(trackidx);
+                if (!ogone)
+                    (void)dropxf(otmp);
             }
             else
             {
                 play_simple_object_sound(otmp, OBJECT_SOUND_TYPE_BREAK);
                 Your_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s is torn to pieces!", robe_simple_name(otmp));
+                otmp->in_use = 1;
+                otmp->item_flags |= ITEM_FLAGS_LAVA_EFFECTS_SKIP; /* Do not burn it in lava; it is already broken */
                 (void)Robe_off();
-                Sprintf(priority_debug_buf_2, "break_armor3: %d", otmp->otyp);
-                useup(otmp);
+                boolean ogone = finish_obj_tracking(trackidx);
+                if (!ogone)
+                {
+                    debugprint("break_armor3: %d", otmp->otyp);
+                    useup(otmp);
+                }
             }
         }
         if ((otmp = uarmu) != 0)
@@ -1195,20 +1247,29 @@ break_armor()
             if (donning(otmp))
                 cancel_don();
 
+            int trackidx = add_to_obj_tracking(otmp);
             if (otmp->oartifact || is_obj_indestructible(otmp))
             {
                 /* Not sure how this happens but at least it is not life-threatening */
                 Your_ex(ATR_NONE, CLR_MSG_WARNING, "shirt falls off!");
                 (void)Shirt_off();
-                dropxf(otmp);
+                boolean ogone = finish_obj_tracking(trackidx);
+                if (!ogone)
+                    (void)dropxf(otmp);
             }
             else
             {
                 play_simple_object_sound(otmp, OBJECT_SOUND_TYPE_BREAK);
                 Your_ex(ATR_NONE, CLR_MSG_NEGATIVE, "shirt rips to shreds!");
+                otmp->in_use = 1;
+                otmp->item_flags |= ITEM_FLAGS_LAVA_EFFECTS_SKIP; /* Do not burn it in lava; it is already broken */
                 (void)Shirt_off();
-                Sprintf(priority_debug_buf_2, "break_armor4: %d", otmp->otyp);
-                useup(otmp);
+                boolean ogone = finish_obj_tracking(trackidx);
+                if (!ogone)
+                {
+                    debugprint("break_armor4: %d", otmp->otyp);
+                    useup(otmp);
+                }
             }
         }
     } 
@@ -1219,8 +1280,14 @@ break_armor()
             if (donning(otmp))
                 cancel_don();
             Your_ex(ATR_NONE, CLR_MSG_WARNING, "armor falls around you!");
+            boolean had_stone_res = Stone_resistance;
+            int trackidx = add_to_obj_tracking(otmp);
             (void) Armor_gone();
-            dropxf(otmp);
+            boolean ogone = finish_obj_tracking(trackidx);
+            if (!ogone)
+                (void)dropxf(otmp);
+            boolean has_stone_res = Stone_resistance;
+            check_wielded_cockatrice(FALSE, FALSE, !has_stone_res && had_stone_res);
         }
         if ((otmp = uarmo) != 0)
         {
@@ -1228,16 +1295,22 @@ break_armor()
                 Your_ex(ATR_NONE, CLR_MSG_WARNING, "%s falls, unsupported!", robe_simple_name(otmp));
             else
                 You_ex(ATR_NONE, CLR_MSG_WARNING, "shrink out of your %s!", robe_simple_name(otmp));
+            int trackidx = add_to_obj_tracking(otmp);
             (void)Robe_off();
-            dropxf(otmp);
+            boolean ogone = finish_obj_tracking(trackidx);
+            if (!ogone)
+                (void)dropxf(otmp);
         }
         if ((otmp = uarmc) != 0) {
             if (is_whirly(youmonst.data))
                 Your_ex(ATR_NONE, CLR_MSG_WARNING, "%s falls, unsupported!", cloak_simple_name(otmp));
             else
                 You_ex(ATR_NONE, CLR_MSG_WARNING, "shrink out of your %s!", cloak_simple_name(otmp));
+            int trackidx = add_to_obj_tracking(otmp);
             (void) Cloak_off();
-            dropxf(otmp);
+            boolean ogone = finish_obj_tracking(trackidx);
+            if (!ogone)
+                (void)dropxf(otmp);
         }
         if ((otmp = uarmu) != 0) 
         {
@@ -1245,8 +1318,11 @@ break_armor()
                 You_ex(ATR_NONE, CLR_MSG_WARNING, "seep right through your shirt!");
             else
                 You_ex(ATR_NONE, CLR_MSG_WARNING, "become much too small for your shirt!");
+            int trackidx = add_to_obj_tracking(otmp);
             setworn((struct obj *) 0, otmp->owornmask & W_ARMU);
-            dropxf(otmp);
+            boolean ogone = finish_obj_tracking(trackidx);
+            if (!ogone)
+                (void)dropxf(otmp);
         }
     }
 
@@ -1261,8 +1337,11 @@ break_armor()
                 cancel_don();
             Your_ex(ATR_NONE, CLR_MSG_WARNING, "%s falls to the %s!", helm_simple_name(otmp),
                 surface(u.ux, u.uy));
+            int trackidx = add_to_obj_tracking(otmp);
             (void)Helmet_off();
-            dropxf(otmp);
+            boolean ogone = finish_obj_tracking(trackidx);
+            if (!ogone)
+                (void)dropxf(otmp);
         }
         else if (horned && flimsy)
         {
@@ -1285,9 +1364,12 @@ break_armor()
                 cancel_don();
             /* Drop weapon along with gloves */
             You_ex(ATR_NONE, CLR_MSG_WARNING, "drop your gloves%s!", uwep ? " and weapon" : "");
+            int trackidx = add_to_obj_tracking(otmp);
             drop_weapon(0);
             (void)Gloves_off();
-            dropxf(otmp);
+            boolean ogone = finish_obj_tracking(trackidx);
+            if (!ogone)
+                (void)dropxf(otmp);
             dropped_gloves = TRUE;
         }
     }
@@ -1304,6 +1386,7 @@ break_armor()
     {
         if ((otmp = uarms) != 0)
         {
+            int trackidx = add_to_obj_tracking(otmp);
             if (is_shield(otmp))
             {
                 You_ex1(ATR_NONE, CLR_MSG_WARNING, canwearshield ? "drop your shield!" : "can no longer hold your shield!");
@@ -1312,9 +1395,11 @@ break_armor()
             else
             {
                 You_ex(ATR_NONE, CLR_MSG_WARNING, canwearshield ? "drop your %s!" : "can no longer hold your %s!", cxname(otmp));
-                remove_worn_item(otmp, FALSE);
+                (void)remove_worn_item(otmp, FALSE);
             }
-            dropxf(otmp);
+            boolean ogone = finish_obj_tracking(trackidx);
+            if (!ogone)
+                (void)dropxf(otmp);
         }
     }
 
@@ -1332,8 +1417,11 @@ break_armor()
             else
                 Your_ex(ATR_NONE, CLR_MSG_WARNING, "boots %s off your feet!",
                      verysmall(youmonst.data) ? "slide" : "are pushed");
+            int trackidx = add_to_obj_tracking(otmp);
             (void) Boots_off();
-            dropxf(otmp);
+            boolean ogone = finish_obj_tracking(trackidx);
+            if (!ogone)
+                (void)dropxf(otmp);
         }
     }
 
@@ -1348,8 +1436,11 @@ break_armor()
             else
                 Your_ex(ATR_NONE, CLR_MSG_WARNING, "bracers %s off your %s!",
                     verysmall(youmonst.data) ? "slide" : "are pushed", makeplural(body_part(ARM)));
+            int trackidx = add_to_obj_tracking(otmp);
             (void)Bracers_off();
-            dropxf(otmp);
+            boolean ogone = finish_obj_tracking(trackidx);
+            if (!ogone)
+                (void)dropxf(otmp);
         }
     }
 
@@ -1391,8 +1482,11 @@ break_armor()
                 if (is_whirly(youmonst.data) || verysmall(youmonst.data))
                 {
                     pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s away!", Yobjnam2(otmp, "fall"));
+                    int trackidx = add_to_obj_tracking(otmp);
                     (void)MiscellaneousItem_off(otmp);
-                    dropxf(otmp);
+                    boolean ogone = finish_obj_tracking(trackidx);
+                    if (!ogone)
+                        (void)dropxf(otmp);
                 }
                 break;
             case MISC_PANTS:
@@ -1400,8 +1494,11 @@ break_armor()
                 if (is_whirly(youmonst.data) || verysmall(youmonst.data) || nofeet(youmonst.data) || slithy(youmonst.data))
                 {
                     pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s away!", Yobjnam2(otmp, "fall"));
+                    int trackidx = add_to_obj_tracking(otmp);
                     (void)MiscellaneousItem_off(otmp);
-                    dropxf(otmp);
+                    boolean ogone = finish_obj_tracking(trackidx);
+                    if (!ogone)
+                        (void)dropxf(otmp);
                 }
                 break;
             case MISC_WRIST_WATCH:
@@ -1414,18 +1511,24 @@ break_armor()
                     else
                         pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s%s off your %s!",
                             Yobjnam2(otmp, verysmall(youmonst.data) ? "slide" : "are"), verysmall(youmonst.data) ? "" : " pushed", subtyp == MISC_BRACERS ? makeplural(body_part(ARM)) : body_part(ARM));
+                    int trackidx = add_to_obj_tracking(otmp);
                     (void)MiscellaneousItem_off(otmp);
-                    dropxf(otmp);
+                    boolean ogone = finish_obj_tracking(trackidx);
+                    if (!ogone)
+                        (void)dropxf(otmp);
                 }
                 break;
             case MISC_BELT:
                 if (breakarm(youmonst.data))
                 {
+                    int trackidx = add_to_obj_tracking(otmp);
                     if (otmp->oartifact || is_obj_indestructible(otmp))
                     {
                         pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s falls off!", Yname2(otmp));
                         (void)MiscellaneousItem_off(otmp);
-                        dropxf(otmp);
+                        boolean ogone = finish_obj_tracking(trackidx);
+                        if (!ogone)
+                            (void)dropxf(otmp);
                     }
                     else
                     {
@@ -1433,15 +1536,22 @@ break_armor()
                         pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s!", Yobjnam2(otmp, "break"));
                         exercise(A_STR, FALSE);
                         (void)MiscellaneousItem_off(otmp);
-                        Sprintf(priority_debug_buf_2, "break_armor5: %d", otmp->otyp);
-                        useup(otmp);
+                        boolean ogone = finish_obj_tracking(trackidx);
+                        if (!ogone)
+                        {
+                            debugprint("break_armor5: %d", otmp->otyp);
+                            useup(otmp);
+                        }
                     }
                 }
                 else if (sliparm(youmonst.data))
                 {
                     pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s falls off!", Yname2(otmp));
+                    int trackidx = add_to_obj_tracking(otmp);
                     (void)MiscellaneousItem_off(otmp);
-                    dropxf(otmp);
+                    boolean ogone = finish_obj_tracking(trackidx);
+                    if (!ogone)
+                        (void)dropxf(otmp);
                 }
                 break;
             case MISC_NOSERING:
@@ -1456,8 +1566,11 @@ break_armor()
                     else
                         pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s%s off your %s!",
                             Yobjnam2(otmp, verysmall(youmonst.data) ? "slide" : "are"), verysmall(youmonst.data) ? "" : " pushed", body_part(subtyp == MISC_NOSERING ? NOSE : HEAD));
+                    int trackidx = add_to_obj_tracking(otmp);
                     (void)MiscellaneousItem_off(otmp);
-                    dropxf(otmp);
+                    boolean ogone = finish_obj_tracking(trackidx);
+                    if (!ogone)
+                        (void)dropxf(otmp);
                 }
                 break;
             case MISC_SCARF:
@@ -1469,8 +1582,11 @@ break_armor()
                     else
                         pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s%s off your %s!",
                             Yobjnam2(otmp, verysmall(youmonst.data) ? "slide" : "are"), verysmall(youmonst.data) ? "" : " pushed", body_part(NECK));
+                    int trackidx = add_to_obj_tracking(otmp);
                     (void)MiscellaneousItem_off(otmp);
-                    dropxf(otmp);
+                    boolean ogone = finish_obj_tracking(trackidx);
+                    if (!ogone)
+                        (void)dropxf(otmp);
                 }
                 break;
             }
@@ -1518,14 +1634,14 @@ int alone;
                 if (otmp && otmp->in_use)
                     updateinv = FALSE;
                 else if (candropwep2)
-                    dropxf(otmp);
+                    (void)dropxf(otmp);
             }
             otmp = uwep;
             uwepgone();
             if (otmp->in_use)
                 updateinv = FALSE;
             else if (candropwep)
-                dropxf(otmp);
+                (void)dropxf(otmp);
 
             if (updateinv)
                 update_inventory();
@@ -1553,7 +1669,7 @@ rehumanize(VOID_ARGS)
         }
     }
 
-    Strcpy(debug_buf_4, "rehumanize");
+    debugprint("rehumanize");
     if (emitted_light_range(youmonst.data))
         del_light_source(LS_MONSTER, monst_to_any(&youmonst));
     if (mon_ambient_sound(youmonst.data))
@@ -1602,22 +1718,26 @@ dobreathe(VOID_ARGS)
     u.uen -= BREATH_WEAPON_MANA_COST;
     context.botl = 1;
 
-    if (!getdir((char *) 0))
+    mattk = attacktype_fordmg(youmonst.data, AT_BREA, AD_ANY);
+    if (!mattk)
+    {
+        impossible("bad breath attack?"); /* mouthwash needed... */
+        return 1;
+    }
+    
+    uchar adtyp = mattk->adtyp;
+    int typ = get_ray_adtyp_choose(adtyp, "breath weapon", &youmonst);
+    if (typ == -1)
         return 0;
 
-    mattk = attacktype_fordmg(youmonst.data, AT_BREA, AD_ANY);
+    if (!getdir((char*)0))
+        return 0;
 
-    if (!mattk)
-        impossible("bad breath attack?"); /* mouthwash needed... */
-    else if (!u.dx && !u.dy && !u.dz)
+    if (!u.dx && !u.dy && !u.dz)
         ubreatheu(mattk);
     else
     {
         update_u_facing(TRUE);
-
-        uchar adtyp = mattk->adtyp;
-        int typ = get_ray_adtyp(adtyp);
-
         buzz((20 + typ - 1), (struct obj*)0, &youmonst, (int)mattk->damn, (int)mattk->damd, (int)mattk->damp, u.ux, u.uy,
             u.dx, u.dy);
 
@@ -1625,14 +1745,15 @@ dobreathe(VOID_ARGS)
     return 1;
 }
 
+int rbgd_effect_choices[2] = { AD_FIRE, AD_DRST };
+int rbpd_effect_choices[2] = { AD_COLD, AD_DISN };
+int ray1_effect_choices[3] = { AD_DISN, AD_ELEC, AD_COLD }; /* Elemental */
+int ray2_effect_choices[3] = { AD_DRAY, AD_STON, AD_SLEE }; /* Magic */
+
 int
 get_ray_adtyp(adtyp)
 uchar adtyp;
 {
-    int rbgd_effect_choices[2] = { AD_FIRE, AD_DRST };
-    int rbpd_effect_choices[2] = { AD_COLD, AD_DISN };
-    int ray1_effect_choices[3] = { AD_DISN, AD_ELEC, AD_COLD }; /* Elemental */
-    int ray2_effect_choices[3] = { AD_DRAY, AD_STON, AD_SLEE }; /* Magic */
     int typ = (adtyp == AD_RBRE) ? rnd(AD_ACID) :
         (adtyp == AD_REY1) ? ray1_effect_choices[rn2(3)] :
         (adtyp == AD_REY2) ? ray2_effect_choices[rn2(3)] :
@@ -1643,35 +1764,120 @@ uchar adtyp;
     return typ;
 }
 
-int
-dosteedbreathemon(mon)
-struct monst* mon UNUSED;
+STATIC_OVL int 
+choose_random_breath_weapon(intarr_ptr, arrsize, attk_name, mon)
+int* intarr_ptr;
+int arrsize;
+const char* attk_name;
+struct monst* mon;
 {
-    return dosteedbreathe();
+    int typ = -1;
+    char buf[BUFSZ];
+    winid menuwin;
+    menu_item* selected = (menu_item*)0;
+    int n = 0, i;
+    anything any;
+    any = zeroany; /* set all bits to zero */
+    int glyph = !mon ? NO_GLYPH : abs(mon == &youmonst ? u_to_glyph() : any_mon_to_glyph(mon, rn2_on_display_rng));
+    int gui_glyph= !mon ? NO_GLYPH : mon == &youmonst ?
+        maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, &youmonst, 0UL, 0UL, 0UL, MAT_NONE, 0)) : 
+        maybe_get_replaced_glyph(glyph, mon->mx, mon->my, data_to_replacement_info(glyph, LAYER_MONSTER, (struct obj*)0, mon, 0UL, 0UL, 0UL, MAT_NONE, 0));
+    menuwin = create_nhwindow_ex(NHW_MENU, 0, gui_glyph, zerocreatewindowinfo);
+    start_menu_ex(menuwin, GHMENU_STYLE_MONSTER_ABILITY);
+
+    if (!intarr_ptr) /* Random breath weapon */
+    {
+        for (i = 1; i <= AD_ACID; i++)
+        {
+            any.a_int = i;
+            Sprintf(buf, "%s", get_damage_type_text((short)i));
+            *buf = highc(*buf);
+            add_menu(menuwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, buf, MENU_UNSELECTED);
+        }
+    }
+    else
+    {
+        for (i = 0; i < arrsize; i++)
+        {
+            any.a_int = intarr_ptr[i];
+            Sprintf(buf, "%s", get_damage_type_text((short)intarr_ptr[i]));
+            *buf = highc(*buf);
+            add_menu(menuwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, buf, MENU_UNSELECTED);
+        }
+    }
+
+    Sprintf(buf, "Choose the type of %s", attk_name ? attk_name : "attack");
+    end_menu(menuwin, buf);
+    n = select_menu(menuwin, PICK_ONE, &selected);
+    if (n > 0)
+    {
+        typ = selected->item.a_int;
+        free((genericptr_t)selected);
+    }
+
+    destroy_nhwindow(menuwin);
+
+    return typ;
+}
+
+int
+get_ray_adtyp_choose(adtyp, attk_name, mon)
+uchar adtyp;
+const char* attk_name;
+struct monst* mon;
+{
+    int typ = (adtyp == AD_RBRE) ? choose_random_breath_weapon(NULL, 0, attk_name, mon) :
+        (adtyp == AD_REY1) ? choose_random_breath_weapon(ray1_effect_choices, SIZE(ray1_effect_choices), attk_name, mon) :
+        (adtyp == AD_REY2) ? choose_random_breath_weapon(ray2_effect_choices, SIZE(ray2_effect_choices), attk_name, mon) :
+        (adtyp == AD_RBGD) ? choose_random_breath_weapon(rbgd_effect_choices, SIZE(rbgd_effect_choices), attk_name, mon) :
+        (adtyp == AD_RBPD) ? choose_random_breath_weapon(rbpd_effect_choices, SIZE(rbpd_effect_choices), attk_name, mon) :
+        adtyp;
+
+    return typ;
 }
 
 int
 dosteedbreathe(VOID_ARGS)
 {
+    return dosteedbreathemon(u.usteed);
+}
+
+int
+dosteedbreathemon(mon)
+struct monst* mon;
+{
     struct attack* mattk;
 
-    if (!u.usteed || !can_breathe(u.usteed->data))
+    if (!mon || !can_breathe(mon->data))
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
         You_ex(ATR_NONE, CLR_MSG_FAIL, "have no steed that use a breath weapon!");
         return 0;
     }
 
-    if (u.usteed->mspec_used > 0)
+    if (mon->mspec_used > 0)
     {
         play_sfx_sound(SFX_NOT_READY_YET);
-        pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s breath weapon is not ready yet.", s_suffix(Monnam(u.usteed)));
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s breath weapon is not ready yet.", s_suffix(Monnam(mon)));
         return 0;
     }
 
+    mattk = attacktype_fordmg(mon->data, AT_BREA, AD_ANY);
+    if (!mattk)
+    {
+        impossible("bad breath attack?"); /* mouthwash needed... */
+        return 1;
+    }
+
+    /* First breath weapon type */
+    int typ = get_ray_adtyp_choose(mattk->adtyp, "breath weapon", mon);
+    if (typ == -1)
+        return 0;
+
+    /* Then the direction */
     if (!getdir((char*)0))
         return 0;
-    
+
     if (!u.dx && !u.dy && !u.dz)
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
@@ -1679,23 +1885,15 @@ dosteedbreathe(VOID_ARGS)
         return 0;
     }
 
-    mattk = attacktype_fordmg(u.usteed->data, AT_BREA, AD_ANY);
-    if (!mattk)
-        impossible("bad breath attack?"); /* mouthwash needed... */
+    update_u_facing(FALSE);
+    update_m_facing(mon, u.dx, TRUE);
+    buzz((int)(-(20 + typ - 1)), (struct obj*)0, mon, (int)mattk->damn, (int)mattk->damd, (int)mattk->damp, u.ux, u.uy, u.dx, u.dy);
+
+    if (typ == AD_SLEE)
+        mon->mspec_used += (MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_CONSTANT + d(MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_DICE, MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_DIESIZE));
     else
-    {
-        update_u_facing(FALSE);
-        update_m_facing(u.usteed, u.dx, TRUE);
+        mon->mspec_used = (MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_CONSTANT + d(MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_DICE, MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_DIESIZE));
 
-        int typ = get_ray_adtyp(mattk->adtyp);
-
-        buzz((int)(-(20 + typ - 1)), (struct obj*)0, u.usteed, (int)mattk->damn, (int)mattk->damd, (int)mattk->damp, u.ux, u.uy, u.dx, u.dy);
-
-        if (typ == AD_SLEE)
-            u.usteed->mspec_used += (MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_CONSTANT + d(MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_DICE, MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_DIESIZE));
-        else
-            u.usteed->mspec_used = (MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_CONSTANT + d(MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_DICE, MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_DIESIZE));
-    }
     return 1;
 }
 
@@ -2203,10 +2401,13 @@ doeyestalk(VOID_ARGS)
             You_ex(ATR_NONE, CLR_MSG_FAIL, "lack the energy to use your eyestalks%s!", attacksperformed > 0 ? " any further" : "");
             return (attacksperformed > 0 ? 1 : 0);
         }
+
+        int typ = get_ray_adtyp_choose(mattk->adtyp, "eyestalk", &youmonst);
+        if (typ == -1)
+            continue;
+
         u.uen -= EYE_STALK_MANA_COST;
         context.botl = 1;
-
-        int typ = get_ray_adtyp(mattk->adtyp); 
 
         if ((typ >= AD_MAGM) && (typ <= AD_STON))
         {
@@ -2333,15 +2534,17 @@ douseunicornhorn()
         You_ex(ATR_NONE, CLR_MSG_FAIL, "lack the energy to use your horn!");
         return 1;
     }
-    u.uen -= UNICORN_HORN_MANA_COST;
-    context.botl = 1;
-
     struct obj dummyhorn = { 0 };
     dummyhorn.otyp = UNICORN_HORN;
     dummyhorn.oclass = TOOL_CLASS;
     dummyhorn.charges = 10;
-    use_unicorn_horn(&dummyhorn);
-    return 1;
+    if (use_unicorn_horn(&dummyhorn, TRUE))
+    {
+        u.uen -= UNICORN_HORN_MANA_COST;
+        context.botl = 1;
+        return 1;
+    }
+    return 0;
 }
 
 int
@@ -2399,8 +2602,8 @@ dolayegg(VOID_ARGS)
     set_corpsenm(uegg, egg_type_from_parent(u.umonnum, FALSE));
     uegg->known = uegg->dknown = 1;
     You("%s an egg.", eggs_in_water(youmonst.data) ? "spawn" : "lay");
-    dropy(uegg);
-    stackobj(uegg);
+    if (!dropy(uegg))
+        stackobj(uegg);
     morehungry((int)objects[EGG].oc_nutrition);
     return 1;
 }

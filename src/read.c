@@ -209,7 +209,7 @@ doread(VOID_ARGS)
                 livelog_printf(LL_CONDUCT, "%s",
                     "became literate by reading a fortune cookie");
 
-        Sprintf(priority_debug_buf_2, "doread: %d", scroll->otyp);
+        debugprint("doread: %d", scroll->otyp);
         useup(scroll);
         return 1;
     } 
@@ -353,7 +353,7 @@ doread(VOID_ARGS)
         if(Hallucination)
             pline_ex1(ATR_NONE, CLR_MSG_TEXT, "\"1 Zorkmid.  857 GUE.  In Frobs We Trust.\"");
         else
-            pline_ex1(ATR_NONE, CLR_MSG_TEXT, "\"1 Yendorian Gold Coin.  Treasury of Yendor.\"");
+            pline_ex(ATR_NONE, CLR_MSG_TEXT, "\"1 Gold Piece.  %d.  Treasury of Yendor.\"", 342 + 100 * ((int)scroll->o_id % 10) + 10 * ((int)scroll->o_id % 50) + ((int)scroll->o_id % 5) + ((int)scroll->o_id % 3));
 
         if (!u.uconduct.literate++)
             livelog_printf(LL_CONDUCT, "%s",
@@ -495,15 +495,21 @@ doread(VOID_ARGS)
     struct monst* shkp = 0;
     if (scroll->unpaid && costly_spot(u.ux, u.uy))
     {
+        debugprint_pos();
         char* o_shop = in_rooms(u.ux, u.uy, SHOPBASE);
         shkp = shop_keeper(*o_shop);
+        debugprint_pos();
         if (shkp && inhishop(shkp) && is_obj_on_shk_bill(scroll, shkp))
         {
             billable_scroll = TRUE;
         }
     }
 
-    if (!(gone = seffects(scroll, &effect_happened, &youmonst)))
+    int trackidx = add_to_obj_tracking(scroll);
+    gone = seffects(scroll, &effect_happened, &youmonst);
+    if (finish_obj_tracking(trackidx))
+        gone = TRUE;
+    if (!gone)
     {
         if (!objects[scroll->otyp].oc_name_known)
         {
@@ -515,7 +521,7 @@ doread(VOID_ARGS)
         scroll->in_use = FALSE;
         if (scroll->otyp != SCR_BLANK_PAPER && scroll->otyp != SCR_IDENTIFY)
         {
-            Sprintf(priority_debug_buf_2, "doread2: %d", scroll->otyp);
+            debugprint("doread2: %d", scroll->otyp);
             useup(scroll);
             gone = TRUE;
         }
@@ -1297,10 +1303,8 @@ boolean dopopup;
                 hcolor_multi_buf3((Blind || same_color) ? "" : scursed ? NH_BLACK
                     : NH_SILVER),
                 otense(otmp, "evaporate"));
-            remove_worn_item(otmp, FALSE);
-            Sprintf(priority_debug_buf_2, "seffects: %d", otmp->otyp);
-            Strcpy(priority_debug_buf_3, "seffects");
-            Strcpy(priority_debug_buf_4, "seffects");
+            debugprint("seffects: %d", otmp->otyp);
+            (void)remove_worn_item(otmp, FALSE);
             useup(otmp);
             return;
         }
@@ -1409,7 +1413,7 @@ boolean dopopup;
             if (is_on)
                 Ring_gone(obj);
             s = rnd(3 * abs(obj->enchantment)); /* amount of damage */
-            Sprintf(priority_debug_buf_2, "enchant_ring: %d", obj->otyp);
+            debugprint("enchant_ring: %d", obj->otyp);
             useup(obj);
             losehp(adjust_damage(s, (struct monst*)0, &youmonst, AD_PHYS, ADFLAGS_NONE), "exploding ring", KILLED_BY_AN);
         }
@@ -1672,6 +1676,7 @@ int howmuch;
      * thing to do is to run it through the vision system again, which
      * is always correct.
      */
+    debugprint_pos();
     docrt(); /* this correctly will reset vision */
 }
 
@@ -1697,7 +1702,7 @@ struct monst* origmonst;
     {
         if (mtmp->isshk)
             make_happy_shk(mtmp, FALSE);
-        else if (is_tame(mtmp) && !is_charmed(mtmp))
+        else if (is_tame(mtmp) && !is_charmed_or_controlled(mtmp))
         {
             /* already as tame as it gets */
             return 0;
@@ -1717,8 +1722,6 @@ struct monst* origmonst;
                 duration += existing_charmed_duration;
                 duration += d(objects[sobj->otyp].oc_spell_dur_dice, objects[sobj->otyp].oc_spell_dur_diesize) + objects[sobj->otyp].oc_spell_dur_plus;
                 charmed = 1;
-                if (is_tame(mtmp) && !was_tame)
-                    u.uconduct.pets++;
             }
 
             /* tame dog verbosely */
@@ -1782,8 +1785,6 @@ struct monst* origmonst;
                 duration += existing_control_duration;
                 duration += d(objects[sobj->otyp].oc_spell_dur_dice, objects[sobj->otyp].oc_spell_dur_diesize) + objects[sobj->otyp].oc_spell_dur_plus;
                 controlled = 2;
-                if (is_tame(mtmp) && !was_tame)
-                    u.uconduct.pets++;
             }
 
             /* tame dog verbosely */
@@ -1903,7 +1904,7 @@ struct monst* targetmonst;
                 "This seems to be junk mail addressed to the finder of the Eye of Larn.");
         else
         {
-#ifdef MAIL
+#if defined(MAIL) && !defined(GNH_MOBILE)
             readmail(sobj);
 #else
             pline("This scroll is mail, but it is totally scrambled.");
@@ -2043,9 +2044,7 @@ struct monst* targetmonst;
         //                : NH_SILVER),
         //            otense(otmp, "evaporate"));
         //        remove_worn_item(otmp, FALSE);
-        //        Sprintf(priority_debug_buf_2, "seffects: %d", otmp->otyp);
-        //        Strcpy(priority_debug_buf_3, "seffects");
-        //        Strcpy(priority_debug_buf_4, "seffects");
+        //        debugprint("seffects: %d", otmp->otyp);
         //        useup(otmp);
         //        break;
         //    }
@@ -2822,7 +2821,7 @@ struct monst* targetmonst;
         if (confused)
         {
             pline_ex(ATR_NONE, NO_COLOR, "The scroll disappears.");
-            Sprintf(priority_debug_buf_2, "seffects2: %d", sobj->otyp);
+            debugprint("seffects2: %d", sobj->otyp);
             useup(sobj);
             sobj = 0; /* it's gone */
             break;
@@ -2836,7 +2835,7 @@ struct monst* targetmonst;
             if (res > 0)
             {
                 pline_ex(ATR_NONE, NO_COLOR, "The scroll disappears.");
-                Sprintf(priority_debug_buf_2, "seffects3: %d", sobj->otyp);
+                debugprint("seffects3: %d", sobj->otyp);
                 useup(sobj);
                 sobj = 0; /* it's gone */
             }
@@ -2953,7 +2952,7 @@ struct monst* targetmonst;
             /* use it up now to prevent it from showing in the
                getobj picklist because the "disappears" message
                was already delivered */
-            Sprintf(priority_debug_buf_2, "seffects4: %d", sobj->otyp);
+            debugprint("seffects4: %d", sobj->otyp);
             useup(sobj);
             sobj = 0; /* it's gone */
         }
@@ -3128,11 +3127,17 @@ struct monst* targetmonst;
         }
         if (sblessed) {
             register int x, y;
-
+            boolean foundsdoor = FALSE;
             for (x = 1; x < COLNO; x++)
                 for (y = 0; y < ROWNO; y++)
                     if (levl[x][y].typ == SDOOR)
+                    {
                         cvt_sdoor_to_door(x, y);
+                        foundsdoor = TRUE;
+                    }
+            if (foundsdoor)
+                issue_achievement(GUI_ACHIEVEMENT_FOUND_SECRET_DOOR_OR_PASSAGE);
+
             /* do_mapping() already reveals secret passages */
         }
         known = TRUE;
@@ -3219,7 +3224,7 @@ struct monst* targetmonst;
 
         cc.x = u.ux;
         cc.y = u.uy;
-        Sprintf(priority_debug_buf_2, "seffects5: %d", sobj->otyp);
+        debugprint("seffects5: %d", sobj->otyp);
         useup(sobj);
         sobj = 0; /* it's gone */
         if (!already_known)
@@ -3637,11 +3642,11 @@ boolean confused, byu;
         }
         wake_nearto(x, y, 4 * 4);
     } else if (u.uswallow && mtmp == u.ustuck) {
-        Sprintf(priority_debug_buf_4, "drop_boulder_on_monster: %d", otmp2->otyp);
+        debugprint("drop_boulder_on_monster: %d", otmp2->otyp);
         obfree(otmp2, (struct obj *) 0);
         /* fall through to player */
         drop_boulder_on_player(confused, TRUE, FALSE, TRUE);
-        return 1;
+        return TRUE;
     }
     /* Drop the rock/boulder to the floor */
     if (!flooreffects(otmp2, x, y, "fall")) {
@@ -3708,7 +3713,7 @@ int chg; /* recharging */
         pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s %s explodes!", Yname2(obj), expl);
         losehp(adjust_damage(dmg, (struct monst*)0, &youmonst, AD_MAGM, ADFLAGS_SPELL_DAMAGE), "exploding wand", KILLED_BY_AN);
     }
-    Sprintf(priority_debug_buf_2, "wand_explode: %d", obj->otyp);
+    debugprint("wand_explode: %d", obj->otyp);
     useup(obj);
     /* obscure side-effect */
     exercise(A_STR, FALSE);
@@ -3827,6 +3832,7 @@ struct obj *obj;
      *  correctly update all previously seen positions *and* correctly
      *  set the waslit bit [could be messed up from above].
      */
+    debugprint_pos();
     if (!Blind) {
         vision_recalc(2);
 
@@ -3840,6 +3846,7 @@ struct obj *obj;
         struct litmon *gremlin;
 
         /* can't delay vision recalc after all */
+        debugprint_pos();
         vision_recalc(0);
         /* after vision has been updated, monsters who are affected
            when hit by light can now be hit by it */
@@ -3995,6 +4002,7 @@ do_class_genocide()
                     kill_genocided_monsters();
                     update_inventory(); /* eggs & tins */
                     pline("Wiped out all %s.", nam);
+                    issue_achievement(GUI_ACHIEVEMENT_GENOCIDED_MONSTERS);
 
                     if (!ll_done++) 
                     {
@@ -4222,6 +4230,7 @@ int how;
         mvitals[mndx].mvflags |= (MV_GENOCIDED | MV_NOCORPSE);
         pline("Wiped out %s%s.", which, pluralbuf);
               //(*which != 'a') ? buf : makeplural(buf));
+        issue_achievement(GUI_ACHIEVEMENT_GENOCIDED_MONSTERS);
 
         if (!u.uconduct.genocides++)
             livelog_printf(LL_CONDUCT | LL_GENOCIDE,
@@ -4325,9 +4334,9 @@ struct obj *sobj;
         || unsolid(youmonst.data) || is_incorporeal(youmonst.data)) {
         if (!reuse_ball) {
             pline("A ball and chain appears, then falls away.");
-            dropy(mkobj(BALL_CLASS, TRUE, FALSE));
+            (void)dropy(mkobj(BALL_CLASS, TRUE, FALSE));
         } else {
-            dropy(reuse_ball);
+            (void)dropy(reuse_ball);
         }
         return;
     }
@@ -4358,7 +4367,7 @@ unpunish()
 {
     struct obj *savechain = uchain;
 
-    Strcpy(debug_buf_2, "unpunish");
+    debugprint("unpunish");
     obj_extract_self(uchain);
     newsym(uchain->ox, uchain->oy);
     setworn((struct obj *) 0, W_CHAIN);
@@ -4704,7 +4713,7 @@ boolean confused; /* Is caster confused */
     {
         char qbuf[BUFSZ];
         Sprintf(qbuf, "What would you like to %s?", (otyp == SPE_BLESS ? "bless" : "curse"));
-        n = query_objlist(qbuf, &objchn, (SIGNAL_NOMENU | SIGNAL_ESCAPE | USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON),
+        n = query_objlist(qbuf, &objchn, (SIGNAL_NOMENU | SIGNAL_ESCAPE | USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON | SHOW_QUICK),
             &pick_list, PICK_ONE, allow_all_but_coins, SHOWWEIGHTS_NONE);
         if (n && pick_list && pick_list[0].item.a_obj)
         {

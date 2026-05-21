@@ -111,9 +111,9 @@ register struct monst *mtmp;
     ygold = findgold(invent);
 
     if (fgold && (!ygold || fgold->quan > ygold->quan || !rn2(5))) {
-        Strcpy(debug_buf_2, "stealgold");
+        debugprint("stealgold");
         obj_extract_self(fgold);
-        add_to_minv(mtmp, fgold);
+        (void)add_to_minv(mtmp, fgold);
         newsym(u.ux, u.uy);
         if (u.usteed) {
             who = u.usteed;
@@ -147,9 +147,9 @@ register struct monst *mtmp;
         if (tmp < ygold->quan)
             ygold = splitobj(ygold, tmp);
         else
-            setnotworn(ygold);
+            (void)setnotworn(ygold);
         freeinv(ygold);
-        add_to_minv(mtmp, ygold);
+        (void)add_to_minv(mtmp, ygold);
 
         if (isok(u.ux, u.uy))
         {
@@ -187,6 +187,7 @@ stealarm(VOID_ARGS)
                         impossible("stealarm(): dead monster stealing");
                     if (!dmgtype(mtmp->data, AD_SITM)) /* polymorphed */
                         goto botm;
+                    debugprint_pos();
                     if (otmp->unpaid)
                         subfrombill(otmp, shop_keeper(*u.ushops));
                     freeinv(otmp);
@@ -210,20 +211,85 @@ botm:
     return 0;
 }
 
+int
+add_to_obj_tracking(obj)
+struct obj* obj;
+{
+    if (!obj)
+        return -1;
+    iflags.object_tracking_item_index++;
+    int saved_item_idx = iflags.object_tracking_item_index - 1;
+    if (saved_item_idx >= MAX_TRACKED_OBJECTS)
+    {
+        debugprint("add_to_obj_tracking with saved_item_idx >= MAX_TRACKED_OBJECTS: idx=%d, maxidx=%d", saved_item_idx, iflags.object_tracking_item_index);
+        // saved_item_idx = MAX_TRACKED_OBJECTS - 1;
+        /* Changed to reset the object_tracking_item_index to 1 so that an omitted finish_obj_tracking does not make the system inoperational */
+        /* This also has the effect of not checking any previous trackings beyond the presently set one */
+        /* Should never happen unless there is a programming error, as MAX_TRACKED_OBJECTS is more than enough to cover all tracking cases */
+        iflags.object_tracking_item_index = 1;
+        saved_item_idx = 0;
+    }
+    iflags.tracked_object_obj[saved_item_idx] = obj;
+    iflags.tracked_object_gone[saved_item_idx] = FALSE;
+    return saved_item_idx;
+}
+
+boolean
+finish_obj_tracking(saved_item_idx)
+int saved_item_idx;
+{
+    if (saved_item_idx < 0)
+        return FALSE; /* No object was destroyed since obj was zero */
+    if (saved_item_idx >= MAX_TRACKED_OBJECTS)
+    {
+        debugprint("finish_obj_tracking with saved_item_idx >= MAX_TRACKED_OBJECTS: idx=%d, maxidx=%d", saved_item_idx, iflags.object_tracking_item_index);
+        iflags.object_tracking_item_index--;
+        if (iflags.object_tracking_item_index < 0)
+            iflags.object_tracking_item_index = 0;
+        return FALSE; /* Some problem occurred */
+    }
+
+    if (iflags.tracked_object_obj[saved_item_idx] == 0) /* Should not happen */
+        debugprint("finish_obj_tracking with zero obj: idx=%d, maxidx=%d", saved_item_idx, iflags.object_tracking_item_index);
+
+    boolean obj_gone = iflags.tracked_object_gone[saved_item_idx];
+    iflags.tracked_object_obj[saved_item_idx] = 0;
+    iflags.tracked_object_gone[saved_item_idx] = FALSE;
+    iflags.object_tracking_item_index--;
+    if (iflags.object_tracking_item_index < 0)
+        iflags.object_tracking_item_index = 0;
+    return obj_gone;
+}
+
 /* An object you're wearing has been taken off by a monster (theft or
    seduction).  Also used if a worn item gets transformed (stone to flesh). */
-void
+boolean
 remove_worn_item(obj, unchain_ball)
+struct obj* obj;
+boolean unchain_ball; /* whether to unpunish or just unwield */
+{
+    return remove_worn_item_ex(obj, unchain_ball, FALSE);
+}
+
+boolean
+remove_worn_item_ex(obj, unchain_ball, being_taken_away)
 struct obj *obj;
 boolean unchain_ball; /* whether to unpunish or just unwield */
+boolean being_taken_away; /* shoud not be destroyed by lava_effects etc. */
 {
     if (donning(obj))
         cancel_don();
     if (!obj->owornmask)
-        return;
+        return FALSE;
+    boolean had_flag = (obj->item_flags & ITEM_FLAGS_LAVA_EFFECTS_SKIP) != 0;
+    int saved_item_idx = add_to_obj_tracking(obj);
+    if (being_taken_away && !had_flag)
+        obj->item_flags |= ITEM_FLAGS_LAVA_EFFECTS_SKIP;
 
-    if (obj->owornmask & W_ARMOR) {
-        if (obj == uskin) {
+    if (obj->owornmask & W_ARMOR)
+    {
+        if (obj == uskin) 
+        {
             impossible("Removing embedded scales?");
             skinback(TRUE); /* uarm = uskin; uskin = 0; */
         }
@@ -250,15 +316,25 @@ boolean unchain_ball; /* whether to unpunish or just unwield */
         /* catchall -- should never happen, except for uarms with non-shields & non-weapons */
         else
             setworn((struct obj *) 0, obj->owornmask & W_ARMOR);
-    } else if (obj->owornmask & W_AMUL) {
+    }
+    else if (obj->owornmask & W_AMUL) 
+    {
         Amulet_off();
-    } else if (obj->owornmask & W_MISCITEMS) {
+    }
+    else if (obj->owornmask & W_MISCITEMS)
+    {
         MiscellaneousItem_off(obj);
-    } else if (obj->owornmask & W_RING) {
+    }
+    else if (obj->owornmask & W_RING) 
+    {
         Ring_gone(obj);
-    } else if (obj->owornmask & W_BLINDFOLD) {
+    } 
+    else if (obj->owornmask & W_BLINDFOLD) 
+    {
         Blindf_off(obj);
-    } else if (obj->owornmask & W_WEAPON) {
+    }
+    else if (obj->owornmask & W_WEAPON)
+    {
         if (obj == uwep)
             uwepgone();
         if (obj == uarms)
@@ -271,13 +347,21 @@ boolean unchain_ball; /* whether to unpunish or just unwield */
             uqwepgone();
     }
 
-    if (obj->owornmask & (W_BALL | W_CHAIN)) {
+    if (obj->owornmask & (W_BALL | W_CHAIN))
+    {
         if (unchain_ball)
             unpunish();
-    } else if (obj->owornmask) {
-        /* catchall */
-        setnotworn(obj);
     }
+    else if (obj->owornmask) 
+    {
+        /* catchall */
+        (void)setnotworn(obj);
+    }
+    boolean obj_gone = finish_obj_tracking(saved_item_idx);
+    if (!obj_gone && being_taken_away && !had_flag)
+        obj->item_flags &= ~ITEM_FLAGS_LAVA_EFFECTS_SKIP;
+
+    return obj_gone;
 }
 
 
@@ -425,6 +509,7 @@ gotobj:
     if (uarms && is_shield(uarms))
         wmask |= W_ARMS;
 
+    boolean ogone = FALSE;
     if (otmp->owornmask & wmask) {
         switch (otmp->oclass) {
         case TOOL_CLASS:
@@ -432,7 +517,7 @@ gotobj:
         case MISCELLANEOUS_CLASS:
         case RING_CLASS:
         case FOOD_CLASS: /* meat ring */
-            remove_worn_item(otmp, TRUE);
+            ogone = remove_worn_item_ex(otmp, TRUE, TRUE);
             break;
         case ARMOR_CLASS:
             armordelay = objects[otmp->otyp].oc_delay;
@@ -443,7 +528,7 @@ gotobj:
                    to take off items which require extra time */
                 if (armordelay >= 1 && !olddelay && rn2(10))
                     goto cant_take;
-                remove_worn_item(otmp, TRUE);
+                ogone = remove_worn_item(otmp, TRUE);
                 break;
             } else {
                 int curssv = otmp->cursed;
@@ -479,17 +564,20 @@ gotobj:
                 nomovemsg = 0;
                 nomovemsg_attr = ATR_NONE;
                 nomovemsg_color = NO_COLOR;
-                remove_worn_item(otmp, TRUE);
-                otmp->cursed = curssv;
-                if (multi < 0) {
-                    /*
-                    multi = 0;
-                    afternmv = 0;
-                    */
-                    stealoid = otmp->o_id;
-                    stealmid = mtmp->m_id;
-                    afternmv = stealarm;
-                    return 0;
+                ogone = remove_worn_item_ex(otmp, TRUE, TRUE);
+                if (!ogone)
+                {
+                    otmp->cursed = curssv;
+                    if (multi < 0) {
+                        /*
+                        multi = 0;
+                        afternmv = 0;
+                        */
+                        stealoid = otmp->o_id;
+                        stealmid = mtmp->m_id;
+                        afternmv = stealarm;
+                        return 0;
+                    }
                 }
             }
             break;
@@ -498,7 +586,7 @@ gotobj:
                        otmp->oclass);
         }
     } else if (otmp->owornmask)
-        remove_worn_item(otmp, TRUE);
+        ogone = remove_worn_item_ex(otmp, TRUE, TRUE);
 
     /* do this before removing it from inventory */
     if (objnambuf)
@@ -508,6 +596,7 @@ gotobj:
      */
     mtmp->mavenge = 1;
 
+    debugprint_pos();
     if (otmp->unpaid)
         subfrombill(otmp, shop_keeper(*u.ushops));
     freeinv(otmp);
@@ -516,11 +605,11 @@ gotobj:
     could_petrify =
         (otmp->otyp == CORPSE && otmp->corpsenm >= LOW_PM && touch_petrifies(&mons[otmp->corpsenm]));
     (void) mpickobj(mtmp, otmp); /* may free otmp */
-
-    if (could_petrify && !(mtmp->worn_item_flags & W_ARMG))
+    if (could_petrify && !resists_ston(mtmp) && !(mtmp->worn_item_flags & W_ARMG))
     {
         start_delayed_petrification(mtmp, FALSE);
     }
+
     if(mtmp->mnum == PM_HARPY)
         standard_hint("You can use a wand of slow monster on the harpy, or a wand of lightning to blind the harpy, and then kill it with ranged weapons. Consider also genociding harpies as early as possible.", &u.uhint.stuff_got_stolen_by_harpy);
     else
@@ -528,13 +617,13 @@ gotobj:
     return (multi < 0) ? 0 : 1;
 }
 
-/* Returns 1 if otmp is free'd, 0 otherwise. */
-int
+/* Returns TRUE if otmp is free'd, FALSE otherwise. */
+boolean
 mpickobj(mtmp, otmp)
 register struct monst *mtmp;
 register struct obj *otmp;
 {
-    int freed_otmp;
+    boolean freed_otmp;
     boolean snuff_otmp = FALSE;
 
     /* if monster is acquiring a thrown or kicked object, the throwing
@@ -642,39 +731,48 @@ struct monst *mtmp;
     { /* we have something to snatch */
         /* take off outer gear if we're targetting [hypothetical]
            quest artifact suit, shirt, gloves, or rings */
+        int trackidx = add_to_obj_tracking(otmp);
         if ((otmp == uarm || otmp == uarmo || otmp == uarmu) && uarmc)
-            remove_worn_item(uarmc, FALSE);
+            (void)remove_worn_item(uarmc, FALSE);
         if ((otmp == uarm || otmp == uarmu) && uarmo)
-            remove_worn_item(uarmo, FALSE);
+            (void)remove_worn_item(uarmo, FALSE);
         if (otmp == uarmu && uarm)
-            remove_worn_item(uarm, FALSE);
+            (void)remove_worn_item(uarm, FALSE);
         if ((otmp == uarmg || ((otmp == uright || otmp == uleft) && uarmg))
             && uwep) {
             /* gloves are about to be unworn; unwield weapon first */
-            remove_worn_item(uwep, FALSE);
+            (void)remove_worn_item(uwep, FALSE);
         }
         if ((otmp == uarmg || ((otmp == uright || otmp == uleft) && uarmg))
             && uarms) {
             /* gloves are about to be unworn; unwield shields & left hand weapon */
-            remove_worn_item(uarms, FALSE);
+            (void)remove_worn_item(uarms, FALSE);
         }
         if ((otmp == uright || otmp == uleft) && uarmg)
             /* calls Gloves_off() to handle wielded cockatrice corpse */
-            remove_worn_item(uarmg, FALSE);
+            (void)remove_worn_item(uarmg, FALSE);
 
-        /* finally, steal the target item */
-        if (otmp->owornmask)
-            remove_worn_item(otmp, TRUE);
-        if (otmp->unpaid)
-            subfrombill(otmp, shop_keeper(*u.ushops));
-        freeinv(otmp);
-        Strcpy(buf, doname(otmp));
-        (void) mpickobj(mtmp, otmp); /* could merge and free otmp but won't */
-        play_sfx_sound(SFX_STEAL_ITEM);
-        pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s steals %s!", Monnam(mtmp), buf);
-        if (has_teleportation(mtmp) && !tele_restrict(mtmp))
+        boolean ogone = finish_obj_tracking(trackidx);
+        if (!ogone)
         {
-            (void)rloc2(mtmp, TRUE, TRUE);
+            /* finally, steal the target item */
+            if (otmp->owornmask)
+                ogone = remove_worn_item_ex(otmp, TRUE, TRUE);
+            if (!ogone)
+            {
+                debugprint_pos();
+                if (otmp->unpaid)
+                    subfrombill(otmp, shop_keeper(*u.ushops));
+                freeinv(otmp);
+                Strcpy(buf, doname(otmp));
+                (void)mpickobj(mtmp, otmp); /* could merge and free otmp but won't */
+                play_sfx_sound(SFX_STEAL_ITEM);
+                pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s steals %s!", Monnam(mtmp), buf);
+                if (has_teleportation(mtmp) && !tele_restrict(mtmp))
+                {
+                    (void)rloc2(mtmp, TRUE, TRUE);
+                }
+            }
         }
     }
 }
@@ -693,27 +791,33 @@ int ochance, achance; /* percent chance for ordinary item, artifact */
         return;
 
     if (carried(obj)) {
+        boolean ogone = FALSE;
         if (obj->owornmask)
-            remove_worn_item(obj, TRUE);
-        if (obj->unpaid)
-            subfrombill(obj, shop_keeper(*u.ushops));
-        if (cansee(mon->mx, mon->my)) {
-            const char *MonName = Monnam(mon);
+            ogone = remove_worn_item(obj, TRUE);
+        if (!ogone)
+        {
+            debugprint_pos();
+            if (obj->unpaid)
+                subfrombill(obj, shop_keeper(*u.ushops));
+            if (cansee(mon->mx, mon->my)) {
+                const char* MonName = Monnam(mon);
 
-            /* mon might be invisible; avoid "It pulls ... and absorbs it!" */
-            if (!strcmp(MonName, "It"))
-                MonName = "Something";
-            pline("%s pulls %s away from you and absorbs %s!", MonName,
-                  yname(obj), (obj->quan > 1L) ? "them" : "it");
-        } else {
-            const char *hand_s = body_part(HAND);
+                /* mon might be invisible; avoid "It pulls ... and absorbs it!" */
+                if (!strcmp(MonName, "It"))
+                    MonName = "Something";
+                pline("%s pulls %s away from you and absorbs %s!", MonName,
+                    yname(obj), (obj->quan > 1L) ? "them" : "it");
+            }
+            else {
+                const char* hand_s = body_part(HAND);
 
-            if (bimanual(obj))
-                hand_s = makeplural(hand_s);
-            pline("%s %s pulled from your %s!", upstart(yname(obj)),
-                  otense(obj, "are"), hand_s);
+                if (bimanual(obj))
+                    hand_s = makeplural(hand_s);
+                pline("%s %s pulled from your %s!", upstart(yname(obj)),
+                    otense(obj, "are"), hand_s);
+            }
+            freeinv(obj);
         }
-        freeinv(obj);
     } else {
         /* not carried; presumably thrown or kicked */
         if (canspotmon(mon))
@@ -802,7 +906,7 @@ struct monst *mon;
         if (is_obj_unremovable_from_the_game(obj) || is_quest_artifact(obj))
         {
             obj->item_flags &= ~ITEM_FLAGS_GIVEN_BY_HERO;
-            Strcpy(debug_buf_2, "mdrop_special_objs");
+            debugprint("mdrop_special_objs");
             obj_extract_self(obj);
             if (mon->mx) 
             {
@@ -841,15 +945,14 @@ boolean is_mon_dead;
         if (canspotmon(mtmp))
             pline("%s gold %s.", s_suffix(Monnam(mtmp)),
                   canseemon(mtmp) ? "vanishes" : "seems to vanish");
-        Strcpy(debug_buf_2, "release_monster_objects1");
+        debugprint("release_monster_objects1: %d", otmp->otyp);
         obj_extract_self(otmp);
-        Sprintf(priority_debug_buf_4, "release_monster_objects: %d", otmp->otyp);
         obfree(otmp, (struct obj *) 0);
     } /* isgd && has gold */
 
     while ((otmp = (is_pet ? droppables(mtmp) : mtmp->minvent)) != 0) 
     {
-        Strcpy(debug_buf_2, "release_monster_objects2");
+        debugprint("release_monster_objects2: %d", otmp->otyp);
         obj_extract_self(otmp);
         if (((otmp->speflags & SPEFLAGS_CLONED_ITEM) || ((mtmp->issummoned || mtmp->ispartymember) && (!is_mon_dead || otmp->oclass == COIN_CLASS)))
             /* When leaving without dying, summoned and joined monsters take their possessions with them, except central artifacts 
@@ -905,7 +1008,7 @@ boolean is_mon_dead;
             {
                 artifact_taken_away(otmp->oartifact); //It can now be generated again some time later
             }
-            Sprintf(priority_debug_buf_4, "release_monster_objects2: %d", otmp->otyp);
+            debugprint("release_monster_objects3: %d", otmp->otyp);
             obfree(otmp, (struct obj*) 0); //Delete the item
         }
         else
@@ -925,7 +1028,7 @@ struct monst* mtmp;
     struct obj* otmp;
     int omx = mtmp->mx, omy = mtmp->my;
 
-    Strcpy(debug_buf_2, "mdrop_droppable_objs");
+    debugprint("mdrop_droppable_objs");
     while ((otmp = droppables(mtmp)) != 0)
     {
         obj_extract_self(otmp);

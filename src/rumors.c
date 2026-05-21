@@ -505,7 +505,7 @@ void
 restore_oracles(fd)
 int fd;
 {
-    Strcpy(debug_buf_4, "restore_oracles");
+    //debugprint("restore_oracles");
     mread(fd, (genericptr_t) &oracle_cnt, sizeof oracle_cnt);
     if (oracle_cnt) {
         oracle_loc = (int64_t *) alloc(oracle_cnt * sizeof(int64_t));
@@ -738,6 +738,7 @@ struct monst *oracl;
     {
         //achievement_gained("Consulted the Oracle");
         u.uachieve.consulted_oracle = 1;
+        issue_achievement(GUI_ACHIEVEMENT_CONSULTED_ORACLE);
     }
 
     return 1;

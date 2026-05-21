@@ -376,9 +376,6 @@ mkdesertedshop()
             i = 0;
     }
 
-    /* Change temporarily to so mimics look correct */
-    sroom->rtype = SHOPBASE + i;
-
     /* Change floor */
     int x, y;
     enum floor_subtypes lsubtype = !rn2(2) ? FLOOR_SUBTYPE_PARQUET : FLOOR_SUBTYPE_MARBLE;
@@ -400,13 +397,16 @@ mkdesertedshop()
     /* set room bits before stocking the shop */
     topologize(sroom);
 
-    /* stock the room with a shopkeeper and artifacts */
-    stock_room(i, sroom, TRUE);
+    /* Change temporarily to so mimics look correct */
+    sroom->rtype = SHOPBASE + i;
 
-    context.made_deserted_shop = 1;
+    /* stock the room with items and mimics */
+    stock_room(i, sroom, TRUE);
 
     /* Change back to get the right message */
     sroom->rtype = DESERTEDSHOP;
+
+    context.made_deserted_shop = 1;
 
     /* Remove doodads */
     for (x = sroom->lx - 1; x <= sroom->hx + 1; x++)
@@ -453,6 +453,8 @@ STATIC_OVL int
 mkzoo(type)
 int type;
 {
+    debugprint("mkzoo: %d", type);
+
     register struct mkroom *sroom;
     int x, y;
 
@@ -611,6 +613,7 @@ struct mkroom *sroom;
     int rmno = (int) ((sroom - rooms) + ROOMOFFSET);
     coord mm;
     int librarytype = 0;
+    debugprint("fill_zoo: %d", type);
 
     register int roll = rn2(4);
     int hd = level_difficulty();
@@ -1189,6 +1192,7 @@ int mm_flags;
     struct obj *otmp;
     coord cc;
     struct monst* mtmp;
+    debugprint("mkundead");
 
     context.makemon_spef_idx = 0;
     while (cnt--) {
@@ -1331,6 +1335,7 @@ mkswamp() /* Michiel Huisjes & Fred de Wilde */
     register struct mkroom *sroom;
     register int sx, sy, i, eelct = 0;
     int swampnumber = 0;
+    debugprint("mkswamp");
 
     for (i = 0; i < 5; i++) { /* turn up to 5 rooms swampy */
         sroom = &rooms[rn2(nroom)];
@@ -1381,16 +1386,20 @@ mkswamp() /* Michiel Huisjes & Fred de Wilde */
                     }
                     else if (!rn2(4)) /* swamps tend to be moldy */
                         (void)makemon(mkclass(S_FUNGUS, 0), sx, sy, NO_MM_FLAGS);
-                    else if (!rn2(8)) /* swamps may have cloudberries */
+                    else if (!rn2(8)) /* swamps may have dragon fruits */
                         (void)mksobj_at(DRAGON_FRUIT, sx, sy, TRUE, FALSE);
                     else if (!rn2(10)) /* swamps may have cloudberries */
                         (void)mksobj_at(CLOUDBERRY, sx, sy, TRUE, FALSE);
-                    else if (!rn2(10)) /* swamps may have cloudberries */
+                    else if (!rn2(10)) /* swamps may have panther caps */
                         (void)mksobj_at(PANTHER_CAP, sx, sy, TRUE, FALSE);
-                    else if (!rn2(10)) /* swamps may have cloudberries */
+                    else if (!rn2(10)) /* swamps may have death caps */
                         (void)mksobj_at(DEATH_CAP, sx, sy, TRUE, FALSE);
-                    else if (!rn2(8)) /* swamps may have cloudberries */
-                        (void)mksobj_at(!rn2(4) ? CHANTERELLE : !rn2(3) ? PENNY_BUN : !rn2(2) ? CHAMPIGNON : FLY_AGARIC, sx, sy, TRUE, FALSE);
+                    else if (!rn2(7)) /* swamps may have chanterelles */
+                        (void)mksobj_at(CHANTERELLE, sx, sy, TRUE, FALSE);
+                    else if (!rn2(7)) /* swamps may have penny buns */
+                        (void)mksobj_at(PENNY_BUN, sx, sy, TRUE, FALSE);
+                    else if (!rn2(7)) /* swamps may have other mushrooms */
+                        (void)mksobj_at(!rn2(2) ? CHAMPIGNON : FLY_AGARIC, sx, sy, TRUE, FALSE);
                     else if (!rn2(50)) /* swamps may have phantomberries */
                         (void)mksobj_at(PHANTOMBERRY, sx, sy, TRUE, FALSE);
                 }
@@ -1410,6 +1419,7 @@ mkgarden()
 {
     register struct mkroom* sroom = (struct mkroom*)0;
     register int sx, sy, i;
+    debugprint("mkgarden");
 
     for (i = 0; i < nroom; i++) { /* turn up to 1 rooms gardenlike */
         sroom = &rooms[rn2(nroom)];
@@ -1671,6 +1681,7 @@ mkdragonlair()
 {
     register struct mkroom* sroom = (struct mkroom*)0;
     register int sx, sy, i, j;
+    debugprint("mkdragonlair");
 
     for (i = 0; i < nroom; i++) { /* turn up to 1 rooms into a dragon lair */
         sroom = &rooms[rn2(nroom)];
@@ -1893,6 +1904,7 @@ mktemple()
     if (!(sroom = pick_room(TRUE)))
         return 0;
 
+    debugprint("mktemple");
     /* set up Priest and shrine */
     sroom->rtype = TEMPLE;
     /*
@@ -2021,6 +2033,7 @@ mksmithy()
     if (!(sroom = pick_room(TRUE)))
         return 0;
 
+    debugprint("mksmithy");
     /* set up the smith and the smithy */
     sroom->rtype = SMITHY;
     /*
@@ -2093,6 +2106,7 @@ int npctyp;
     if (!(sroom = pick_room(TRUE)))
         return 0;
 
+    debugprint("mknpcroom");
     sroom->rtype = NPCROOM;
 
     schar u_depth = depth(&u.uz);
@@ -2771,7 +2785,7 @@ int fd;
 struct mkroom *r;
 {
     short i;
-    Strcpy(debug_buf_4, "rest_room");
+    //debugprint("rest_room");
 
     mread(fd, (genericptr_t) r, sizeof(struct mkroom));
     for (i = 0; i < r->nsubrooms; i++) {

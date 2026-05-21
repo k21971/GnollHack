@@ -213,11 +213,12 @@ VA_DECL(const char *, line)
 #endif /* USE_STDARG | USE_VARARG */
 {       /* start of vpline() or of nested block in USE_OLDARG's pline() */
     static int in_pline = 0;
-    char pbuf[VERYBIGBUFSZ]; /* will get chopped down to BUFSZ-1 if longer */
+    static char pbuf[VERYBIGBUFSZ], combined_line[VERYBIGBUFSZ]; /* will get chopped down to BUFSZ-1 if longer */
+    char multi_line[BIGBUFSZ], attrs[BIGBUFSZ], colors[BIGBUFSZ];
     int ln;
     int msgtyp;
     boolean no_repeat;
-    char multi_line[BIGBUFSZ], combined_line[VERYBIGBUFSZ], attrs[BIGBUFSZ], colors[BIGBUFSZ];
+    pbuf[0] = 0;
     multi_line[0] = 0;
     combined_line[0] = 0;
     attrs[0] = 0;
@@ -416,6 +417,7 @@ VA_DECL(const char *, line)
 
     if (!saving && !restoring && !reseting && !check_pointing && !program_state.in_tricked && !program_state.in_impossible && iflags.window_inited && WIN_MAP != WIN_ERR)
     {
+        debugprint_pos();
         if (vision_full_recalc)
             vision_recalc(0);
     }
@@ -532,6 +534,7 @@ int attr, color;
 
     if (!saving && !restoring && !reseting && !check_pointing && !program_state.in_tricked && !program_state.in_impossible && iflags.window_inited && WIN_MAP != WIN_ERR)
     {
+        debugprint_pos();
         if (vision_full_recalc)
             vision_recalc(0);
     }
@@ -1186,14 +1189,13 @@ VA_DECL(const char *, s)
     {
         Vsprintf(pbuf, s, VA_ARGS);
         pbuf[BUFSZ - 1] = '\0';
-        panic("impossible called impossible: %s, %s", pbuf, debug_buf_1);
+        panic("impossible called impossible: %s", pbuf);
         return;
     }
 
     program_state.in_impossible = 1;
     Vsprintf(pbuf, s, VA_ARGS);
     pbuf[BUFSZ - 1] = '\0'; /* sanity */
-    Strcpy(debug_buf_1, pbuf);
     paniclog("impossible", pbuf);
     if (iflags.debug_fuzzer)
     {
@@ -1202,9 +1204,13 @@ VA_DECL(const char *, s)
     }
     if (issue_gui_command)
     {
-        char dbufs[BUFSZ * 18];
-        Sprintf(dbufs, "%s|P1:%s, P2:%s, P3:%s, P4:%s, B1:%s, B2:%s, B3:%s, B4:%s", pbuf, priority_debug_buf_1, priority_debug_buf_2, priority_debug_buf_3, priority_debug_buf_4, debug_buf_1, debug_buf_2, debug_buf_3, debug_buf_4);
-        issue_gui_command(GUI_CMD_POST_DIAGNOSTIC_DATA, DIAGNOSTIC_DATA_IMPOSSIBLE, 0, dbufs);
+        char* dbufs = allocate_buffer_with_debug_buffers(pbuf);
+        if (dbufs)
+        {
+            issue_debuglog_impossible(0, dbufs);
+            //issue_gui_command(GUI_CMD_POST_DIAGNOSTIC_DATA, DIAGNOSTIC_DATA_IMPOSSIBLE, 0, dbufs);
+            free(dbufs);
+        }
     }
 
     pline_ex(ATR_NONE, CLR_MSG_ERROR, "impossible: %s", VA_PASS1(pbuf));
@@ -1218,6 +1224,87 @@ VA_DECL(const char *, s)
     program_state.in_impossible = 0;
     VA_END();
 }
+
+const char* basefilename(filepath)
+const char* filepath;
+{
+    if (!filepath)
+        return 0;
+    size_t length = strlen(filepath);
+    if (length == 0)
+        return filepath;
+    const char* p = filepath + length;
+    do
+    {
+        p--;
+        if (*p == '\\' || *p == '/')
+            return p + 1;
+    } while (p > filepath);
+    return filepath;
+}
+
+/*VARARGS1*/
+void debugprint
+VA_DECL(const char*, s)
+{
+    if (debug_buf_count < NUM_DEBUGBUFS)
+    {
+        debug_buf_count++;
+    }
+    else
+    {
+        debug_buf_start = (debug_buf_start + 1) % NUM_DEBUGBUFS;
+    }
+    int debug_buf_idx = (debug_buf_start + debug_buf_count - 1) % NUM_DEBUGBUFS;
+    char* pbuf = debug_buf_array[debug_buf_idx];
+    VA_START(s);
+    VA_INIT(s, const char*);
+    Vsnprintf(pbuf, DEBUGBUFSIZ, s, VA_ARGS);
+    pbuf[DEBUGBUFSIZ - 1] = '\0'; /* sanity */
+    VA_END();
+}
+
+char*
+allocate_buffer_with_debug_buffers(message)
+const char* message;
+{
+    char* long_buffer = (char*)alloc((message ? strlen(message) + 3 : 0) + (DEBUGBUFSIZ + 5) * NUM_DEBUGBUFS + 1);
+    if (!long_buffer)
+        return 0;
+
+    char* p = long_buffer;
+    *p = 0;
+
+    int chars_written;
+    if (message)
+    {
+        chars_written = sprintf(p, "%s|", message);
+        if (chars_written >= 0)
+            p += chars_written;
+    }
+    else
+        *long_buffer = 0;
+
+    int i, j = 0;
+    for (i = debug_buf_count - 1; i >= 0; i--)
+    {
+        int idx = (debug_buf_start + i) % NUM_DEBUGBUFS;
+        if (!*debug_buf_array[idx])
+            continue;
+        else
+        {
+            j++;
+            chars_written = sprintf(p, "%s%d:%s", j == 1 ? "" : "; ", j, debug_buf_array[idx]);
+            if (chars_written >= 0)
+                p += chars_written;
+            else
+                break;
+        }
+    }
+
+    return long_buffer;
+}
+
 
 #if defined(MSGHANDLER) && (defined(POSIX_TYPES) || defined(__GNUC__))
 STATIC_VAR boolean use_pline_handler = TRUE;

@@ -102,8 +102,20 @@ namespace GnollHackX
         SetIgnoreStopping,
         StopAllGameSounds,
         SetVolume,
-        RestartGameUponPageDestruction,
-        StopWaitAndExitThread,
+        RestartGameAfterPageDestruction,
+        ForceExitThread,
+        TerminateGnollHackAndRestartGameInNewGamePage,
+        ToggleZoomMini,
+        SetWornShowsEquipment,
+        SetNoPetsPreference,
+        UpdateShortcutLabels,
+        PlayButtonClickSound,
+        PlayMenuSelectSound,
+        GameEnteredMoveloop,
+        ProcessPendingAchievements,
+        SetEngraveQuickText,
+        SetEngraveQuickStyle,
+        SetMetricSystem,
     }
 
     public struct AddContextMenuData

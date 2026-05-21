@@ -661,6 +661,17 @@ int control;
                         next_row[col] |= IN_XRAY_SIGHT;
                         oldseenv = levl[col][row].seenv;
                         levl[col][row].seenv = SVALL; /* see all! */
+                        if (OBJ_AT(col, row))
+                        {
+                            struct obj* obj;
+                            for (obj = o_at(col, row); obj; obj = obj->nexthere)
+                            {
+                                if (!obj->dknown)
+                                {
+                                    obj->dknown = 1;
+                                }
+                            }
+                        }
                         /* Update if previously not in sight or new angle. */
                         if (!(old_row_val & IN_XRAY_SIGHT) || oldseenv != SVALL)
                             newsym(col, row);
@@ -874,6 +885,7 @@ skip:
     viz_rmin = next_rmin;
     viz_rmax = next_rmax;
 
+    debugprint_pos();
     recalc_mapseen();
 }
 
@@ -2818,6 +2830,7 @@ genericptr_t arg;
             return;
         }
 
+        debugprint_pos();
         if (vision_full_recalc)
             vision_recalc(0); /* recalc vision if dirty */
         limits = circle_ptr(range);
@@ -2844,7 +2857,7 @@ howmonseen(mon)
 struct monst *mon;
 {
     boolean useemon = (boolean) canseemon(mon);
-    int xraydist = (u.xray_range < 0) ? -1 : (u.xray_range * u.xray_range);
+    int xraydist = (u.xray_range < 0) ? -1 : ((u.xray_range + 1) * (u.xray_range + 1) - 1); /* Defined by circle_data --JG */
     unsigned how_seen = 0; /* result */
 
     /* normal vision;
@@ -2863,9 +2876,19 @@ struct monst *mon;
     /* telepathy */
     if (tp_sensemon(mon))
         how_seen |= MONSEEN_TELEPAT;
-    /* xray */
-    if (useemon && xraydist > 0 && distu(mon->mx, mon->my) <= xraydist)
-        how_seen |= MONSEEN_XRAYVIS;
+    /* xray and astral */
+    if (useemon && xraydist > 0)
+    {
+        int distance = distu(mon->mx, mon->my);
+        if (distance <= xraydist)
+        {
+            if (Astral_vision && distance <= (ASTRAL_VISION_RANGE + 1) * (ASTRAL_VISION_RANGE + 1) - 1)
+                how_seen |= MONSEEN_ASTRALVIS;
+            
+            if (!Astral_vision /* Insurance */ || (XRay_vision && distance <= (XRAY_VISION_RANGE + 1) * (XRAY_VISION_RANGE + 1) - 1))
+                how_seen |= MONSEEN_XRAYVIS;
+        }
+    }
     /* extended detection */
     if (Detect_monsters)
         how_seen |= MONSEEN_DETECT;

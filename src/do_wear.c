@@ -30,14 +30,14 @@ STATIC_VAR NEARDATA const int64_t wear_order[] = {
 };
 
 STATIC_DCL void FDECL(on_msg, (struct obj *));
-STATIC_DCL void FDECL(toggle_stealth, (struct obj *, int64_t, BOOLEAN_P));
-STATIC_DCL void FDECL(toggle_displacement, (struct obj *, int64_t, BOOLEAN_P));
+STATIC_DCL void FDECL(toggle_stealth, (struct obj *, int, int64_t, BOOLEAN_P));
+STATIC_DCL void FDECL(toggle_displacement, (struct obj *, int, int64_t, BOOLEAN_P));
 STATIC_PTR int NDECL(Armor_on);
 /* int NDECL(Boots_on); -- moved to extern.h */
 STATIC_PTR int NDECL(Cloak_on);
 STATIC_PTR int NDECL(Helmet_on);
 STATIC_PTR int NDECL(Gloves_on);
-STATIC_DCL void FDECL(wielding_corpse, (struct obj *, BOOLEAN_P));
+STATIC_DCL void FDECL(wielding_corpse, (struct obj *, BOOLEAN_P, BOOLEAN_P, BOOLEAN_P));
 STATIC_PTR int NDECL(Shield_on);
 STATIC_PTR int NDECL(Shirt_on);
 STATIC_PTR int NDECL(Robe_on);
@@ -68,12 +68,20 @@ STATIC_DCL int FDECL(wear_oid_bit_to_index, (int64_t));
 
 void
 off_msg(otmp)
+struct obj* otmp;
+{
+    off_msg_with_flags(otmp, 0U);
+}
+
+void
+off_msg_with_flags(otmp, donameflags)
 struct obj *otmp;
+unsigned donameflags;
 {
     if (flags.verbose && otmp)
     {
         play_simple_object_sound(otmp, OBJECT_SOUND_TYPE_TAKE_OFF);
-        You("were wearing %s.", doname(otmp));
+        You("were wearing %s.", doname_with_flags(otmp, donameflags, (char**)0, (char**)0));
     }
 }
 
@@ -175,8 +183,9 @@ STATIC_VAR boolean initial_don = FALSE; /* manipulated in set_wear() */
    give feedback and discover it iff stealth state is changing */
 STATIC_OVL
 void
-toggle_stealth(obj, oldprop, on)
+toggle_stealth(obj, otyp, oldprop, on)
 struct obj *obj;
+int otyp;
 int64_t oldprop; /* prop[].extrinsic, with obj->owornmask stripped by caller */
 boolean on;
 {
@@ -184,14 +193,21 @@ boolean on;
         return;
 
     if (!oldprop /* extrinsic stealth from something else */
-        && !HStealth) { /* stealth blocked by something */
-        if (obj->otyp == RIN_STEALTH)
-            learnring(obj, TRUE);
-        else
-            makeknown(obj->otyp);
+        && !HStealth) 
+    { /* stealth blocked by something */
+        if (obj)
+        {
+            if (obj->otyp == RIN_STEALTH)
+                learnring(obj, TRUE);
+            else
+                makeknown(obj->otyp);
+        }
+        else if (otyp > 0)
+            makeknown(otyp);
 
-        if (on) {
-            if (!is_boots(obj))
+        if (on) 
+        {
+            if (obj ? !is_boots(obj) : otyp > 0 ? is_otyp_boots(otyp) : TRUE)
                 You("move very quietly.");
             else if (Levitation || Flying)
                 You("float imperceptibly.");
@@ -208,8 +224,9 @@ boolean on;
    hero is able to see self (or sense monsters) */
 STATIC_OVL
 void
-toggle_displacement(obj, oldprop, on)
+toggle_displacement(obj, otyp, oldprop, on)
 struct obj *obj;
+int otyp;
 int64_t oldprop; /* prop[].extrinsic, with obj->owornmask stripped by caller */
 boolean on;
 {
@@ -229,8 +246,12 @@ boolean on;
                hero also senses self in this situation */
             || (Unblind_telepat
                 || (Blind_telepat && Blind)
-                || Detect_monsters))) {
-        makeknown(obj->otyp);
+                || Detect_monsters))) 
+    {
+        if (obj)
+            makeknown(obj->otyp);
+        else if (otyp > 0)
+            makeknown(otyp);
 
         You_feel("that monsters%s have difficulty pinpointing your location.",
                  on ? "" : " no longer");
@@ -266,7 +287,7 @@ Boots_on(VOID_ARGS)
         makeknown(uarmf->otyp);
         break;
     case ELVEN_BOOTS:
-        toggle_stealth(uarmf, oldprop, TRUE);
+        toggle_stealth(uarmf, uarmf->otyp, oldprop, TRUE);
         break;
     }
     uarmf->known = 1; /* boots' +/- evident because of status line AC */
@@ -282,6 +303,8 @@ Boots_off(VOID_ARGS)
     struct obj *otmp = uarmf;
     int otyp = otmp->otyp;
     int64_t oldprop = u.uprops[objects[otyp].oc_oprop].extrinsic & ~WORN_BOOTS;
+    boolean on_purpose = !context.mon_moving && otmp && !otmp->in_use;
+    boolean had_stone_res = Stone_resistance;
 
     if (flags.verbose && otmp)
         play_simple_object_sound(otmp, OBJECT_SOUND_TYPE_TAKE_OFF);
@@ -290,7 +313,9 @@ Boots_off(VOID_ARGS)
     /* For levitation, float_down() returns if Levitation, so we
      * must do a setworn() _before_ the levitation case.
      */
+    int trackidx = add_to_obj_tracking(otmp);
     setworn((struct obj *) 0, W_ARMF);
+    boolean objgone = finish_obj_tracking(trackidx);
 
     switch (otyp) {
     case WATER_WALKING_BOOTS:
@@ -306,10 +331,12 @@ Boots_off(VOID_ARGS)
         }
         break;
     case ELVEN_BOOTS:
-        toggle_stealth(otmp, oldprop, FALSE);
+        toggle_stealth(objgone ? 0 : otmp, otyp, oldprop, FALSE);
         break;
     }
     context.takeoff.cancelled_don = FALSE;
+    boolean has_stone_res = Stone_resistance;
+    check_wielded_cockatrice(on_purpose, FALSE, !has_stone_res && had_stone_res);
     return 0;
 }
 
@@ -329,10 +356,10 @@ Cloak_on(VOID_ARGS)
 
     switch (uarmc->otyp) {
     case ELVEN_CLOAK:
-        toggle_stealth(uarmc, oldprop, TRUE);
+        toggle_stealth(uarmc, uarmc->otyp, oldprop, TRUE);
         break;
     case CLOAK_OF_DISPLACEMENT:
-        toggle_displacement(uarmc, oldprop, TRUE);
+        toggle_displacement(uarmc, uarmc->otyp, oldprop, TRUE);
         break;
     case OILSKIN_CLOAK:
         pline("%s very tightly.", Tobjnam(uarmc, "fit"));
@@ -348,23 +375,29 @@ Cloak_off(VOID_ARGS)
     struct obj *otmp = uarmc;
     int otyp = otmp->otyp;
     int64_t oldprop = u.uprops[objects[otyp].oc_oprop].extrinsic & ~WORN_CLOAK;
+    boolean on_purpose = !context.mon_moving && otmp && !otmp->in_use;
+    boolean had_stone_res = Stone_resistance;
 
     if (flags.verbose && otmp)
         play_simple_object_sound(otmp, OBJECT_SOUND_TYPE_TAKE_OFF);
 
+    int trackidx = add_to_obj_tracking(otmp);
     context.takeoff.mask &= ~W_ARMC;
     /* For mummy wrapping, taking it off first resets `Invisible'. */
     setworn((struct obj *) 0, W_ARMC);
     context.takeoff.cancelled_don = FALSE;
+    boolean objgone = finish_obj_tracking(trackidx);
 
     switch (otyp) {
     case ELVEN_CLOAK:
-        toggle_stealth(otmp, oldprop, FALSE);
+        toggle_stealth(objgone ? 0 : otmp, otyp, oldprop, FALSE);
         break;
     case CLOAK_OF_DISPLACEMENT:
-        toggle_displacement(otmp, oldprop, FALSE);
+        toggle_displacement(objgone ? 0 : otmp, otyp, oldprop, FALSE);
         break;
     }
+    boolean has_stone_res = Stone_resistance;
+    check_wielded_cockatrice(on_purpose, FALSE, !has_stone_res && had_stone_res);
     return 0;
 }
 
@@ -437,6 +470,8 @@ Helmet_off(VOID_ARGS)
     if (!uarmh)
         return 0;
 
+    boolean on_purpose = !context.mon_moving && uarmh && !uarmh->in_use;
+    boolean had_stone_res = Stone_resistance;
     if (flags.verbose && uarmh)
         play_simple_object_sound(uarmh, OBJECT_SOUND_TYPE_TAKE_OFF);
 
@@ -452,8 +487,9 @@ Helmet_off(VOID_ARGS)
     }
 
     setworn((struct obj *) 0, W_ARMH);
-
     context.takeoff.cancelled_don = FALSE;
+    boolean has_stone_res = Stone_resistance;
+    check_wielded_cockatrice(on_purpose, FALSE, !has_stone_res && had_stone_res);
     return 0;
 }
 
@@ -472,9 +508,9 @@ Gloves_on(VOID_ARGS)
 }
 
 STATIC_OVL void
-wielding_corpse(obj, voluntary)
+wielding_corpse(obj, voluntary, lostgloves, loststoneresistance)
 struct obj *obj;
-boolean voluntary; /* taking gloves off on purpose? */
+boolean voluntary, lostgloves, loststoneresistance; /* taking gloves off on purpose? */
 {
     char kbuf[BUFSZ];
 
@@ -483,24 +519,37 @@ boolean voluntary; /* taking gloves off on purpose? */
     if (obj != uwep && obj != uarms)
         return;
 
-    if (obj->corpsenm >= LOW_PM && touch_petrifies(&mons[obj->corpsenm]) && !Stone_resistance) {
-        You("now wield %s in your bare %s.",
-            corpse_xname(obj, (const char *) 0, CXN_ARTICLE),
-            makeplural(body_part(HAND)));
-        Sprintf(kbuf, "%s gloves while wielding %s",
+    if (obj->corpsenm >= LOW_PM && touch_petrifies(&mons[obj->corpsenm]) && !Stone_resistance) 
+    {
+        if (lostgloves)
+        {
+            You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "now wield %s in your bare %s.",
+                corpse_xname(obj, (const char*)0, CXN_ARTICLE),
+                makeplural(body_part(HAND)));
+            Sprintf(kbuf, "%s gloves while wielding %s",
                 voluntary ? "removing" : "losing", killer_xname(obj));
+        }
+        else
+        {
+            if (loststoneresistance)
+                Sprintf(kbuf, "%s petrification resistance while wielding %s",
+                    voluntary ? "removing" : "losing", killer_xname(obj));
+            else
+                Sprintf(kbuf, "wielding %s bare-handed", killer_xname(obj));
+            pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "Wielding %s bare-handed is a fatal mistake.", corpse_xname(obj, (const char*)0, CXN_ARTICLE));
+        }
         killer.hint_idx = HINT_KILLED_TOUCHED_COCKATRICE_CORPSE;
         instapetrify(kbuf);
         /* life-saved; can't continue wielding cockatrice corpse though */
-        remove_worn_item(obj, FALSE);
+        (void)remove_worn_item(obj, FALSE);
     }
 }
 
 int
 Gloves_off(VOID_ARGS)
 {
-    boolean on_purpose = !context.mon_moving && !uarmg->in_use;
-
+    boolean on_purpose = !context.mon_moving && uarmg && !uarmg->in_use;
+    boolean had_stone_res = Stone_resistance;
     if (flags.verbose && uarmg)
         play_simple_object_sound(uarmg, OBJECT_SOUND_TYPE_TAKE_OFF);
 
@@ -510,17 +559,8 @@ Gloves_off(VOID_ARGS)
 
     context.takeoff.cancelled_don = FALSE;
     (void) encumber_msg(); /* immediate feedback for GoP */
-
-    /* prevent wielding cockatrice when not wearing gloves */
-    if (uwep && uwep->otyp == CORPSE)
-        wielding_corpse(uwep, on_purpose);
-
-    /* KMH -- ...or your secondary weapon when you're wielding it
-       [This case can't actually happen; twoweapon mode won't
-       engage if a corpse has been set up as the alternate weapon.] */
-    if (uarms && uarms->otyp == CORPSE)
-        wielding_corpse(uarms, on_purpose);
-
+    boolean has_stone_res = Stone_resistance;
+    check_wielded_cockatrice(on_purpose, TRUE, !has_stone_res && had_stone_res);
     return 0;
 }
 
@@ -571,6 +611,8 @@ Shirt_on(VOID_ARGS)
 int
 Shirt_off(VOID_ARGS)
 {
+    boolean on_purpose = !context.mon_moving && uarmu && !uarmu->in_use;
+    boolean had_stone_res = Stone_resistance;
     if (flags.verbose && uarmu)
         play_simple_object_sound(uarmu, OBJECT_SOUND_TYPE_TAKE_OFF);
 
@@ -579,6 +621,8 @@ Shirt_off(VOID_ARGS)
     setworn((struct obj*) 0, W_ARMU);
 
     context.takeoff.cancelled_don = FALSE;
+    boolean has_stone_res = Stone_resistance;
+    check_wielded_cockatrice(on_purpose, FALSE, !has_stone_res && had_stone_res);
     return 0;
 }
 
@@ -598,12 +642,16 @@ Robe_on(VOID_ARGS)
 int
 Robe_off(VOID_ARGS)
 {
+    boolean on_purpose = !context.mon_moving && uarmo && !uarmo->in_use;
+    boolean had_stone_res = Stone_resistance;
     if (flags.verbose && uarmo)
         play_simple_object_sound(uarmo, OBJECT_SOUND_TYPE_TAKE_OFF);
 
     context.takeoff.mask &= ~W_ARMO;
     setworn((struct obj*) 0, W_ARMO);
     context.takeoff.cancelled_don = FALSE;
+    boolean has_stone_res = Stone_resistance;
+    check_wielded_cockatrice(on_purpose, FALSE, !has_stone_res && had_stone_res);
 
     return 0;
 }
@@ -624,6 +672,8 @@ Bracers_on(VOID_ARGS)
 int
 Bracers_off(VOID_ARGS)
 {
+    boolean on_purpose = !context.mon_moving && uarmb && !uarmb->in_use;
+    boolean had_stone_res = Stone_resistance;
     if (flags.verbose && uarmb)
         play_simple_object_sound(uarmb, OBJECT_SOUND_TYPE_TAKE_OFF);
 
@@ -631,6 +681,8 @@ Bracers_off(VOID_ARGS)
 
     setworn((struct obj*) 0, W_ARMB);
     context.takeoff.cancelled_don = FALSE;
+    boolean has_stone_res = Stone_resistance;
+    check_wielded_cockatrice(on_purpose, FALSE, !has_stone_res && had_stone_res);
     return 0;
 }
 
@@ -678,20 +730,25 @@ struct obj* ud;
     if (!ud)
         return 0;
 
+    boolean on_purpose = !context.mon_moving && ud && !ud->in_use;
+    boolean had_stone_res = Stone_resistance;
     if (flags.verbose && ud)
         play_simple_object_sound(ud, OBJECT_SOUND_TYPE_TAKE_OFF);
 
     int64_t bit = ud->owornmask & W_MISCITEMS;
-
-    context.takeoff.mask &= ~bit;
-    setworn((struct obj*) 0, bit);
-    context.takeoff.cancelled_don = FALSE;
 
     if (objects[ud->otyp].oc_subtyp == MISC_IOUN_STONE)
     {
         pline("%s orbiting around your %s.", Tobjnam(ud, "stop"), body_part(HEAD));
     }
 
+    context.takeoff.mask &= ~bit;
+    setworn((struct obj*) 0, bit);
+    context.takeoff.cancelled_don = FALSE;
+
+    (void) encumber_msg();
+    boolean has_stone_res = Stone_resistance;
+    check_wielded_cockatrice(on_purpose, FALSE, !has_stone_res && had_stone_res);
     return 0;
 }
 
@@ -716,12 +773,16 @@ Armor_on(VOID_ARGS)
 int
 Armor_off(VOID_ARGS)
 {
+    boolean on_purpose = !context.mon_moving && uarm && !uarm->in_use;
+    boolean had_stone_res = Stone_resistance;
     if (flags.verbose && uarm)
         play_simple_object_sound(uarm, OBJECT_SOUND_TYPE_TAKE_OFF);
 
     context.takeoff.mask &= ~W_ARM;
     setworn((struct obj *) 0, W_ARM);
     context.takeoff.cancelled_don = FALSE;
+    boolean has_stone_res = Stone_resistance;
+    check_wielded_cockatrice(on_purpose, FALSE, !has_stone_res && had_stone_res);
     return 0;
 }
 
@@ -735,7 +796,7 @@ int
 Armor_gone()
 {
     context.takeoff.mask &= ~W_ARM;
-    setnotworn(uarm);
+    (void)setnotworn(uarm);
     context.takeoff.cancelled_don = FALSE;
     return 0;
 }
@@ -788,6 +849,8 @@ Amulet_off()
     if (!uamul)
         return;
 
+    boolean on_purpose = !context.mon_moving && uamul && !uamul->in_use;
+    boolean had_stone_res = Stone_resistance;
     if (flags.verbose && uamul)
         play_simple_object_sound(uamul, OBJECT_SOUND_TYPE_TAKE_OFF);
 
@@ -807,6 +870,8 @@ Amulet_off()
     }
 
     setworn((struct obj *) 0, W_AMUL);
+    boolean has_stone_res = Stone_resistance;
+    check_wielded_cockatrice(on_purpose, FALSE, !has_stone_res && had_stone_res);
     return;
 }
 
@@ -847,11 +912,64 @@ struct obj* uitem;
         && !objects[uitem->otyp].oc_name_known
         && !objects[uitem->otyp].oc_uname)
         docall(uitem, dcbuf);
-    Sprintf(priority_debug_buf_2, "item_change_sex_and_useup: %d", uitem->otyp);
-    Strcpy(priority_debug_buf_3, "item_change_sex_and_useup");
-    Strcpy(priority_debug_buf_4, "item_change_sex_and_useup");
+    debugprint("item_change_sex_and_useup: %d", uitem->otyp);
     useup(uitem);
     newsym(u.ux, u.uy);
+}
+
+void
+mon_item_change_sex_and_useup(mon, uitem, creation)
+struct monst* mon;
+struct obj* uitem;
+boolean creation; 
+{
+    if (!mon || !uitem)
+        return;
+
+    if (mon == &youmonst)
+    {
+        item_change_sex_and_useup(uitem);
+        return;
+    }
+
+    char dcbuf[BUFSZ] = "";
+
+    if (mon->mprops[UNCHANGING])
+        return;
+
+    unsigned orig_sex = mon->female;
+    if (!(is_male(mon->data) || is_female(mon->data) || is_neuter(mon->data)))
+        mon->female = !mon->female;
+
+    if (!creation && canseemon(mon))
+    {
+        /* Don't use same message as polymorph */
+        if (orig_sex != mon->female) {
+            makeknown(uitem->otyp);
+            play_sfx_sound_at_location(SFX_SEX_CHANGE, mon->mx, mon->my);
+            Sprintf(dcbuf, "%s is suddenly very %s!", Monnam(mon),
+                mon->female ? "feminine" : "masculine");
+            pline_ex1(ATR_NONE, CLR_MSG_ATTENTION, dcbuf);
+        }
+        else
+        {
+            play_sfx_sound_at_location(SFX_UNKNOWN_ODD_EFFECT, mon->mx, mon->my);
+            /* already polymorphed into single-gender monster; only
+               changed the character's base sex */
+            Sprintf(dcbuf, "%s doesn't feel like %sself.", Monnam(mon), mhim(mon));
+            pline_ex1(ATR_NONE, CLR_MSG_ATTENTION, dcbuf);
+        }
+        play_sfx_sound_at_location(SFX_ITEM_CRUMBLES_TO_DUST, mon->mx, mon->my);
+        pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s disintegrates!", The(cxname(uitem)));
+        if (orig_sex == mon->female && uitem->dknown
+            && !objects[uitem->otyp].oc_name_known
+            && !objects[uitem->otyp].oc_uname)
+            docall(uitem, dcbuf);
+    }
+ 
+    debugprint("mon_item_change_sex_and_useup: mnum=%d, otyp=%d", mon->mnum, uitem->otyp);
+    m_useup(mon, uitem);
+    newsym(mon->mx, mon->my);
 }
 
 /* handle ring discovery; comparable to learnwand() */
@@ -921,7 +1039,7 @@ register struct obj *obj;
 
     switch (obj->otyp) {
     case RIN_STEALTH:
-        toggle_stealth(obj, oldprop, TRUE);
+        toggle_stealth(obj, obj->otyp, oldprop, TRUE);
         break;
 
     case RIN_PROTECTION_FROM_SHAPE_CHANGERS:
@@ -939,7 +1057,7 @@ boolean gone;
 {
     if (!obj)
         return;
-
+    int otyp = obj->otyp;
     if (flags.verbose && obj && !gone)
         play_simple_object_sound(obj, OBJECT_SOUND_TYPE_TAKE_OFF);
 
@@ -947,14 +1065,15 @@ boolean gone;
     context.takeoff.mask &= ~mask;
     //if (!(u.uprops[objects[obj->otyp].oc_oprop].extrinsic & mask))
     //   impossible("Strange... I didn't know you had that ring.");
+    int trackidx = add_to_obj_tracking(obj);
     if (gone)
-        setnotworn(obj);
+        (void)setnotworn(obj);
     else
         setworn((struct obj *) 0, obj->owornmask);
-
-    switch (obj->otyp) {
+    boolean ogone = finish_obj_tracking(trackidx);
+    switch (otyp) {
     case RIN_STEALTH:
-        toggle_stealth(obj, (EStealth & ~mask), FALSE);
+        toggle_stealth(ogone ? 0 : obj, otyp, (EStealth & ~mask), FALSE);
         break;
     case RIN_PROTECTION_FROM_SHAPE_CHANGERS:
         /* If you're no longer protected, let the chameleons
@@ -963,7 +1082,6 @@ boolean gone;
         restartcham();
         break;
     }
-
     return;
 }
 
@@ -986,10 +1104,14 @@ Blindf_on(otmp)
 struct obj *otmp;
 {
     /* blindfold might be wielded; release it for wearing */
+    boolean ogone = FALSE;
     if (otmp->owornmask & W_WEAPON)
-        remove_worn_item(otmp, FALSE);
-    setworn(otmp, W_BLINDFOLD);
-    on_msg(otmp);
+        ogone = remove_worn_item(otmp, FALSE);
+    if (!ogone)
+    {
+        setworn(otmp, W_BLINDFOLD);
+        on_msg(otmp);
+    }
 }
 
 void
@@ -1003,8 +1125,8 @@ struct obj *otmp;
         return;
     }
     context.takeoff.mask &= ~W_BLINDFOLD;
+    off_msg_with_flags(otmp, DONAME_HIDE_WORN);
     setworn((struct obj *) 0, otmp->owornmask);
-    off_msg(otmp);
 
     if (Blind) {
         if (was_blind) {
@@ -1344,7 +1466,7 @@ struct obj *obj;
         if (is_shield(obj))
             (void)armoroff(obj);
         else
-            remove_worn_item(obj, FALSE);
+            (void)remove_worn_item(obj, FALSE);
     } 
     else if (obj->owornmask & W_ARMOR) 
     {
@@ -1359,21 +1481,65 @@ struct obj *obj;
          */
         off_msg(obj);
         Ring_off(obj);
-    } else if (obj == uamul) {
+    }
+    else if (obj == uamul) 
+    {
+        off_msg_with_flags(obj, DONAME_HIDE_WORN);
         Amulet_off();
-        off_msg(obj);
-    } else if (obj == umisc || obj == umisc2 || obj == umisc3 || obj == umisc4 || obj == umisc5) {
+    } 
+    else if (obj == umisc || obj == umisc2 || obj == umisc3 || obj == umisc4 || obj == umisc5)
+    {
+        off_msg_with_flags(obj, DONAME_HIDE_WORN);
         MiscellaneousItem_off(obj);
-        off_msg(obj);
-    } else if (obj == ublindf) {
+    } 
+    else if (obj == ublindf) 
+    {
         Blindf_off(obj); /* does its own off_msg */
-    } else {
+    }
+    else 
+    {
         impossible("removing strange accessory?");
         if (obj->owornmask)
-            remove_worn_item(obj, FALSE);
+            (void)remove_worn_item(obj, FALSE);
     }
-
     return 1;
+}
+
+void
+check_wielded_cockatrice(on_purpose, lostgloves, loststoneresistance)
+boolean on_purpose, lostgloves, loststoneresistance;
+{
+    if (!uarmg && !Stone_resistance)
+    {
+        /* prevent wielding cockatrice when not wearing gloves */
+        if (uwep && uwep->otyp == CORPSE)
+            wielding_corpse(uwep, on_purpose, lostgloves, loststoneresistance);
+
+        /* KMH -- ...or your secondary weapon when you're wielding it
+           [This case can't actually happen; twoweapon mode won't
+           engage if a corpse has been set up as the alternate weapon.] */
+        if (uarms && uarms->otyp == CORPSE)
+            wielding_corpse(uarms, on_purpose, lostgloves, loststoneresistance);
+
+        //if (uwep && uwep->otyp == CORPSE && uwep->corpsenm >= LOW_PM && touch_petrifies(&mons[uwep->corpsenm])
+        //    && !(poly_when_stoned(youmonst.data) && polymon(PM_STONE_GOLEM)))
+        //{
+        //    char kbuf[BUFSZ];
+        //    Sprintf(kbuf, "%s corpse", an(corpse_monster_name(uwep)));
+        //    pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "Wielding %s bare-handed is a fatal mistake.", kbuf);
+        //    killer.hint_idx = HINT_KILLED_TOUCHED_COCKATRICE_CORPSE;
+        //    instapetrify(kbuf);
+        //}
+        //else if (uarms && uarms->otyp == CORPSE && uarms->corpsenm >= LOW_PM && touch_petrifies(&mons[uarms->corpsenm])
+        //    && !(poly_when_stoned(youmonst.data) && polymon(PM_STONE_GOLEM)))
+        //{
+        //    char kbuf[BUFSZ];
+        //    Sprintf(kbuf, "%s corpse", an(corpse_monster_name(uarms)));
+        //    pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "Wielding %s bare-handed in your left %s is a fatal mistake.", kbuf, body_part(HAND));
+        //    killer.hint_idx = HINT_KILLED_TOUCHED_COCKATRICE_CORPSE;
+        //    instapetrify(kbuf);
+        //}
+    }
 }
 
 
@@ -1560,6 +1726,7 @@ register struct obj *otmp;
          * doesn't force the resistance granting item to be re-worn
          * after being lifesaved anymore.
          */
+        off_msg_with_flags(otmp, DONAME_HIDE_WORN); /* Any of the off functions below may remove levitation or flying, and otmp can then be destroyed in lava_effects */
         if (is_cloak(otmp))
             (void) Cloak_off();
         else if (is_gloves(otmp)) //here just in case is instantaneous
@@ -1580,7 +1747,7 @@ register struct obj *otmp;
             (void) Armor_off();
         else
             setworn((struct obj *) 0, otmp->owornmask & W_ARMOR);
-        off_msg(otmp);
+        //off_msg(otmp);
     }
     context.takeoff.mask = context.takeoff.what = context.wear.mask = context.wear.what = 0L;
     return 1;
@@ -2552,66 +2719,70 @@ int* result_style_ptr;
     {
         /* if the armor is wielded, release it for wearing (won't be
            welded even if cursed; that only happens for weapons/weptools) */
+        boolean ogone = FALSE;
         if (obj->owornmask & W_WEAPON)
-            remove_worn_item(obj, FALSE);
-        /*
-         * Setting obj->known=1 is done because setworn() causes hero's AC
-         * to change so armor's +/- value is evident via the status line.
-         * We used to set it here because of that, but then it would stick
-         * if a nymph stole the armor before it was fully worn.  Delay it
-         * until the aftermv action.  The player may still know this armor's
-         * +/- amount if donning gets interrupted, but the hero won't.
-         *
-        obj->known = 1;
-         */
-        setworn(obj, mask);
-        /* if there's no delay, we'll execute 'aftermv' immediately */
-        if (obj == uarm)
-            afternmv = Armor_on;
-        else if (obj == uarmh)
-            afternmv = Helmet_on;
-        else if (obj == uarmb)
-            afternmv = Bracers_on;
-        else if (obj == uarmg)
-            afternmv = Gloves_on;
-        else if (obj == uarmf)
-            afternmv = Boots_on;
-        else if (obj == uarms && obj->oclass == ARMOR_CLASS && objects[obj->otyp].oc_armor_category == ARM_SHIELD)
-            afternmv = Shield_on;
-        else if (obj == uarmc)
-            afternmv = Cloak_on;
-        else if (obj == uarmo)
-            afternmv = Robe_on;
-        else if (obj == uarmu)
-            afternmv = Shirt_on;
-        else
+            ogone = remove_worn_item(obj, FALSE);
+        if (!ogone)
         {
-            panic("wearing armor not worn as armor? [%08lx]", obj->owornmask);
-            return 0;
-        }
+            /*
+ * Setting obj->known=1 is done because setworn() causes hero's AC
+ * to change so armor's +/- value is evident via the status line.
+ * We used to set it here because of that, but then it would stick
+ * if a nymph stole the armor before it was fully worn.  Delay it
+ * until the aftermv action.  The player may still know this armor's
+ * +/- amount if donning gets interrupted, but the hero won't.
+ *
+obj->known = 1;
+ */
+            setworn(obj, mask);
+            /* if there's no delay, we'll execute 'aftermv' immediately */
+            if (obj == uarm)
+                afternmv = Armor_on;
+            else if (obj == uarmh)
+                afternmv = Helmet_on;
+            else if (obj == uarmb)
+                afternmv = Bracers_on;
+            else if (obj == uarmg)
+                afternmv = Gloves_on;
+            else if (obj == uarmf)
+                afternmv = Boots_on;
+            else if (obj == uarms && obj->oclass == ARMOR_CLASS && objects[obj->otyp].oc_armor_category == ARM_SHIELD)
+                afternmv = Shield_on;
+            else if (obj == uarmc)
+                afternmv = Cloak_on;
+            else if (obj == uarmo)
+                afternmv = Robe_on;
+            else if (obj == uarmu)
+                afternmv = Shirt_on;
+            else
+            {
+                panic("wearing armor not worn as armor? [%08lx]", obj->owornmask);
+                return 0;
+            }
 
-        if (!in_takeoff_wear)
-            delay = -objects[obj->otyp].oc_delay - added_time;
-        else
-            delay = 0;
+            if (!in_takeoff_wear)
+                delay = -objects[obj->otyp].oc_delay - added_time;
+            else
+                delay = 0;
 
-        added_time = 0;
-        if (delay) 
-        {
-            nomul(delay);
-            multi_reason = "dressing up";
-            nomovemsg = "You finish your dressing maneuver.";
-            nomovemsg_attr = ATR_NONE;
-            nomovemsg_color = NO_COLOR;
-        }
-        else 
-        {
-            unmul(""); /* call (*aftermv)(), clear it+nomovemsg+multi_reason */
-            on_msg(obj);
-        }
+            added_time = 0;
+            if (delay)
+            {
+                nomul(delay);
+                multi_reason = "dressing up";
+                nomovemsg = "You finish your dressing maneuver.";
+                nomovemsg_attr = ATR_NONE;
+                nomovemsg_color = NO_COLOR;
+            }
+            else
+            {
+                unmul(""); /* call (*aftermv)(), clear it+nomovemsg+multi_reason */
+                on_msg(obj);
+            }
 
-        if(!in_takeoff_wear)
-            context.takeoff.mask = context.takeoff.what = context.wear.mask = context.wear.what = 0L;
+            if (!in_takeoff_wear)
+                context.takeoff.mask = context.takeoff.what = context.wear.mask = context.wear.what = 0L;
+        }
     } 
     else 
     { /* not armor */
@@ -2879,13 +3050,19 @@ glibr()
         xfl++;
         if (leftfall) {
             otmp = uleft;
+            int trackidx = add_to_obj_tracking(otmp);
             Ring_off(uleft);
-            dropxf(otmp);
+            boolean ogone = finish_obj_tracking(trackidx);
+            if (!ogone)
+                (void)dropxf(otmp);
         }
         if (rightfall) {
             otmp = uright;
+            int trackidx = add_to_obj_tracking(otmp);
             Ring_off(uright);
-            dropxf(otmp);
+            boolean ogone = finish_obj_tracking(trackidx);
+            if (!ogone)
+                (void)dropxf(otmp);
         }
     }
 
@@ -2907,7 +3084,7 @@ glibr()
         wastwoweap = TRUE;
         setuwep((struct obj *) 0, otmp->owornmask);
         if (canletgo(otmp, ""))
-            dropxf(otmp);
+            (void)dropxf(otmp);
     }
     otmp = uwep;
     if (otmp && !welded(otmp, &youmonst)) {
@@ -2942,7 +3119,7 @@ glibr()
         otmp->quan = savequan;
         setuwep((struct obj *) 0, W_WEP);
         if (canletgo(otmp, ""))
-            dropxf(otmp);
+            (void)dropxf(otmp);
     }
 }
 
@@ -3545,7 +3722,7 @@ take_off(VOID_ARGS)
             }
 
             unsigned id = don->oid[idx];
-            if (id == 0 || (otmp = o_on(id, invent)) == 0)
+            if (id == 0 || (otmp = o_on_open_inventory(id)) == 0)
             {
                 reset_remarm();
                 return 0; /* Can't find the object to be worn in the inventory; cancel the process */
@@ -3825,7 +4002,7 @@ doddoremarm()
     add_valid_menu_class(0); /* reset */
     if (flags.menu_style != MENU_TRADITIONAL
         || (result = ggetobj("take off", select_off, 0, FALSE,
-                             (unsigned *) 0, 0)) < -1)
+                             (unsigned *) 0, 0, TRUE)) < -1)
         result = menu_remarm(result);
 
     activate_take_off();
@@ -3864,7 +4041,7 @@ int retry;
     } else if (flags.menu_style == MENU_COMBINATION) {
         unsigned ggofeedback = 0;
 
-        i = ggetobj("take off", select_off, 0, TRUE, &ggofeedback, 0);
+        i = ggetobj("take off", select_off, 0, TRUE, &ggofeedback, 0, TRUE);
         if (ggofeedback & ALL_FINISHED)
             return 0;
         all_worn_categories = (i == -2);
@@ -3875,7 +4052,7 @@ int retry;
         all_worn_categories = FALSE;
 
     n = query_objlist("What do you want to take off?", &invent,
-                      (SIGNAL_NOMENU | USE_INVLET | INVORDER_SORT),
+                      (SIGNAL_NOMENU | USE_INVLET | INVORDER_SORT | SHOW_QUICK),
                       &pick_list, PICK_ANY,
                       all_worn_categories ? is_worn : is_worn_by_type, SHOWWEIGHTS_NONE);
     if (n > 0) {
@@ -3918,7 +4095,7 @@ int retry;
     else if (flags.menu_style == MENU_COMBINATION) {
         unsigned ggofeedback = 0;
 
-        i = ggetobj("wear", select_on, 0, TRUE, &ggofeedback, 0);
+        i = ggetobj("wear", select_on, 0, TRUE, &ggofeedback, 0, TRUE);
         if (ggofeedback & ALL_FINISHED)
             return 0;
         all_wearable_categories = (i == -2);
@@ -3929,7 +4106,7 @@ int retry;
         all_wearable_categories = FALSE;
 
     n = query_objlist("What do you want to wear?", &invent,
-        (SIGNAL_NOMENU | USE_INVLET | INVORDER_SORT | WORN_UNSELECTABLE),
+        (SIGNAL_NOMENU | USE_INVLET | INVORDER_SORT | WORN_UNSELECTABLE | SHOW_QUICK),
         &pick_list, PICK_ANY,
         all_wearable_categories ? is_wearable : is_wearable_by_type, SHOWWEIGHTS_NONE);
     if (n > 0) {
@@ -3943,7 +4120,7 @@ int retry;
     return 0;
 }
 
-/* the M('W') command -- wear multiple items */
+/* the M('w') command -- wear multiple items */
 int
 ddowear()
 {
@@ -3963,7 +4140,7 @@ ddowear()
     add_valid_menu_class(0); /* reset */
     if (flags.menu_style != MENU_TRADITIONAL
         || (result = ggetobj("wear", select_on, 0, FALSE,
-            (unsigned*)0, 0)) < -1)
+            (unsigned*)0, 0, TRUE)) < -1)
         result = menu_wearmany(result);
 
     activate_wear();
@@ -3987,83 +4164,148 @@ register struct obj *atmp;
          ? (otmp->in_use = TRUE) != 0             \
          : FALSE)
 
-    Strcpy(priority_debug_buf_3, "destroy_arm");
-    Strcpy(priority_debug_buf_4, "destroy_arm");
+    debugprint("destroy_arm");
 
     if (DESTROY_ARM(uarmc)) {
         if (donning(otmp))
             cancel_don();
         play_sfx_sound(SFX_ITEM_CRUMBLES_TO_DUST);
         Your_ex(ATR_NONE, CLR_MSG_WARNING, "%s crumbles and turns to dust!", cloak_simple_name(uarmc));
+        otmp->in_use = 1;
+        otmp->item_flags |= ITEM_FLAGS_LAVA_EFFECTS_SKIP; /* Prevent lava_effects etc. from destroying the item when they are taken off */
+        int trackidx = add_to_obj_tracking(otmp);
         (void) Cloak_off();
-        Sprintf(priority_debug_buf_2, "destroy_arm: %d", otmp->otyp);
-        useup(otmp);
+        boolean ogone = finish_obj_tracking(trackidx);
+        if (!ogone)
+        {
+            debugprint("destroy_arm1: %d", otmp->otyp);
+            useup(otmp);
+        }
     } else if (DESTROY_ARM(uarmo)) {
         if (donning(otmp))
             cancel_don();
         play_sfx_sound(SFX_ITEM_CRUMBLES_TO_DUST);
         Your_ex(ATR_NONE, CLR_MSG_WARNING, "%s crumbles and turns to dust!", robe_simple_name(uarmc));
+        otmp->in_use = 1;
+        otmp->item_flags |= ITEM_FLAGS_LAVA_EFFECTS_SKIP; /* Prevent lava_effects etc. from destroying the item when they are taken off */
+        int trackidx = add_to_obj_tracking(otmp);
         (void)Robe_off();
-        Sprintf(priority_debug_buf_2, "destroy_arm2: %d", otmp->otyp);
-        useup(otmp);
+        boolean ogone = finish_obj_tracking(trackidx);
+        if (!ogone)
+        {
+            debugprint("destroy_arm2: %d", otmp->otyp);
+            useup(otmp);
+        }
     } else if (DESTROY_ARM(uarm)) {
         if (donning(otmp))
             cancel_don();
         play_sfx_sound(SFX_ITEM_CRUMBLES_TO_DUST);
         Your_ex(ATR_NONE, CLR_MSG_WARNING, "armor turns to dust and falls to the %s!", surface(u.ux, u.uy));
+        boolean had_stone_res = Stone_resistance;
+        otmp->in_use = 1;
+        otmp->item_flags |= ITEM_FLAGS_LAVA_EFFECTS_SKIP; /* Prevent lava_effects etc. from destroying the item when they are taken off */
+        int trackidx = add_to_obj_tracking(otmp);
         (void) Armor_gone();
-        Sprintf(priority_debug_buf_2, "destroy_arm3: %d", otmp->otyp);
-        useup(otmp);
+        boolean has_stone_res = Stone_resistance;
+        boolean ogone = finish_obj_tracking(trackidx);
+        if (!ogone)
+        {
+            debugprint("destroy_arm3: %d", otmp->otyp);
+            useup(otmp);
+        }
+        check_wielded_cockatrice(FALSE, FALSE, !has_stone_res && had_stone_res);
     } else if (DESTROY_ARM(uarmu)) {
         if (donning(otmp))
             cancel_don();
         play_sfx_sound(SFX_ITEM_CRUMBLES_TO_DUST);
         Your_ex(ATR_NONE, CLR_MSG_WARNING, "shirt crumbles into tiny threads and falls apart!");
+        otmp->in_use = 1;
+        otmp->item_flags |= ITEM_FLAGS_LAVA_EFFECTS_SKIP; /* Prevent lava_effects etc. from destroying the item when they are taken off */
+        int trackidx = add_to_obj_tracking(otmp);
         (void) Shirt_off();
-        Sprintf(priority_debug_buf_2, "destroy_arm4: %d", otmp->otyp);
-        useup(otmp);
+        boolean ogone = finish_obj_tracking(trackidx);
+        if (!ogone)
+        {
+            debugprint("destroy_arm4: %d", otmp->otyp);
+            useup(otmp);
+        }
     } else if (DESTROY_ARM(uarmh)) {
         if (donning(otmp))
             cancel_don();
         play_sfx_sound(SFX_ITEM_CRUMBLES_TO_DUST);
         Your_ex(ATR_NONE, CLR_MSG_WARNING, "%s turns to dust and is blown away!", helm_simple_name(uarmh));
+        otmp->in_use = 1;
+        otmp->item_flags |= ITEM_FLAGS_LAVA_EFFECTS_SKIP; /* Prevent lava_effects etc. from destroying the item when they are taken off */
+        int trackidx = add_to_obj_tracking(otmp);
         (void) Helmet_off();
-        Sprintf(priority_debug_buf_2, "destroy_arm5: %d", otmp->otyp);
-        useup(otmp);
+        boolean ogone = finish_obj_tracking(trackidx);
+        if (!ogone)
+        {
+            debugprint("destroy_arm5: %d", otmp->otyp);
+            useup(otmp);
+        }
     } else if (DESTROY_ARM(uarmb)) {
         if (donning(otmp))
             cancel_don();
         play_sfx_sound(SFX_ITEM_VANISHES);
         Your_ex(ATR_NONE, CLR_MSG_WARNING, "bracers vanish!");
+        otmp->in_use = 1;
+        otmp->item_flags |= ITEM_FLAGS_LAVA_EFFECTS_SKIP; /* Prevent lava_effects etc. from destroying the item when they are taken off */
+        int trackidx = add_to_obj_tracking(otmp);
         (void)Bracers_off();
-        Sprintf(priority_debug_buf_2, "destroy_arm6: %d", otmp->otyp);
-        useup(otmp);
+        boolean ogone = finish_obj_tracking(trackidx);
+        if (!ogone)
+        {
+            debugprint("destroy_arm6: %d", otmp->otyp);
+            useup(otmp);
+        }
     } else if (DESTROY_ARM(uarmg)) {
         if (donning(otmp))
             cancel_don();
         play_sfx_sound(SFX_ITEM_VANISHES);
         Your_ex(ATR_NONE, CLR_MSG_WARNING, "gloves vanish!");
+        otmp->in_use = 1;
+        otmp->item_flags |= ITEM_FLAGS_LAVA_EFFECTS_SKIP; /* Prevent lava_effects etc. from destroying the item when they are taken off */
+        int trackidx = add_to_obj_tracking(otmp);
         (void) Gloves_off();
-        Sprintf(priority_debug_buf_2, "destroy_arm7: %d", otmp->otyp);
-        useup(otmp);
+        boolean ogone = finish_obj_tracking(trackidx);
+        if (!ogone)
+        {
+            debugprint("destroy_arm7: %d", otmp->otyp);
+            useup(otmp);
+        }
         selftouch("You");
     } else if (DESTROY_ARM(uarmf)) {
         if (donning(otmp))
             cancel_don();
         play_sfx_sound(SFX_ITEM_CRUMBLES_TO_DUST);
         Your_ex(ATR_NONE, CLR_MSG_WARNING, "boots disintegrate!");
+        otmp->in_use = 1;
+        otmp->item_flags |= ITEM_FLAGS_LAVA_EFFECTS_SKIP; /* Prevent lava_effects etc. from destroying the item when they are taken off */
+        int trackidx = add_to_obj_tracking(otmp);
         (void) Boots_off();
-        Sprintf(priority_debug_buf_2, "destroy_arm8: %d", otmp->otyp);
-        useup(otmp);
+        boolean ogone = finish_obj_tracking(trackidx);
+        if (!ogone)
+        {
+            debugprint("destroy_arm8: %d", otmp->otyp);
+            useup(otmp);
+        }
     }
     else if (uarms && is_shield(uarms) && DESTROY_ARM(uarms)) {
         if (donning(otmp))
             cancel_don();
         play_sfx_sound(SFX_ITEM_CRUMBLES_TO_DUST);
         Your_ex(ATR_NONE, CLR_MSG_WARNING, "shield crumbles away!");
+        otmp->in_use = 1;
+        otmp->item_flags |= ITEM_FLAGS_LAVA_EFFECTS_SKIP; /* Prevent lava_effects etc. from destroying the item when they are taken off */
+        int trackidx = add_to_obj_tracking(otmp);
         (void) Shield_off();
-        Sprintf(priority_debug_buf_2, "destroy_arm9: %d", otmp->otyp);
-        useup(otmp);
+        boolean ogone = finish_obj_tracking(trackidx);
+        if (!ogone)
+        {
+            debugprint("destroy_arm9: %d", otmp->otyp);
+            useup(otmp);
+        }
     } else {
         return 0; /* could not destroy anything */
     }

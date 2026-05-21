@@ -381,7 +381,7 @@ d_level *lev;
         u_on_newpos(x, y);
         break;
     case LR_PORTAL:
-        mkportal(x, y, lev->dnum, lev->dlevel);
+        mkportal(x, y, lev->dnum, lev->dlevel, 0, 0, FALSE);
         break;
     case LR_DOWNSTAIR:
     case LR_UPSTAIR:
@@ -707,6 +707,7 @@ struct monst *mtmp;
     int gemprob, goldprob, otyp;
     struct obj *otmp;
     boolean is_captain = (mtmp->data == &mons[PM_ORC_CAPTAIN]);
+    debugprint("shiny_orc_stuff");
 
     /* probabilities */
     goldprob = is_captain ? 600 : 300;
@@ -715,7 +716,7 @@ struct monst *mtmp;
         if ((otmp = mksobj(GOLD_PIECE, FALSE, FALSE, FALSE)) != 0) {
             otmp->quan = 1L + rnd(goldprob);
             otmp->owt = weight(otmp);
-            add_to_minv(mtmp, otmp);
+            (void)add_to_minv(mtmp, otmp);
         }
     }
     if (rn2(1000) < gemprob) {
@@ -723,13 +724,13 @@ struct monst *mtmp;
             if (is_rock(otmp))
                 dealloc_obj(otmp);
             else
-                add_to_minv(mtmp, otmp);
+                (void)add_to_minv(mtmp, otmp);
         }
     }
     if (is_captain || !rn2(8)) {
         otyp = shiny_obj(RING_CLASS);
         if (otyp != STRANGE_OBJECT && (otmp = mksobj(otyp, FALSE, FALSE, FALSE)) != 0)
-            add_to_minv(mtmp, otmp);
+            (void)add_to_minv(mtmp, otmp);
     }
 }
 void
@@ -1479,8 +1480,11 @@ bound_digging()
 }
 
 void
-mkportal(x, y, todnum, todlevel)
+mkportal(x, y, todnum, todlevel, subtyp, portal_flags, seen)
 xchar x, y, todnum, todlevel;
+uchar subtyp;
+uint64_t portal_flags;
+boolean seen;
 {
     /* a portal "trap" must be matched by a
        portal in the destination dungeon/dlevel */
@@ -1494,7 +1498,10 @@ xchar x, y, todnum, todlevel;
                 dungeons[todnum].dname, todlevel);
     ttmp->dst.dnum = todnum;
     ttmp->dst.dlevel = todlevel;
-    return;
+    ttmp->tsubtyp = subtyp;
+    ttmp->tflags = portal_flags;
+    ttmp->activation_count = 0;
+    ttmp->tseen = seen;
 }
 
 void
@@ -1558,6 +1565,7 @@ movebubbles()
     if (!wportal)
         set_wportal();
 
+    debugprint_pos();
     vision_recalc(2);
 
     if (Is_waterlevel(&u.uz)) {
@@ -1765,7 +1773,7 @@ int fd;
     if (!Is_waterlevel(&u.uz) && !Is_airlevel(&u.uz))
         return;
 
-    Strcpy(debug_buf_4, "restore_waterlevel");
+    //debugprint("restore_waterlevel");
     set_wportal();
     mread(fd, (genericptr_t) &n, sizeof(int));
     mread(fd, (genericptr_t) &xmin, sizeof(int));

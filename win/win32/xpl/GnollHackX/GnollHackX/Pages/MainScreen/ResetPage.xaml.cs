@@ -151,7 +151,7 @@ namespace GnollHackX.Pages.MainScreen
 
                 Dictionary<string, string> saveverdict = new Dictionary<string, string>();
                 Dictionary<string, DateTime> savetimedict = new Dictionary<string, DateTime>();
-                foreach (SecretsFile sf in GHApp.CurrentSecrets.files)
+                foreach (SecretsFile sf in GHApp.CurrentSettings.files)
                 {
                     bool has_vbv = Preferences.ContainsKey("Verify_" + sf.id + "_Version");
                     string vbv = Preferences.Get("Verify_" + sf.id + "_Version", "");
@@ -203,6 +203,9 @@ namespace GnollHackX.Pages.MainScreen
             {
                 try
                 {
+                    GHApp.DeleteUserData();
+                    GHApp.ClearAchievementsFromMemory();
+
                     string datadir = Path.Combine(GHApp.GHPath, GHConstants.UserDataDirectory);
                     if (Directory.Exists(datadir))
                         Directory.Delete(datadir, true);
@@ -255,8 +258,7 @@ namespace GnollHackX.Pages.MainScreen
             if (playClickedSound)
                 GHApp.PlayButtonClickedSound();
             GHApp.CurrentMainPage?.InvalidateCarousel();
-            var page = await GHApp.Navigation.PopModalAsync();
-            GHApp.DisconnectIViewHandlers(page);
+            await GHApp.PopModalPageAsync();
         }
 
 

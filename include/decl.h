@@ -8,6 +8,7 @@
 #ifndef DECL_H
 #define DECL_H
 
+#include "coord.h"
 #include "config.h"
 #include "flag.h"
 #include "general.h"
@@ -218,6 +219,10 @@ E NEARDATA struct sinfo {
 } program_state;
 
 E int exit_hack_code;
+#define EXITHACK_NORMAL             0 /* Normal start without existing GamePage; ExitHack should prepare the game to return to main menu */
+#define EXITHACK_RESTART_EXISTING   1 /* Restart game to an existing GamePage without saying welcome back; ExitHack should prepare the game to be loaded after exit */
+#define EXITHACK_RECOVER_NEW        2 /* Recover game to a new GamePage without saying welcome back; the original GamePage has been destroyed by OS and should be regenerated */
+#define EXITHACK_EXITTHREAD         3 /* Exiting thread; ExitHack should not do anything */
 
 E boolean restoring;
 E boolean saving;
@@ -296,6 +301,8 @@ E NEARDATA const char getobj_toss_objs[];
 E NEARDATA const char getobj_tippables[];
 E NEARDATA const char getobj_zap_syms[];
 E NEARDATA const char getobj_favorites[];
+E NEARDATA const char getobj_quick_bags[];
+E NEARDATA const char getobj_quick_pickaxes[];
 E NEARDATA const char getobj_enchant_weapon_objects[];
 E NEARDATA const char getobj_enchant_armor_objects[];
 E NEARDATA const char getobj_enchant_accessory_objects[];
@@ -439,6 +446,7 @@ E NEARDATA const struct extended_menu_info zeroextendedmenuinfo;
 E NEARDATA const struct extended_create_window_info zerocreatewindowinfo;
 
 E NEARDATA const struct d_level zerodlevel;
+E NEARDATA const coord zerocoord;
 
 E NEARDATA int gnh_has_rogue_level;
 
@@ -690,15 +698,11 @@ E const char* const hofe_titles[3];
 
 E uint64_t file_end_marker;
 
-E char debug_buf_1[BUFSZ * 2];
-E char debug_buf_2[BUFSZ * 2];
-E char debug_buf_3[BUFSZ * 2];
-E char debug_buf_4[BUFSZ * 2];
-
-E char priority_debug_buf_1[BUFSZ * 2];
-E char priority_debug_buf_2[BUFSZ * 2];
-E char priority_debug_buf_3[BUFSZ * 2];
-E char priority_debug_buf_4[BUFSZ * 2];
+#define NUM_DEBUGBUFS 25
+#define DEBUGBUFSIZ (BUFSZ * 2)
+E char debug_buf_array[NUM_DEBUGBUFS][DEBUGBUFSIZ];
+E int debug_buf_count;
+E int debug_buf_start;
 
 #undef E
 

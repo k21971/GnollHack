@@ -6,9 +6,11 @@ using GnollHackM.Platforms.Windows;
 using System.Management;
 using Windows.Graphics;
 using System.Reflection.Metadata;
+using Windows.System;
 #elif ANDROID
 using Android.Animation;
 using Android.Views;
+using Android.Content;
 #elif IOS
 using CoreAnimation;
 using Foundation;
@@ -48,10 +50,16 @@ using Azure;
 using System.Text.RegularExpressions;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 
 namespace GnollHackX
 {
     public delegate Task<bool> BackButtonHandler(object sender, EventArgs e);
+    public struct KeyMap
+    {
+        public int MappedCommand;
+        public IntPtr FunctionPointer;
+    }
 
     public static class GHApp
     {
@@ -105,6 +113,7 @@ namespace GnollHackX
             DeveloperMode = Preferences.Get("DeveloperMode", GHConstants.DefaultDeveloperMode);
             DebugLogMessages = DeveloperMode && Preferences.Get("DebugLogMessages", GHConstants.DefaultLogMessages);
             LowLevelLogging = DeveloperMode && Preferences.Get("LowLevelLogging", false);
+            ScreenLogging = DeveloperMode && Preferences.Get("ScreenLogging", false);
             DebugPostChannel = DeveloperMode && Preferences.Get("DebugPostChannel", GHConstants.DefaultDebugPostChannel);
             TournamentMode = Preferences.Get("TournamentMode", false);
             FullVersionMode = true; // Preferences.Get("FullVersion", true);
@@ -138,7 +147,7 @@ namespace GnollHackX
             XlogPassword = Preferences.Get("XlogPassword", "");
             XlogReleaseAccount = Preferences.Get("XlogReleaseAccount", false);
             AllowBones = Preferences.Get("AllowBones", true);
-            AllowPet = Preferences.Get("AllowPet", true);
+            //AllowPet = Preferences.Get("AllowPet", true);  //Use MirroredPetsNotGifted instead
             BonesAllowedUsers = Preferences.Get("BonesAllowedUsers", "");
             EmptyWishIsNothing = Preferences.Get("EmptyWishIsNothing", true);
             RecommendedSettingsChecked = Preferences.Get("RecommendedSettingsChecked", false);
@@ -168,11 +177,20 @@ namespace GnollHackX
             UseAuxGPU = Preferences.Get("UseAuxiliaryGLCanvas", IsUseAuxGPUDefault);
             DisableAuxGPU = Preferences.Get("DisableAuxiliaryGLCanvas", IsDisableAuxGPUDefault);
             FixRects = Preferences.Get("FixRects", IsFixRectsDefault);
+            FixFiltering = Preferences.Get("FixFiltering", IsFixFilteringDefault);
+            RuntimeEffects = Preferences.Get("RuntimeEffects", GHConstants.DefaultRuntimeEffects);
             DisableWindowsKey = Preferences.Get("DisableWindowsKey", false);
             DefaultVIKeys = Preferences.Get("DefaultVIKeys", false);
+            ShowKeyboardShortcuts = Preferences.Get("ShowKeyboardShortcuts", IsDesktop);
+            UseSingleMoreCommandsPage = Preferences.Get("UseSingleMoreCommandsPage", IsDesktop);
+            ShowSkillContextButton = Preferences.Get("ShowSkillContextButton", true);
+            ShowPolearmContextButton = Preferences.Get("ShowPolearmContextButton", GHConstants.DefaultShowPolearmContextButton);
+            EquipmentFlipAnimation = Preferences.Get("EquipmentFlipAnimation", true);
+            ShowEquipmentIcons = Preferences.Get("ShowEquipmentIcons", true);
 
-            ulong FreeDiskSpaceInBytes = PlatformService.GetDeviceFreeDiskSpaceInBytes();
-            if (FreeDiskSpaceInBytes < GHConstants.LowFreeDiskSpaceThresholdInBytes)
+            ulong freeDiskSpaceInBytes = PlatformService?.GetDeviceFreeDiskSpaceInBytes() ?? 0;
+            FreeDiskSpaceInBytes = freeDiskSpaceInBytes;
+            if (freeDiskSpaceInBytes < GHConstants.LowFreeDiskSpaceThresholdInBytes)
             {
                 if (RecordGame)
                 {
@@ -181,7 +199,7 @@ namespace GnollHackX
                     InformAboutRecordingSetOff = true;
                 }
 
-                if (FreeDiskSpaceInBytes < GHConstants.VeryLowFreeDiskSpaceThresholdInBytes)
+                if (freeDiskSpaceInBytes < GHConstants.VeryLowFreeDiskSpaceThresholdInBytes)
                 {
                     InformAboutFreeDiskSpace = true;
                 }
@@ -198,6 +216,133 @@ namespace GnollHackX
             SaveScreenResolution();
             ChangeToCustomScreenResolution();
             InitializePlatformRenderLoop();
+            InitializeMemoryWarnings();
+        }
+
+        private static long _usedBitmapBytes = 0L;
+        public static ulong UsedBitmapBytes { get { return (ulong)Interlocked.CompareExchange(ref _usedBitmapBytes, 0L, 0L); } set { Interlocked.Exchange(ref _usedBitmapBytes, (long)value); } }
+        public static void AddUsedBitmapBytes(long amount)
+        {
+            Interlocked.Add(ref _usedBitmapBytes, amount);
+        }
+
+        private static long _freeDiskSpaceInBytes = 0L;
+        public static ulong FreeDiskSpaceInBytes { get { return (ulong)Interlocked.CompareExchange(ref _freeDiskSpaceInBytes, 0L, 0L); } set { Interlocked.Exchange(ref _freeDiskSpaceInBytes, (long)value); } }
+        public static void UpdateFreeDiskSpace()
+        {
+            try
+            {
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    try
+                    {
+                        FreeDiskSpaceInBytes = PlatformService?.GetDeviceFreeDiskSpaceInBytes() ?? 0;
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex.Message);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+            }
+        }
+
+        private static long _memUsage = 0;
+        public static long MemoryUsageInBytes { get { return Interlocked.CompareExchange(ref _memUsage, 0L, 0L); } set { Interlocked.Exchange(ref _memUsage, value); } }
+
+        public static void UpdateUsedMemory()
+        {
+            try
+            {
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    try
+                    {
+                        MemoryUsageInBytes = GetUsedMemoryInBytes();
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex.Message);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+            }
+        }
+
+        private static KeyMap[] _tempKeyMapArray = new KeyMap[256];
+        private static KeyMap[] _keyMapArray = new KeyMap[256];
+        private static KeyMap[] KeyMapArray { get { return Interlocked.CompareExchange(ref _keyMapArray, null, null); } set { Interlocked.Exchange(ref _keyMapArray, value); } }
+
+        public static int MapCommand(int c)
+        {
+            if (c <= 0 || c >= 256)
+                return c;
+
+            KeyMap[] arr = KeyMapArray;
+            if (arr[c].MappedCommand == 0)
+                return c;
+            else
+                return arr[c].MappedCommand;
+        }
+
+        private static int _closingApp = 0;
+        public static bool CheckCloseAndSetTrue { get { return Interlocked.Exchange(ref _closingApp, 1) != 0; } }
+        public static bool IsAppClosing { get { return Interlocked.CompareExchange(ref _closingApp, 0, 0) != 0; } }
+
+
+        private static int _isCriticalClearCachesAndMemoryOk = 1;
+        public static bool IsCriticalClearCachesAndMemoryOk { get { return Interlocked.CompareExchange(ref _isCriticalClearCachesAndMemoryOk, 0, 0) != 0; } set { Interlocked.Exchange(ref _isCriticalClearCachesAndMemoryOk, value ? 1 : 0); } }
+        private static int _isCompleteClearCachesAndMemoryOk = 1;
+        public static bool IsCompleteClearCachesAndMemoryOk { get { return Interlocked.CompareExchange(ref _isCompleteClearCachesAndMemoryOk, 0, 0) != 0; } set { Interlocked.Exchange(ref _isCompleteClearCachesAndMemoryOk, value ? 1 : 0); } }
+
+        private static void HandleMemoryWarning(MemoryPressureLevel level)
+        {
+            switch (level)
+            {
+                case MemoryPressureLevel.Low:
+                case MemoryPressureLevel.Medium:
+                    break;
+                case MemoryPressureLevel.Critical:
+                    if (!IsAppClosing && Interlocked.Exchange(ref _isCriticalClearCachesAndMemoryOk, 0) == 1)
+                    {
+                        ulong TotalMemInMB = TotalMemory / (1024 * 1024);
+                        long UsedMemInBytes = GetUsedMemoryInBytes();
+                        long UsedMemInMB = UsedMemInBytes == -1 ? -1 : UsedMemInBytes / (1024 * 1024);
+                        CurrentGamePage?.RequestClearCaches((int)level);
+                        AddSentryBreadcrumb("MemoryWarning at " + level.ToString() + " (" + UsedMemInMB + " / " + TotalMemInMB + " MB)", GHConstants.SentryGnollHackGeneralCategoryName);
+                    }
+                    break;
+                case MemoryPressureLevel.Background:
+                    if (!IsAppClosing && Interlocked.Exchange(ref _isCompleteClearCachesAndMemoryOk, 0) == 1)
+                    {
+                        ulong TotalMemInMB = TotalMemory / (1024 * 1024);
+                        long UsedMemInBytes = GetUsedMemoryInBytes();
+                        long UsedMemInMB = UsedMemInBytes == -1 ? -1 : UsedMemInBytes / (1024 * 1024);
+                        if (!SavingGame) /* Due to backgrounding must be done first */
+                            CollectGarbage();
+                        CurrentGamePage?.RequestClearCaches((int)level);
+                        AddSentryBreadcrumb("MemoryWarning at " + level.ToString() + " (" + UsedMemInMB + " / " + TotalMemInMB + " MB)", GHConstants.SentryGnollHackGeneralCategoryName);
+                    }
+                    break;
+                case MemoryPressureLevel.Complete:
+                    if (!IsAppClosing && Interlocked.Exchange(ref _isCompleteClearCachesAndMemoryOk, 0) == 1)
+                    {
+                        ulong TotalMemInMB = TotalMemory / (1024 * 1024);
+                        long UsedMemInBytes = GetUsedMemoryInBytes();
+                        long UsedMemInMB = UsedMemInBytes == -1 ? -1 : UsedMemInBytes / (1024 * 1024);
+                        if (!SavingGame)
+                            CollectGarbage(); /* Do this already here too, as we may not be able to wait until after clearing caches */
+                        CurrentGamePage?.RequestClearCaches((int)level);
+                        AddSentryBreadcrumb("MemoryWarning at " + level.ToString() + " (" + UsedMemInMB + " / " + TotalMemInMB + " MB)", GHConstants.SentryGnollHackGeneralCategoryName);
+                    }
+                    break;
+            }
         }
 
         private static int _mainPageConstructorRunNumber = 0;
@@ -209,12 +354,15 @@ namespace GnollHackX
 
         private static int _gameStarted = 0;
         public static bool GameStarted { get { return Interlocked.CompareExchange(ref _gameStarted, 0, 0) != 0; } set { Interlocked.Exchange(ref _gameStarted, value ? 1 : 0); } }
-        
+
         private static int _mainScreenMusicStarted = 0;
         public static bool MainScreenMusicStarted { get { return Interlocked.CompareExchange(ref _mainScreenMusicStarted, 0, 0) != 0; } set { Interlocked.Exchange(ref _mainScreenMusicStarted, value ? 1 : 0); } }
 
         private static int _doAppExitOnReturn = 0;
         public static bool DoAppExitOnReturn { get { return Interlocked.CompareExchange(ref _doAppExitOnReturn, 0, 0) != 0; } set { Interlocked.Exchange(ref _doAppExitOnReturn, value ? 1 : 0); } }
+
+        private static int _handlingKeyPress = 0;
+        public static bool PushingModalPage { get { return Interlocked.CompareExchange(ref _handlingKeyPress, 0, 0) != 0; } set { Interlocked.Exchange(ref _handlingKeyPress, value ? 1 : 0); } }
 
 
 #if ANDROID
@@ -251,11 +399,27 @@ namespace GnollHackX
 #endif
         }
 
+        public static long GetUsedManagedMemoryInBytes()
+        {
+            try
+            {
+                return GC.GetTotalMemory(false);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex);
+                return -1;
+            }
+        }
+
         public static long GetUsedMemoryInBytes()
         {
             try
             {
 #if IOS
+                ulong mem = _platformService?.GetUsedMemoryInBytes() ?? 0;
+                if (mem > 0)
+                    return (long)mem;
                 return -1;
 #else
                 var process = Process.GetCurrentProcess();
@@ -300,16 +464,16 @@ namespace GnollHackX
 
         private static int _usePlatformAnimationLoop = 0;
         public static bool UsePlatformRenderLoop { get { return IsPlatformRenderLoopAvailable && Interlocked.CompareExchange(ref _usePlatformAnimationLoop, 0, 0) != 0; } set { Interlocked.Exchange(ref _usePlatformAnimationLoop, value ? 1 : 0); } }
-        public static bool IsPlatformRenderLoopAvailable 
-        { 
-            get 
+        public static bool IsPlatformRenderLoopAvailable
+        {
+            get
             {
 #if GNH_MAUI && (WINDOWS || ANDROID || IOS)
                 return true;
 #else
                 return false;
 #endif
-            } 
+            }
         }
 
         private static readonly Stopwatch _renderingStopWatch = new Stopwatch();
@@ -324,14 +488,7 @@ namespace GnollHackX
                 counter = 0;
             }
 
-            //lock (_renderingLock)
-            //{
-            //    _renderingCounter++;
-            //    if (_renderingCounter == long.MaxValue)
-            //        _renderingCounter = 0;
-            //}
-
-            if (!UsePlatformRenderLoop)
+            if (!UsePlatformRenderLoop || IsSuspended)
                 return;
 
             GamePage curGamePage = CurrentGamePage;
@@ -396,6 +553,8 @@ namespace GnollHackX
             else
             {
                 int divisor = screenRefreshRate / refreshRate;
+                if (divisor <= 0)
+                    divisor = 1;
                 if (divisor == 1 || counter % divisor == 0)
                 {
                     int mod = screenRefreshRate % refreshRate;
@@ -416,14 +575,8 @@ namespace GnollHackX
                 _renderingStopWatch.Stop();
         }
 
-        public static void BeforeExitApp()
+        public static void StopPlatformRenderLoop()
         {
-            AddSentryBreadcrumb("BeforeExitApp", GHConstants.SentryGnollHackGeneralCategoryName);
-            FmodService?.ShutdownFmod();
-            Connectivity.ConnectivityChanged -= Connectivity_ConnectivityChanged;
-            Battery.BatteryInfoChanged -= Battery_BatteryInfoChanged;
-            DeviceDisplay.MainDisplayInfoChanged -= DeviceDisplay_MainDisplayInfoChanged;
-            RevertScreenResolution();
 #if WINDOWS
             Microsoft.UI.Xaml.Media.CompositionTarget.Rendering -= CompositionTarget_Rendering;
 #elif ANDROID
@@ -445,7 +598,40 @@ namespace GnollHackX
                 _platformTicker = null;
             }
 #endif
-            //CollectGarbage();
+        }
+
+        public static void UnsubscribeFromEvents()
+        {
+            AddSentryBreadcrumb("UnsubscribeFromEvents", GHConstants.SentryGnollHackGeneralCategoryName);
+            Connectivity.ConnectivityChanged -= Connectivity_ConnectivityChanged;
+            Battery.BatteryInfoChanged -= Battery_BatteryInfoChanged;
+            DeviceDisplay.MainDisplayInfoChanged -= DeviceDisplay_MainDisplayInfoChanged;
+        }
+
+        public static void BeforeExitApp()
+        {
+            AddSentryBreadcrumb("BeforeExitApp", GHConstants.SentryGnollHackGeneralCategoryName);
+            RevertScreenResolution();
+        }
+
+        public static async Task FinishApp()
+        {
+            bool didAwait = false;
+#if GNH_MAUI
+            AddSentryBreadcrumb("FinishApp", GHConstants.SentryGnollHackGeneralCategoryName);
+#if ANDROID
+            var activity = Platform.CurrentActivity;
+            if (activity != null)
+            {
+                activity.FinishAffinity();
+                activity.Finish();
+                await Task.Delay(250);
+                didAwait = true;
+            }
+#endif
+#endif
+            if (!didAwait)
+                await Task.Delay(40);
         }
 
         private static void InitializeScreenResolutions()
@@ -713,6 +899,50 @@ namespace GnollHackX
             }
         }
 
+        public static async Task PopModalPageAsync()
+        {
+            try
+            {
+                var page = await Navigation.PopModalAsync();
+                DisconnectIViewHandlers(page);
+            }
+            catch (Exception ex)
+            {
+                MaybeWriteGHLog(ex.Message);
+            }
+        }
+
+        public static async Task PushModalPageAsync(Page page)
+        {
+            try
+            {
+                PushingModalPage = true;
+                await Task.Yield();
+                await Navigation.PushModalAsync(page);
+            }
+            catch (Exception ex)
+            {
+                MaybeWriteGHLog(ex.Message);
+            }
+            finally
+            {
+                PushingModalPage = false;
+            }
+        }
+
+        public static async Task PushModalPageAsync(Page page, bool animated)
+        {
+            try
+            {
+                await Task.Yield();
+                await Navigation.PushModalAsync(page, animated);
+            }
+            catch (Exception ex)
+            {
+                MaybeWriteGHLog(ex.Message);
+            }
+        }
+
         public static bool IsKeyboardConnected
         {
             get
@@ -780,7 +1010,7 @@ namespace GnollHackX
             if (args != null && args.Length > 0)
             {
                 int cnt = args.Length;
-                for(int i = 0; i < cnt; i++)
+                for (int i = 0; i < cnt; i++)
                 {
                     if (args[i] != null && args[i].ToLower() == "-store")
                     {
@@ -898,30 +1128,47 @@ namespace GnollHackX
         public static void SetMirroredOptionsToDefaults()
         {
             MirroredCharacterClickAction = Preferences.Get("CharacterClickAction", GHConstants.DefaultCharacterClickAction);
+            MirroredMetricSystem = Preferences.Get("MetricSystem", GHConstants.DefaultMetricSystem);
             MirroredRightMouseCommand = Preferences.Get("RightMouseCommand", GHConstants.DefaultRightMouseCommand);
             MirroredMiddleMouseCommand = Preferences.Get("MiddleMouseCommand", GHConstants.DefaultMiddleMouseCommand);
             MirroredDiceAsRanges = Preferences.Get("DiceAsRanges", GHConstants.DefaultDiceAsRanges);
+            MirroredWornShowsEquipment = Preferences.Get("WornShowsEquipment", GHConstants.DefaultWornShowsEquipment);
             MirroredAutoDig = Preferences.Get("AutoDig", GHConstants.DefaultAutoDig);
             MirroredIgnoreStopping = Preferences.Get("IgnoreStopping", GHConstants.DefaultIgnoreStopping);
+            MirroredPetsNotGifted = !Preferences.Get("AllowPet", true);
+
+            MirroredEngraveQuickText = Preferences.Get("EngraveQuickText", "");
+            MirroredEngraveQuickStyle = Preferences.Get("EngraveQuickStyle", 0);
         }
 
-        public static void MaybeFixRects(ref SKRect source, ref SKRect dest, float targetscale, bool usingGL, bool fixRects)
+        public static void MaybeFixRects(ref SKRect source, ref SKRect dest, float targetscale, bool usingGL, bool fixRects, bool fixFiltering)
         {
+            /* Requires only high quality filter to be on; can happen on GL and non-GL */
+            if (fixFiltering && source.Height > 1.02f)
+            {
+                /* Note that many horizontal artifacts in menus may be caused by Improved Menu Images and its high quality filtering that expands beyond the source bitmap */
+                source.Top += 0.51f;
+                source.Bottom -= 0.51f;
+                source.Left += 0.51f;
+                source.Right -= 0.51f;
+            }
+
             if ((usingGL || IsWindows) && fixRects)
             {
                 //if (targetscale <= 0)
                 //    targetscale = 1.0f;
 
-                if (source.Width > 0.02f)
+                if (!fixFiltering && source.Width > 0.02f)
                 {
                     source.Left += 0.01f;
                     source.Right -= 0.01f;
                 }
-                if (source.Height > 0.02f)
+                if (!fixFiltering && source.Height > 0.02f)
                 {
                     source.Top += 0.01f;
                     source.Bottom -= 0.01f;
                 }
+
                 dest.Right += 1.0f;
                 dest.Bottom += 1.0f;
             }
@@ -1149,7 +1396,7 @@ namespace GnollHackX
             }
         }
 
-        public static readonly bool IsDebug = 
+        public static readonly bool IsDebug =
 #if DEBUG
             true;
 #else
@@ -1176,6 +1423,12 @@ namespace GnollHackX
         //private static readonly object _fixRectLock = new object();
         private static int _fixRects = 0;
         public static bool FixRects { get { return Interlocked.CompareExchange(ref _fixRects, 0, 0) != 0; } set { Interlocked.Exchange(ref _fixRects, value ? 1 : 0); } }
+
+        private static int _fixFiltering = 0;
+        public static bool FixFiltering { get { return Interlocked.CompareExchange(ref _fixFiltering, 0, 0) != 0; } set { Interlocked.Exchange(ref _fixFiltering, value ? 1 : 0); } }
+
+        private static int _runtimeEffects = GHConstants.DefaultRuntimeEffects ? 1 : 0;
+        public static bool RuntimeEffects { get { return GHConstants.EnableExperimentalFeatures && Interlocked.CompareExchange(ref _runtimeEffects, 0, 0) != 0; } set { Interlocked.Exchange(ref _runtimeEffects, value ? 1 : 0); } }
 
         //private static readonly object _drawWallEndsLock = new object();
         private static int _drawWallEnds = GHConstants.DefaultDrawWallEnds ? 1 : 0;
@@ -1277,7 +1530,7 @@ namespace GnollHackX
         }
 
         private static GHGame _currentGHGame = null;
-        public static GHGame CurrentGHGame 
+        public static GHGame CurrentGHGame
         {
             get { return Interlocked.CompareExchange(ref _currentGHGame, null, null); }
             set { Interlocked.Exchange(ref _currentGHGame, value); }
@@ -1428,11 +1681,11 @@ namespace GnollHackX
             get
             {
                 return true;
-//#if WINDOWS
-//                return IsPackaged;
-//#else
-//                return true;
-//#endif
+                //#if WINDOWS
+                //                return IsPackaged;
+                //#else
+                //                return true;
+                //#endif
             }
         }
 
@@ -1452,6 +1705,21 @@ namespace GnollHackX
             }
         }
 
+        public static bool IsFixFilteringDefault
+        {
+            get
+            {
+#if GNH_MAUI
+#if IOS
+                return true;
+#else
+                return false;
+#endif
+#else
+                return false;
+#endif
+            }
+        }
         public static bool IsUseMainMipMapDefault
         {
             get
@@ -1574,15 +1842,15 @@ namespace GnollHackX
             }
         }
 
-        private static Secrets _currentSecrets = null;
-        public static Secrets CurrentSecrets
+        private static Secrets _currentSettings = null;
+        public static Secrets CurrentSettings
         {
             get
-            { return _currentSecrets; }
+            { return _currentSettings; }
             set
-            { _currentSecrets = value; }
+            { _currentSettings = value; }
         }
-        public static void ReadSecrets()
+        public static void ReadSettings()
         {
             Assembly assembly = typeof(App).GetTypeInfo().Assembly;
             string json = "";
@@ -1601,7 +1869,7 @@ namespace GnollHackX
                 }
             }
 
-            CurrentSecrets = JsonConvert.DeserializeObject<Secrets>(json);
+            CurrentSettings = JsonConvert.DeserializeObject<Secrets>(json);
         }
 
         private static UserSecrets _currentUserSecrets = null;
@@ -1616,7 +1884,7 @@ namespace GnollHackX
         {
             Assembly assembly = typeof(App).GetTypeInfo().Assembly;
             string json = "";
-            using (Stream stream = assembly.GetManifestResourceStream(GHApp.AppResourceName + GHConstants.GHSecretsResourcePath))
+            using (Stream stream = assembly.GetManifestResourceStream(AppResourceName + GHConstants.GHSecretsResourcePath))
             {
                 if (stream != null)
                 {
@@ -1634,6 +1902,18 @@ namespace GnollHackX
             CurrentUserSecrets = JsonConvert.DeserializeObject<UserSecrets>(json);
         }
 
+        public static void TryReadSecrets()
+        {
+            try
+            {
+                ReadUserSecrets();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("GnollHack failed to read user secrets file: " + ex.Message); //MaybeWriteGHLog
+            }
+        }
+
         //private static readonly object _aggregateSessionPlayTimeLock = new object();
         private static long _aggregateSessionPlayTime = 0L;
         public static long AggregateSessionPlayTime { get { return Interlocked.CompareExchange(ref _aggregateSessionPlayTime, 0, 0); } set { Interlocked.Exchange(ref _aggregateSessionPlayTime, value); } }
@@ -1644,13 +1924,8 @@ namespace GnollHackX
 
             if (Interlocked.Add(ref _aggregateSessionPlayTime, addition) < 0)
                 Interlocked.Exchange(ref _aggregateSessionPlayTime, 0);
-            //lock (_aggregateSessionPlayTimeLock)
-            //{
-            //    _aggregateSessionPlayTime = _aggregateSessionPlayTime + addition;
-            //}
         }
 
-        //private static readonly object _saveResumeLock = new object();
         private static int _cancelSaveGame = 0;
         private static int _savingGame = 0;
         private static int _appSwitchSaveStyle = 0;
@@ -1663,11 +1938,11 @@ namespace GnollHackX
 
 
         private static readonly object _gameSaveResultLock = new object();
-        public static int GameSaveResult 
-        { 
-            get 
-            { 
-                lock (_gameSaveResultLock) 
+        public static int GameSaveResult
+        {
+            get
+            {
+                lock (_gameSaveResultLock)
                 {
                     try
                     {
@@ -1678,11 +1953,11 @@ namespace GnollHackX
                         Debug.WriteLine(ex);
                         return 0;
                     }
-                } 
-            } 
-            set 
-            { 
-                lock (_gameSaveResultLock) 
+                }
+            }
+            set
+            {
+                lock (_gameSaveResultLock)
                 {
                     try
                     {
@@ -1692,8 +1967,8 @@ namespace GnollHackX
                     {
                         Debug.WriteLine(ex);
                     }
-                } 
-            } 
+                }
+            }
         }
 
         public static void CollectGarbage()
@@ -1746,6 +2021,7 @@ namespace GnollHackX
 
         public static void OnSleep()
         {
+            IsSuspended = true;
             if (!UsePlatformRenderLoop)
                 PlatformService?.RevertAnimatorDuration(false);
 
@@ -1754,8 +2030,17 @@ namespace GnollHackX
 
             SleepMuteMode = true;
 
-            /* On MAUI on Android and iOS, moved saving game to SaveGameOnSleepAsync which is called in earlier events using a background task that should live long enough */
 #if !GNH_MAUI || (!ANDROID && !IOS) 
+            SaveGameOnSleep();
+#else
+            /* Android and iOS are handled in MauiProgram */
+            /* On MAUI on Android and iOS, moved saving game to SaveGameOnSleepAsync which is called in earlier events using a background task that should live long enough */
+#endif
+            CollectGarbage();
+        }
+
+        public static void SaveGameOnSleep()
+        {
             if (IsAutoSaveUponSwitchingAppsOn)
             {
                 CancelSaveGame = false;
@@ -1777,12 +2062,11 @@ namespace GnollHackX
                         GamePage gamePage = game.ActiveGamePage;
                         if (gamePage != null && gamePage.GameEnded && OperatingSystemKillsAppsOnBackground)
                             gamePage.FastForwardRequested = true;
+                        MaybeWriteGHLog("OnSleep: SaveGameAndWaitForResume", true, GHConstants.SentryGnollHackGeneralCategoryName);
                         game.SaveGameAndWaitForResume();
                     }
                 }
             }
-#endif
-            CollectGarbage();
         }
 
         public static async Task SaveGameOnSleepAsync()
@@ -1815,15 +2099,14 @@ namespace GnollHackX
         }
 
 #if IOS
-        private static IntPtr _backgroundTaskId = UIKit.UIApplication.BackgroundTaskInvalid;
-        public static IntPtr BackgroundTaskId { get { return Interlocked.CompareExchange(ref _backgroundTaskId, 0, 0); } set { Interlocked.Exchange(ref _backgroundTaskId, value); } }
-        public static void EndBackgroundTask()
+        //private static IntPtr _backgroundTaskId = UIKit.UIApplication.BackgroundTaskInvalid;
+        //public static IntPtr BackgroundTaskId { get { return Interlocked.CompareExchange(ref _backgroundTaskId, 0, 0); } set { Interlocked.Exchange(ref _backgroundTaskId, value); } }
+        public static void EndBackgroundTask(IntPtr localTaskId)
         {
-            IntPtr localTaskId = BackgroundTaskId;
             if (localTaskId != UIKit.UIApplication.BackgroundTaskInvalid)
             {
                 UIKit.UIApplication.SharedApplication.EndBackgroundTask(localTaskId);
-                BackgroundTaskId = UIKit.UIApplication.BackgroundTaskInvalid;
+                //BackgroundTaskId = UIKit.UIApplication.BackgroundTaskInvalid;
             }
         }
 #endif
@@ -1842,6 +2125,29 @@ namespace GnollHackX
             CurrentGamePage = null;
         }
 
+        public static async Task PopAllModalPagesAboveGamePageAsync()
+        {
+            try
+            {
+                Page topPage;
+                while ((topPage = PageFromTopOfModalNavigationStack()) != null && !(topPage is GamePage))
+                {
+                    if (topPage is ICloseablePage)
+                    {
+                        (topPage as ICloseablePage)?.ClosePage();
+                    }
+                    else
+                    {
+                        await PopModalPageAsync();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MaybeWriteGHLog(ex.Message);
+            }
+        }
+
         public static void OnResume()
         {
             HandleResume(false);
@@ -1849,8 +2155,12 @@ namespace GnollHackX
 
         private static void HandleResume(bool isRestart)
         {
+            IsSuspended = false;
             if (!UsePlatformRenderLoop)
                 PlatformService?.OverrideAnimatorDuration();
+
+            IsCriticalClearCachesAndMemoryOk = true;
+            IsCompleteClearCachesAndMemoryOk = true;
 
             CtrlDown = false;
             AltDown = false;
@@ -1863,7 +2173,7 @@ namespace GnollHackX
                 var timer = Microsoft.Maui.Controls.Application.Current.Dispatcher.CreateTimer();
                 timer.Interval = TimeSpan.FromSeconds(0.25);
                 timer.IsRepeating = false;
-                timer.Tick += async (s, e) => 
+                timer.Tick += async (s, e) =>
                 {
                     try
                     {
@@ -1932,7 +2242,17 @@ namespace GnollHackX
             }
 #endif
 
-            if (IsAutoSaveUponSwitchingAppsOn && !isRestart)
+#if !GNH_MAUI || !IOS
+            if (!isRestart)
+                CheckResumeSavedGame();
+#else
+            /* iOS is handled in MauiProgram */
+#endif
+        }
+
+        public static void CheckResumeSavedGame()
+        {
+            if (IsAutoSaveUponSwitchingAppsOn)
             {
                 CancelSaveGame = true;
                 GHGame game = CurrentGHGame;
@@ -1940,7 +2260,7 @@ namespace GnollHackX
                 {
                     //Detect background app killing OS, check if last exit is through going to sleep & game has been saved, and load previously saved game
                     bool wenttosleep = false;
-                    try 
+                    try
                     {
                         wenttosleep = Preferences.Get("WentToSleepWithGameOn", false);
                         Preferences.Set("WentToSleepWithGameOn", false);
@@ -1952,9 +2272,31 @@ namespace GnollHackX
                     }
                     if (wenttosleep && (GameSaved || SavingGame))
                     {
+                        MaybeWriteGHLog("HandleResume: StopWaitAndResumeSavedGame", true, GHConstants.SentryGnollHackGeneralCategoryName);
                         game.StopWaitAndResumeSavedGame();
                     }
                 }
+            }
+        }
+
+        public static bool WasGameSaved
+        {
+            get
+            {
+                GHGame curGame = GHApp.CurrentGHGame;
+                bool wenttosleep = false;
+                try
+                {
+                    wenttosleep = Preferences.Get("WentToSleepWithGameOn", false);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine(ex);
+                }
+                bool wasSaved = IsAutoSaveUponSwitchingAppsOn
+                    && curGame != null && !curGame.PlayingReplay
+                    && wenttosleep && (GameSaved || SavingGame);
+                return wasSaved;
             }
         }
 
@@ -1966,7 +2308,7 @@ namespace GnollHackX
                 Thread t = GnhThread;
                 if (game != null && t != null && t.IsAlive)
                 {
-                    game.StopWaitAndExitThread();
+                    game.RequestForceExitThread();
                 }
             }
             catch (Exception ex)
@@ -1979,8 +2321,73 @@ namespace GnollHackX
         {
 #if SENTRY
             if (!string.IsNullOrWhiteSpace(message))
+            {
                 SentrySdk.AddBreadcrumb(message, category);
+            }
 #endif
+        }
+
+
+        public static void ReadCommands(int customKeyBindingsRead)
+        {
+            IGnollHackService gnollHackService = GnollHackService;
+            if (gnollHackService != null)
+            {
+                if (customKeyBindingsRead == 0)
+                {
+                    /* Set function pointers, initialize mapped command */
+                    for (int i = 1; i < 256; i++)
+                    {
+                        IntPtr ptr = gnollHackService.GetCommandFunctionPointer(i);
+                        _tempKeyMapArray[i].FunctionPointer = ptr;
+                        _tempKeyMapArray[i].MappedCommand = 0;
+                    }
+                }
+                else
+                {
+                    for (int i = 1; i < 256; i++)
+                    {
+                        bool wasFound = false;
+                        IntPtr origPtr = _tempKeyMapArray[i].FunctionPointer; /* We need to look for this original one */
+                        if (origPtr != IntPtr.Zero)
+                        {
+                            /* Find the corresponding function pointer, and set mapped command to i */
+                            for (int j = 1; j < 256; j++)
+                            {
+                                IntPtr curPtr = gnollHackService.GetCommandFunctionPointer(j);
+                                if (curPtr != IntPtr.Zero && curPtr == origPtr
+                                    && (_tempKeyMapArray[i].MappedCommand == 0
+                                        || i == j
+                                        || ((j >= 32 && j < 128) && !(_tempKeyMapArray[i].MappedCommand >= 32 && _tempKeyMapArray[i].MappedCommand < 128))
+                                        ))
+                                {
+                                    _tempKeyMapArray[i].MappedCommand = j;
+                                    wasFound = true;
+                                    //break;
+                                }
+                            }
+                        }
+                        /* This is a new command not present earlier, so we map it to where it is, if that key is free */
+                        /* Since these are not used by the GUI in buttons (GUI uses only the ones present in the original bindings so that the commands in fact work), this does not do much anything */
+                        if (!wasFound && origPtr == IntPtr.Zero)
+                        {
+                            _tempKeyMapArray[i].MappedCommand = i;
+                        }
+                    }
+
+                    /* These are old commands that are not found in new bindings; we map them where they are if there is no other mapped command overriding them */
+                    /* This obviously does not cause the old command to executed but at least does something when the key is pressed */
+                    for (int i = 1; i < 256; i++)
+                    {
+                        if (_tempKeyMapArray[i].MappedCommand == 0 && _tempKeyMapArray[i].FunctionPointer != IntPtr.Zero)
+                        {
+                            _tempKeyMapArray[i].MappedCommand = i;
+                        }
+                    }
+
+                    _tempKeyMapArray = Interlocked.Exchange(ref _keyMapArray, _tempKeyMapArray);
+                }
+            }
         }
 
         //private static readonly object _keyboardLock = new object();
@@ -1990,13 +2397,27 @@ namespace GnollHackX
         private static int _windowsKeyDown = 0;
         private static int _disableWindowsKey = 0;
         private static int _defaultVIKeys = 0;
+        private static int _showKeyboardShortcuts = 0;
+        private static int _useSingleMoreCommandsPage = 0;
+        private static int _showSkillContextButton = 0;
+        private static int _showPolearmContextButton = 0;
+        private static int _equipmentFlipAnimation = 0;
+        private static int _showEquipmentIcons = 0;
+        private static int _isSuspended = 0;
 
         public static bool CtrlDown { get { return Interlocked.CompareExchange(ref _ctrlDown, 0, 0) != 0; } set { Interlocked.Exchange(ref _ctrlDown, value ? 1 : 0); } }
         public static bool AltDown { get { return Interlocked.CompareExchange(ref _altDown, 0, 0) != 0; } set { Interlocked.Exchange(ref _altDown, value ? 1 : 0); } }
         public static bool ShiftDown { get { return Interlocked.CompareExchange(ref _shiftDown, 0, 0) != 0; } set { Interlocked.Exchange(ref _shiftDown, value ? 1 : 0); } }
         public static bool WindowsKeyDown { get { return Interlocked.CompareExchange(ref _windowsKeyDown, 0, 0) != 0; } set { Interlocked.Exchange(ref _windowsKeyDown, value ? 1 : 0); } }
-        public static bool DisableWindowsKey{ get { return Interlocked.CompareExchange(ref _disableWindowsKey, 0, 0) != 0; } set { Interlocked.Exchange(ref _disableWindowsKey, value ? 1 : 0); } }
+        public static bool DisableWindowsKey { get { return Interlocked.CompareExchange(ref _disableWindowsKey, 0, 0) != 0; } set { Interlocked.Exchange(ref _disableWindowsKey, value ? 1 : 0); } }
         public static bool DefaultVIKeys { get { return Interlocked.CompareExchange(ref _defaultVIKeys, 0, 0) != 0; } set { Interlocked.Exchange(ref _defaultVIKeys, value ? 1 : 0); } }
+        public static bool ShowKeyboardShortcuts { get { return Interlocked.CompareExchange(ref _showKeyboardShortcuts, 0, 0) != 0; } set { Interlocked.Exchange(ref _showKeyboardShortcuts, value ? 1 : 0); } }
+        public static bool UseSingleMoreCommandsPage { get { return Interlocked.CompareExchange(ref _useSingleMoreCommandsPage, 0, 0) != 0; } set { Interlocked.Exchange(ref _useSingleMoreCommandsPage, value ? 1 : 0); } }
+        public static bool ShowSkillContextButton { get { return Interlocked.CompareExchange(ref _showSkillContextButton, 0, 0) != 0; } set { Interlocked.Exchange(ref _showSkillContextButton, value ? 1 : 0); } }
+        public static bool ShowPolearmContextButton { get { return Interlocked.CompareExchange(ref _showPolearmContextButton, 0, 0) != 0; } set { Interlocked.Exchange(ref _showPolearmContextButton, value ? 1 : 0); } }
+        public static bool EquipmentFlipAnimation { get { return Interlocked.CompareExchange(ref _equipmentFlipAnimation, 0, 0) != 0; } set { Interlocked.Exchange(ref _equipmentFlipAnimation, value ? 1 : 0); } }
+        public static bool ShowEquipmentIcons { get { return Interlocked.CompareExchange(ref _showEquipmentIcons, 0, 0) != 0; } set { Interlocked.Exchange(ref _showEquipmentIcons, value ? 1 : 0); } }
+        public static bool IsSuspended { get { return Interlocked.CompareExchange(ref _isSuspended, 0, 0) != 0; } set { Interlocked.Exchange(ref _isSuspended, value ? 1 : 0); } }
 
         public static bool DownloadOnDemandPackage
         {
@@ -2010,24 +2431,18 @@ namespace GnollHackX
             }
         }
 
-        //private readonly static object _windowedModeLock = new object();
         private static int _windowedMode = 0;
         public static bool WindowedMode
         {
             get { return Interlocked.CompareExchange(ref _windowedMode, 0, 0) != 0; }
             set { Interlocked.Exchange(ref _windowedMode, value ? 1 : 0); }
-            //get { lock (_windowedModeLock) { return _windowedMode; } }
-            //set { lock (_windowedModeLock) { _windowedMode = value; } }
         }
 
-        //private readonly static object _darkModeLock = new object();
         private static int _darkMode = 0;
         public static bool DarkMode
         {
             get { return Interlocked.CompareExchange(ref _darkMode, 0, 0) != 0; }
             set { Interlocked.Exchange(ref _darkMode, value ? 1 : 0); }
-            //get { lock (_darkModeLock) { return _darkMode; } }
-            //set { lock (_darkModeLock) { _darkMode = value; } UpdateTheme(value); }
         }
 
         private static void UpdateTheme(bool isDarkTheme)
@@ -2078,15 +2493,15 @@ namespace GnollHackX
 
         private static bool _silentMode = false;
         public static bool SilentMode /* Manual mute by user  */
-        { 
-            get 
-            { 
-                lock (_muteLock) 
-                { 
-                    return _silentMode; 
-                } 
-            } 
-            set 
+        {
+            get
+            {
+                lock (_muteLock)
+                {
+                    return _silentMode;
+                }
+            }
+            set
             {
                 //UpdateSoundMuteness(GameMuteMode, value, SleepMuteMode, UnfocusedMuteMode); 
                 bool oldGameMuted, oldSilentMode, oldSleepMuteMode, oldUnfocusedMuteMode;
@@ -2099,20 +2514,20 @@ namespace GnollHackX
                     _silentMode = value;
                 }
                 UpdateSoundMuteness(oldGameMuted, value, oldSleepMuteMode, oldUnfocusedMuteMode, oldGameMuted, oldSilentMode, oldSleepMuteMode, oldUnfocusedMuteMode);
-            } 
+            }
         }
 
         private static bool _sleepMuteMode = false;
         public static bool SleepMuteMode /* Muteness because switched apps */
-        { 
-            get 
-            { 
-                lock (_muteLock) 
-                { 
-                    return _sleepMuteMode; 
-                } 
-            } 
-            set 
+        {
+            get
+            {
+                lock (_muteLock)
+                {
+                    return _sleepMuteMode;
+                }
+            }
+            set
             {
                 //UpdateSoundMuteness(GameMuteMode, SilentMode, value, UnfocusedMuteMode);
                 bool oldGameMuted, oldSilentMode, oldSleepMuteMode, oldUnfocusedMuteMode;
@@ -2130,15 +2545,15 @@ namespace GnollHackX
 
         private static bool _unfocusedMuteMode = false;
         public static bool UnfocusedMuteMode /* Muteness due to window being unfocused  */
-        { 
-            get 
-            { 
-                lock (_muteLock) 
-                { 
-                    return _unfocusedMuteMode; 
-                } 
-            } 
-            set 
+        {
+            get
+            {
+                lock (_muteLock)
+                {
+                    return _unfocusedMuteMode;
+                }
+            }
+            set
             {
                 //UpdateSoundMuteness(GameMuteMode, SilentMode, SleepMuteMode, value); 
                 bool oldGameMuted, oldSilentMode, oldSleepMuteMode, oldUnfocusedMuteMode;
@@ -2151,21 +2566,8 @@ namespace GnollHackX
                     _unfocusedMuteMode = value;
                 }
                 UpdateSoundMuteness(oldGameMuted, oldSilentMode, oldSleepMuteMode, value, oldGameMuted, oldSilentMode, oldSleepMuteMode, oldUnfocusedMuteMode);
-            } 
+            }
         }
-
-        //public static void UpdateSoundMuteness(bool newGameMuted, bool newSilentMode, bool newSleepMuteMode, bool newUnfocusedMuteMode)
-        //{
-        //    bool oldGameMuted, oldSilentMode, oldSleepMuteMode, oldUnfocusedMuteMode;
-        //    lock (_muteLock)
-        //    {
-        //        oldGameMuted = _gameMuteMode;
-        //        oldSilentMode = _silentMode;
-        //        oldSleepMuteMode = _sleepMuteMode;
-        //        oldUnfocusedMuteMode = _unfocusedMuteMode;
-        //    }
-        //    UpdateSoundMutenessCore(newGameMuted, newSilentMode, newSleepMuteMode, newUnfocusedMuteMode, oldGameMuted, oldSilentMode, oldSleepMuteMode, oldUnfocusedMuteMode);
-        //}
 
         public static void UpdateSoundMuteness(bool newGameMuted, bool newSilentMode, bool newSleepMuteMode, bool newUnfocusedMuteMode, bool oldGameMuted, bool oldSilentMode, bool oldSleepMuteMode, bool oldUnfocusedMuteMode)
         {
@@ -2244,7 +2646,7 @@ namespace GnollHackX
             bool resetfiles = Preferences.Get("ResetExternalFiles", true);
             if (resetfiles)
             {
-                foreach (SecretsFile sf in CurrentSecrets.files)
+                foreach (SecretsFile sf in CurrentSettings.files)
                 {
                     if (resetfiles)
                     {
@@ -2282,7 +2684,7 @@ namespace GnollHackX
                 if (_hideNavBar)
                 {
 #if GNH_MAUI
-                    if(PlatformService != null)
+                    if (PlatformService != null)
                         PlatformService.HideOsNavigationBar();
 #else
                     MessagingCenter.Send<Object>(new object(), "HideOsNavigationBar");
@@ -2291,7 +2693,7 @@ namespace GnollHackX
                 else
                 {
 #if GNH_MAUI
-                    if(PlatformService != null)
+                    if (PlatformService != null)
                         PlatformService.ShowOsNavigationBar();
 #else
                     MessagingCenter.Send<Object>(new object(), "ShowOsNavigationBar");
@@ -2310,29 +2712,19 @@ namespace GnollHackX
         //private static readonly object _debugLock = new object();
         private static int _debugLogMessages = GHConstants.DefaultLogMessages ? 1 : 0;
         private static int _lowLevelLogging = 0;
+        private static int _screenLogging = 0;
         public static bool DebugLogMessages { get { return Interlocked.CompareExchange(ref _debugLogMessages, 0, 0) != 0; } set { Interlocked.Exchange(ref _debugLogMessages, value ? 1 : 0); } }
         public static bool LowLevelLogging { get { return Interlocked.CompareExchange(ref _lowLevelLogging, 0, 0) != 0; } set { Interlocked.Exchange(ref _lowLevelLogging, value ? 1 : 0); } }
+        public static bool ScreenLogging { get { return Interlocked.CompareExchange(ref _screenLogging, 0, 0) != 0; } set { Interlocked.Exchange(ref _screenLogging, value ? 1 : 0); } }
         public static bool IsDebugLowLevelLoggingOn { get { return DebugLogMessages && LowLevelLogging; } }
+        public static bool IsDebugScreenLoggingOn { get { return DebugLogMessages && ScreenLogging; } }
 
         private static int _debugPostChannel = GHConstants.DefaultDebugPostChannel ? 1 : 0;
         public static bool DebugPostChannel /* This is the setting value on Settings Page */
-        { get { return Interlocked.CompareExchange(ref _debugPostChannel, 0, 0) != 0; } set { Interlocked.Exchange(ref _debugPostChannel, value ? 1 : 0); } }
-        //{ 
-        //    get 
-        //    {
-        //        lock (_debugLock) 
-        //        { 
-        //            return _debugPostChannel; 
-        //        } 
-        //    } 
-        //    set 
-        //    { 
-        //        lock (_debugLock) 
-        //        { 
-        //            _debugPostChannel = value; 
-        //        } 
-        //    } 
-        //}
+        {
+            get { return Interlocked.CompareExchange(ref _debugPostChannel, 0, 0) != 0; }
+            set { Interlocked.Exchange(ref _debugPostChannel, value ? 1 : 0); }
+        }
 
         public static bool UseDebugPostChannel  /* This should be used to check which channel to use */
         {
@@ -2403,7 +2795,7 @@ namespace GnollHackX
         public static readonly bool IsiOS = (DeviceInfo.Platform == DevicePlatform.iOS);
         public static readonly bool IsWindows = (DeviceInfo.Platform == DevicePlatform.WinUI);
         public static readonly bool IsMacCatalyst = (DeviceInfo.Platform == DevicePlatform.MacCatalyst);
-        public static readonly bool IsDesktop = 
+        public static readonly bool IsDesktop =
 #if WINDOWS
             true;
 #else
@@ -2425,8 +2817,8 @@ namespace GnollHackX
         public static readonly bool IsPackaged = true;
 #endif
 
-        public static bool IsSamsung 
-        { 
+        public static bool IsSamsung
+        {
             get
             {
                 string manufacturer = DeviceInfo.Manufacturer;
@@ -2510,20 +2902,19 @@ namespace GnollHackX
             }
         }
 
-        //private static readonly object _displayDataLock = new object();
         public static float DisplayDensity
         {
-            get { return Interlocked.CompareExchange(ref _displayDensity, 0.0f, 0.0f); }
+            get
+            {
+                float res = Interlocked.CompareExchange(ref _displayDensity, 0.0f, 0.0f);
+                return res == 0.0f ? 1.0f : res;
+            }
             set { Interlocked.Exchange(ref _displayDensity, value <= 0.0f ? 1.0f : value); }
-            //get { lock (_displayDataLock) { return _displayDensity; } }
-            //set { lock (_displayDataLock) { _displayDensity = value <= 0.0f ? 1.0f : value; } }
         }
         public static float DisplayRefreshRate
         {
             get { return Interlocked.CompareExchange(ref _displayRefreshRate, 0.0f, 0.0f); }
             set { Interlocked.Exchange(ref _displayRefreshRate, value <= 0.0f ? 1.0f : value); }
-            //get { lock (_displayDataLock) { return _displayRefreshRate; } }
-            //set { lock (_displayDataLock) { _displayRefreshRate = value <= 0.0f ? 1.0f : value; } }
         }
 
         private static float _customScreenScale = 1.0f;
@@ -2531,8 +2922,6 @@ namespace GnollHackX
         {
             get { return Interlocked.CompareExchange(ref _customScreenScale, 0.0f, 0.0f); }
             set { Interlocked.Exchange(ref _customScreenScale, value <= 0.0f ? 1.0f : value); }
-            //get { lock (_displayDataLock) { return _customScreenScale; } }
-            //set { lock (_displayDataLock) { _customScreenScale = value <= 0.0f ? 1.0f : value; } }
         }
 
         private static float _platformScreenScale = 1.0f;
@@ -2540,14 +2929,11 @@ namespace GnollHackX
         {
             get { return Interlocked.CompareExchange(ref _platformScreenScale, 0.0f, 0.0f); }
             set { Interlocked.Exchange(ref _platformScreenScale, value <= 0.0f ? 1.0f : value); }
-            //get { lock (_displayDataLock) { return _platformScreenScale; } }
-            //set { lock (_displayDataLock) { _platformScreenScale = value <= 0.0f ? 1.0f : value; } }
         }
 
         public static float TotalScreenScale
         {
             get { return DisplayDensity * PlatformScreenScale * CustomScreenScale; }
-            //get { lock (_displayDataLock) { return _displayDensity * _platformScreenScale * _customScreenScale; } }
         }
 
         public static GHPlatform PlatformId
@@ -2617,16 +3003,63 @@ namespace GnollHackX
             return verstr;
         }
 
-        public static SKTypeface DiabloTypeface { get; set; }
-        public static SKTypeface ImmortalTypeface { get; set; }
-        public static SKTypeface EndorTypeface { get; set; }
-        public static SKTypeface XizorTypeface { get; set; }
-        public static SKTypeface UnderwoodTypeface { get; set; }
-        public static SKTypeface DejaVuSansMonoTypeface { get; set; }
-        public static SKTypeface DejaVuSansMonoBoldTypeface { get; set; }
-        public static SKTypeface LatoRegular { get; set; }
-        public static SKTypeface LatoBold { get; set; }
-        public static SKTypeface ARChristyTypeface { get; set; }
+        /* Force lazy loading for MAUI fonts, which seems to sometimes fail on Windows */
+        public static async Task InitBaseFontsViaGrid(Grid grid)
+        {
+            string[] fonts = new string[]
+            {
+                "Diablo",
+                "Immortal",
+                "Underwood",
+                "LatoRegular",
+                "DejaVuSansMono",
+                "DejaVuSansMonoBold"
+            };
+
+            foreach (var font in fonts)
+            {
+                var lbl = new Label
+                {
+                    Text = "G",
+                    FontFamily = font,
+                    Opacity = 0
+                };
+
+#if GNH_MAUI
+                TaskCompletionSource tcs = new TaskCompletionSource();
+                lbl.HandlerChanged += (s, e) =>
+                {
+                    Debug.WriteLine("Handler changed " + (lbl.Handler is not null ? "on" : "off") + " for " + font);
+                    if (lbl.Handler is not null)
+                        tcs.TrySetResult();
+                };
+#endif
+                grid.Children.Add(lbl);
+
+                await Task.Yield();
+#if GNH_MAUI
+                await tcs.Task.WaitAsync(TimeSpan.FromMilliseconds(84));
+#else
+                await Task.Delay(42);
+#endif
+                await Task.Yield();
+
+                grid.Children.Remove(lbl);
+
+                await Task.Yield();
+            }
+        }
+
+        public static SKTypeface DiabloTypeface;
+        public static SKTypeface ImmortalTypeface;
+        public static SKTypeface EndorTypeface;
+        public static SKTypeface XizorTypeface;
+        public static SKTypeface UnderwoodTypeface;
+        public static SKTypeface DejaVuSansMonoTypeface;
+        public static SKTypeface DejaVuSansMonoBoldTypeface;
+        public static SKTypeface LatoRegular;
+        public static SKTypeface LatoBold;
+        public static SKTypeface ARChristyTypeface;
 
         private static Dictionary<string, SKTypeface> TypefaceDictionary = new Dictionary<string, SKTypeface>();
         public static SKTypeface GetTypefaceByName(string fontname)
@@ -2680,36 +3113,43 @@ namespace GnollHackX
             LatoBold = LoadEmbeddedAssetTypeface("LatoBold", "Lato-Bold.ttf");
         }
 
-        public static SKImage MenuBackgroundBitmap { get; set; }
-        public static SKImage OldPaperBackgroundBitmap { get; set; }
-        public static SKImage DarkMarbleBackgroundBitmap { get; set; }
-        public static SKImage LoadingScreenBackgroundBitmap { get; set; }
-        public static SKImage ButtonNormalBitmap { get; set; }
-        public static SKImage ButtonSelectedBitmap { get; set; }
-        public static SKImage ButtonDisabledBitmap { get; set; }
+        public static SKImage MenuBackgroundBitmap;
+        public static SKImage OldPaperBackgroundBitmap;
+        public static SKImage DarkMarbleBackgroundBitmap;
+        public static SKImage LoadingScreenBackgroundBitmap;
+        public static SKImage InventorySlotLightBitmap;
+        public static SKImage InventorySlotDarkBitmap;
+        public static SKImage[] InventoryIconBitmaps;
+        public static SKImage ButtonNormalBitmap;
+        public static SKImage ButtonSelectedBitmap;
+        public static SKImage ButtonDisabledBitmap;
 
-        public static SKImage SimpleFrameTopLeftCornerBitmap { get; set; }
-        public static SKImage SimpleFrameSmallTopLeftCornerBitmap { get; set; }
-        public static SKImage SimpleFrameTopHorizontalBitmap { get; set; }
-        public static SKImage SimpleFrameLeftVerticalBitmap { get; set; }
+        public static SKImage SimpleFrameTopLeftCornerBitmap;
+        public static SKImage SimpleFrameSmallTopLeftCornerBitmap;
+        public static SKImage SimpleFrameTopHorizontalBitmap;
+        public static SKImage SimpleFrameLeftVerticalBitmap;
+        public static SKImage SimpleFrameTransformBitmap;
 
-        public static SKImage SimpleFrame2TopLeftCornerBitmap { get; set; }
-        public static SKImage SimpleFrame2SmallTopLeftCornerBitmap { get; set; }
-        public static SKImage SimpleFrame2TopHorizontalBitmap { get; set; }
-        public static SKImage SimpleFrame2LeftVerticalBitmap { get; set; }
+        public static SKImage SimpleFrame2TopLeftCornerBitmap;
+        public static SKImage SimpleFrame2SmallTopLeftCornerBitmap;
+        public static SKImage SimpleFrame2TopHorizontalBitmap;
+        public static SKImage SimpleFrame2LeftVerticalBitmap;
+        public static SKImage SimpleFrame2TransformBitmap;
 
-        public static SKImage DarkModeSimpleFrameTopLeftCornerBitmap { get; set; }
-        public static SKImage DarkModeSimpleFrameSmallTopLeftCornerBitmap { get; set; }
-        public static SKImage DarkModeSimpleFrameTopHorizontalBitmap { get; set; }
-        public static SKImage DarkModeSimpleFrameLeftVerticalBitmap { get; set; }
+        public static SKImage DarkModeSimpleFrameTopLeftCornerBitmap;
+        public static SKImage DarkModeSimpleFrameSmallTopLeftCornerBitmap;
+        public static SKImage DarkModeSimpleFrameTopHorizontalBitmap;
+        public static SKImage DarkModeSimpleFrameLeftVerticalBitmap;
+        public static SKImage DarkModeSimpleFrameTransformBitmap;
 
-        public static SKImage DarkModeSimpleFrame2TopLeftCornerBitmap { get; set; }
-        public static SKImage DarkModeSimpleFrame2SmallTopLeftCornerBitmap { get; set; }
-        public static SKImage DarkModeSimpleFrame2TopHorizontalBitmap { get; set; }
-        public static SKImage DarkModeSimpleFrame2LeftVerticalBitmap { get; set; }
+        public static SKImage DarkModeSimpleFrame2TopLeftCornerBitmap;
+        public static SKImage DarkModeSimpleFrame2SmallTopLeftCornerBitmap;
+        public static SKImage DarkModeSimpleFrame2TopHorizontalBitmap;
+        public static SKImage DarkModeSimpleFrame2LeftVerticalBitmap;
+        public static SKImage DarkModeSimpleFrame2TransformBitmap;
 
-        public static SKImage ScrollBitmap { get; set; }
-        public static SKImage YouBitmap { get; set; }
+        public static SKImage ScrollBitmap;
+        public static SKImage YouBitmap;
 
         private static SKImage LoadEmbeddedResourceBitmap(string resourcePath)
         {
@@ -2721,6 +3161,8 @@ namespace GnollHackX
                     SKBitmap bmp = SKBitmap.Decode(stream);
                     bmp.SetImmutable();
                     res = SKImage.FromBitmap(bmp);
+                    if (res != null)
+                        AddUsedBitmapBytes(res.Info.BytesSize64);
                 }
             }
             catch (Exception ex)
@@ -2740,6 +3182,8 @@ namespace GnollHackX
                     SKBitmap bmp = SKBitmap.Decode(stream);
                     bmp.SetImmutable();
                     res = SKImage.FromBitmap(bmp);
+                    if (res != null)
+                        AddUsedBitmapBytes(res.Info.BytesSize64);
                 }
             }
             catch (Exception ex)
@@ -2748,31 +3192,6 @@ namespace GnollHackX
             }
             return res;
         }
-
-        //private static SKImage LoadTilesetFromPlatformAssets(string tilesetName)
-        //{
-        //    SKImage res = null;
-        //    try
-        //    {
-        //        byte[] data = PlatformService.GetPlatformAssetsTilesetBytes(GHConstants.AssetsTilesetDirectory, tilesetName);
-        //        WriteGHLog("data: " + (data != null ? "not null" : "null"));
-        //        WriteGHLog("data length: " + data.Length);
-        //        using (MemoryStream ms = new MemoryStream(data))
-        //        {
-        //            WriteGHLog("ms length: " + ms.Length);
-        //            SKBitmap bmp = SKBitmap.Decode(ms);
-        //            WriteGHLog("bmp: " + (bmp != null ? "not null" : "null"));
-        //            bmp.SetImmutable();
-        //            res = SKImage.FromBitmap(bmp);
-        //            WriteGHLog("res: " + (res != null ? "not null" : "null"));
-        //        }
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        MaybeWriteGHLog("LoadTilesetFromPlatformAssets (" + tilesetName + "): " + ex.Message);
-        //    }
-        //    return res;
-        //}
 
         public static SKImage LoadEmbeddedAssetsBitmap(string bitmapName)
         {
@@ -2808,25 +3227,58 @@ namespace GnollHackX
             DarkMarbleBackgroundBitmap = LoadEmbeddedUIBitmap("background-darkmarble.png");
             LoadingScreenBackgroundBitmap = LoadEmbeddedUIBitmap("background-loading-screen.png");
 
+            InventorySlotLightBitmap = LoadEmbeddedUIBitmap("inventory-slot-light.png");
+            InventorySlotDarkBitmap = LoadEmbeddedUIBitmap("inventory-slot-dark.png");
+
+            InventoryIconBitmaps = new SKImage[(int)InventorySlotPictureIndices.NumPictureIndices];
+            InventoryIconBitmaps[(int)InventorySlotPictureIndices.General] = LoadEmbeddedUIBitmap("inventory-icon-weapon-right.png");
+            InventoryIconBitmaps[(int)InventorySlotPictureIndices.WeaponRight] = LoadEmbeddedUIBitmap("inventory-icon-weapon-right.png");
+            InventoryIconBitmaps[(int)InventorySlotPictureIndices.WeaponLeft] = LoadEmbeddedUIBitmap("inventory-icon-weapon-left.png");
+            InventoryIconBitmaps[(int)InventorySlotPictureIndices.Shield] = LoadEmbeddedUIBitmap("inventory-icon-shield.png");
+            InventoryIconBitmaps[(int)InventorySlotPictureIndices.SwapWeaponRight] = LoadEmbeddedUIBitmap("inventory-icon-swapweapon-right.png");
+            InventoryIconBitmaps[(int)InventorySlotPictureIndices.SwapWeaponLeft] = LoadEmbeddedUIBitmap("inventory-icon-swapweapon-left.png");
+            InventoryIconBitmaps[(int)InventorySlotPictureIndices.Quiver] = LoadEmbeddedUIBitmap("inventory-icon-quiver.png");
+            InventoryIconBitmaps[(int)InventorySlotPictureIndices.Suit] = LoadEmbeddedUIBitmap("inventory-icon-suit.png");
+            InventoryIconBitmaps[(int)InventorySlotPictureIndices.Cloak] = LoadEmbeddedUIBitmap("inventory-icon-cloak.png");
+            InventoryIconBitmaps[(int)InventorySlotPictureIndices.Robe] = LoadEmbeddedUIBitmap("inventory-icon-robe.png");
+            InventoryIconBitmaps[(int)InventorySlotPictureIndices.Shirt] = LoadEmbeddedUIBitmap("inventory-icon-shirt.png");
+            InventoryIconBitmaps[(int)InventorySlotPictureIndices.Helmet] = LoadEmbeddedUIBitmap("inventory-icon-helmet.png");
+            InventoryIconBitmaps[(int)InventorySlotPictureIndices.Gloves] = LoadEmbeddedUIBitmap("inventory-icon-gloves.png");
+            InventoryIconBitmaps[(int)InventorySlotPictureIndices.Boots] = LoadEmbeddedUIBitmap("inventory-icon-boots.png");
+            InventoryIconBitmaps[(int)InventorySlotPictureIndices.Bracers] = LoadEmbeddedUIBitmap("inventory-icon-bracers.png");
+            InventoryIconBitmaps[(int)InventorySlotPictureIndices.Blindfold] = LoadEmbeddedUIBitmap("inventory-icon-blindfold.png");
+            InventoryIconBitmaps[(int)InventorySlotPictureIndices.Amulet] = LoadEmbeddedUIBitmap("inventory-icon-amulet.png");
+            InventoryIconBitmaps[(int)InventorySlotPictureIndices.RingLeft] = LoadEmbeddedUIBitmap("inventory-icon-leftring.png");
+            InventoryIconBitmaps[(int)InventorySlotPictureIndices.RingRight] = LoadEmbeddedUIBitmap("inventory-icon-rightring.png");
+            InventoryIconBitmaps[(int)InventorySlotPictureIndices.Miscellaneous1] = LoadEmbeddedUIBitmap("inventory-icon-miscellaneous.png");
+            InventoryIconBitmaps[(int)InventorySlotPictureIndices.Miscellaneous2] = InventoryIconBitmaps[(int)InventorySlotPictureIndices.Miscellaneous1];
+            InventoryIconBitmaps[(int)InventorySlotPictureIndices.Miscellaneous3] = InventoryIconBitmaps[(int)InventorySlotPictureIndices.Miscellaneous1];
+            InventoryIconBitmaps[(int)InventorySlotPictureIndices.Miscellaneous4] = InventoryIconBitmaps[(int)InventorySlotPictureIndices.Miscellaneous1];
+            InventoryIconBitmaps[(int)InventorySlotPictureIndices.Miscellaneous5] = InventoryIconBitmaps[(int)InventorySlotPictureIndices.Miscellaneous1];
+
             SimpleFrameTopLeftCornerBitmap = LoadEmbeddedUIBitmap("frame-topleft.png");
             SimpleFrameSmallTopLeftCornerBitmap = LoadEmbeddedUIBitmap("frame-topleft-small.png");
             SimpleFrameTopHorizontalBitmap = LoadEmbeddedUIBitmap("frame-horizontal.png");
             SimpleFrameLeftVerticalBitmap = LoadEmbeddedUIBitmap("frame-vertical.png");
+            SimpleFrameTransformBitmap = LoadEmbeddedUIBitmap("frame-transform.png");
 
             SimpleFrame2TopLeftCornerBitmap = LoadEmbeddedUIBitmap("frame2-topleft.png");
             SimpleFrame2SmallTopLeftCornerBitmap = LoadEmbeddedUIBitmap("frame2-topleft-small.png");
             SimpleFrame2TopHorizontalBitmap = LoadEmbeddedUIBitmap("frame2-horizontal.png");
             SimpleFrame2LeftVerticalBitmap = LoadEmbeddedUIBitmap("frame2-vertical.png");
+            SimpleFrame2TransformBitmap = LoadEmbeddedUIBitmap("frame2-transform.png");
 
             DarkModeSimpleFrameTopLeftCornerBitmap = LoadEmbeddedUIBitmap("frame-darkmode-topleft.png");
             DarkModeSimpleFrameSmallTopLeftCornerBitmap = LoadEmbeddedUIBitmap("frame-darkmode-topleft-small.png");
             DarkModeSimpleFrameTopHorizontalBitmap = LoadEmbeddedUIBitmap("frame-darkmode-horizontal.png");
             DarkModeSimpleFrameLeftVerticalBitmap = LoadEmbeddedUIBitmap("frame-darkmode-vertical.png");
+            DarkModeSimpleFrameTransformBitmap = LoadEmbeddedUIBitmap("frame-darkmode-transform.png");
 
             DarkModeSimpleFrame2TopLeftCornerBitmap = LoadEmbeddedUIBitmap("frame2-darkmode-topleft.png");
             DarkModeSimpleFrame2SmallTopLeftCornerBitmap = LoadEmbeddedUIBitmap("frame2-darkmode-topleft-small.png");
             DarkModeSimpleFrame2TopHorizontalBitmap = LoadEmbeddedUIBitmap("frame2-darkmode-horizontal.png");
             DarkModeSimpleFrame2LeftVerticalBitmap = LoadEmbeddedUIBitmap("frame2-darkmode-vertical.png");
+            DarkModeSimpleFrame2TransformBitmap = LoadEmbeddedUIBitmap("frame2-darkmode-transform.png");
 
             ScrollBitmap = LoadEmbeddedUIBitmap("scroll.png");
             YouBitmap = LoadEmbeddedUIBitmap("you.png");
@@ -2839,6 +3291,7 @@ namespace GnollHackX
         private static SKImage _addsBitmap;
         private static SKImage _foodBitmap;
         private static SKImage _goldBitmap;
+        private static SKImage _recommendedBitmap;
 
         private static SKImage _spellAbjurationBitmap;
         private static SKImage _spellArcaneBitmap;
@@ -2862,6 +3315,7 @@ namespace GnollHackX
             _addsBitmap = LoadEmbeddedUIBitmap("symbol-adds.png");
             _foodBitmap = LoadEmbeddedUIBitmap("symbol-food.png");
             _goldBitmap = LoadEmbeddedUIBitmap("symbol-gold.png");
+            _recommendedBitmap = LoadEmbeddedUIBitmap("symbol-recommended.png");
 
             _spellAbjurationBitmap = LoadEmbeddedUIBitmap("symbol-spell-abjuration.png");
             _spellArcaneBitmap = LoadEmbeddedUIBitmap("symbol-spell-arcane.png");
@@ -2880,6 +3334,7 @@ namespace GnollHackX
 
         public static SKImage _logoBitmap;
         public static SKImage _skillBitmap;
+        public static SKImage _polearmBitmap;
         public static SKImage _prevWepBitmap;
         public static SKImage _prevUnwieldBitmap;
         public static SKImage[] _arrowBitmap = new SKImage[9];
@@ -2891,6 +3346,9 @@ namespace GnollHackX
 
         public static SKImage _batteryFrameBitmap;
         public static SKImage _batteryRedFrameBitmap;
+        public static SKImage _diskBitmap;
+        public static SKImage _diskYellowBitmap;
+        public static SKImage _diskRedBitmap;
         public static SKImage _fpsBitmap;
         public static SKImage _memoryBitmap;
         public static SKImage _zoomBitmap;
@@ -2946,31 +3404,31 @@ namespace GnollHackX
 
         public static bool StartGameDataSet = false;
         public static readonly object Glyph2TileLock = new object();
-        public static int[] Glyph2Tile { get; set; }
-        public static byte[] GlyphTileFlags { get; set; }
-        public static short[] Tile2Animation { get; set; }
-        public static short[] Tile2Enlargement { get; set; }
-        public static short[] Tile2Autodraw { get; set; }
-        public static int[] AnimationOffsets { get; set; }
-        public static int[] EnlargementOffsets { get; set; }
-        public static int[] ReplacementOffsets { get; set; }
-        public static int Glyph2TileSize { get; set; }
+        public static int[] Glyph2Tile;
+        public static byte[] GlyphTileFlags;
+        public static short[] Tile2Animation;
+        public static short[] Tile2Enlargement;
+        public static short[] Tile2Autodraw;
+        public static int[] AnimationOffsets;
+        public static int[] EnlargementOffsets;
+        public static int[] ReplacementOffsets;
+        public static int Glyph2TileSize;
         public static SKImage[] _tileMap = new SKImage[GHConstants.MaxTileSheets];
-        public static int UsedTileSheets { get; set; }
-        public static int TotalTiles { get; set; }
-        public static int UnexploredGlyph { get; set; }
-        public static int NoGlyph { get; set; }
-        public static int AnimationOff { get; set; }
-        public static int EnlargementOff { get; set; }
-        public static int ReplacementOff { get; set; }
-        public static int GeneralTileOff { get; set; }
-        public static int HitTileOff { get; set; }
-        public static int UITileOff { get; set; }
-        public static int SpellTileOff { get; set; }
-        public static int SkillTileOff { get; set; }
-        public static int CommandTileOff { get; set; }
-        public static int BuffTileOff { get; set; }
-        public static int CursorOff { get; set; }
+        public static int UsedTileSheets;
+        public static int TotalTiles;
+        public static int UnexploredGlyph;
+        public static int NoGlyph;
+        public static int AnimationOff;
+        public static int EnlargementOff;
+        public static int ReplacementOff;
+        public static int GeneralTileOff;
+        public static int HitTileOff;
+        public static int UITileOff;
+        public static int SpellTileOff;
+        public static int SkillTileOff;
+        public static int CommandTileOff;
+        public static int BuffTileOff;
+        public static int CursorOff;
 
         public static int NumberOfGlyphs
         {
@@ -2985,8 +3443,9 @@ namespace GnollHackX
             }
         }
 
-        public static int[] _tilesPerRow = new int[GHConstants.MaxTileSheets];
-        public static int[] TilesPerRow { get { return _tilesPerRow; } }
+        //public static int[] _tilesPerRow = new int[GHConstants.MaxTileSheets];
+        //public static int[] TilesPerRow { get { return _tilesPerRow; } }
+        public static int[] DummyTilesPerRow = new int[GHConstants.MaxTileSheets];
 
         public static List<AnimationDefinition> _animationDefs = null;
         public static List<EnlargementDefinition> _enlargementDefs = null;
@@ -3002,19 +3461,43 @@ namespace GnollHackX
         public static GHCommandButtonItem[,,] _moreBtnMatrix = new GHCommandButtonItem[GHConstants.MoreButtonPages, GHConstants.MoreButtonsPerRow, GHConstants.MoreButtonsPerColumn];
         public static SKImage[,,] _moreBtnBitmaps = new SKImage[GHConstants.MoreButtonPages, GHConstants.MoreButtonsPerRow, GHConstants.MoreButtonsPerColumn];
         public static readonly string[] _moreButtonPageTitle = new string[GHConstants.MoreButtonPages] { "Wizard Mode Commands", "Common Commands", "Additional Commands", "Context and More Commands" };
+        private static int _moreBtnCount = 0;
+        public static int MoreButtonCount { get { return Interlocked.CompareExchange(ref _moreBtnCount, 0, 0); } set { Interlocked.Exchange(ref _moreBtnCount, value); } }
+        private static int _wizBtnCount = 0;
+        public static int WizButtonCount { get { return Interlocked.CompareExchange(ref _wizBtnCount, 0, 0); } set { Interlocked.Exchange(ref _wizBtnCount, value); } }
+        public static List<GHCommandButtonRect> _moreBtnList = new List<GHCommandButtonRect>(GHConstants.DefaultMoreButtonListSize);
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int TileSheetIdx(int ntile)
         {
-            return (Math.Min(UsedTileSheets - 1, Math.Max(0, (ntile / GHConstants.NumberOfTilesPerSheet))));
+            return ntile < GHConstants.NumberOfTilesPerSheet ? 0 : Math.Min(UsedTileSheets - 1, Math.Max(0, ntile >> GHConstants.PowerOf2ForNumberOfTilesPerSheet));
+            //return ntile >> GHConstants.PowerOf2ForNumberOfTilesPerSheet;
+            //return ntile < GHConstants.NumberOfTilesPerSheet ? 0 : (Math.Min(UsedTileSheets - 1, Math.Max(0, (ntile / GHConstants.NumberOfTilesPerSheet))));
         }
 
-        public static int TileSheetX(int ntile)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int TileSheetX(int ntile, int tileSheetIdx)
         {
-            return (((ntile % GHConstants.NumberOfTilesPerSheet) % _tilesPerRow[TileSheetIdx(ntile)]) * GHConstants.TileWidth);
+            return (((ntile < GHConstants.NumberOfTilesPerSheet ? ntile : ntile % GHConstants.NumberOfTilesPerSheet) % GHConstants.MaxTileSheetWidthInTiles /* _tilesPerRow[tileSheetIdx] */) * GHConstants.TileWidth);
         }
-        public static int TileSheetY(int ntile)
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int TileSheetY(int ntile, int tileSheetIdx)
         {
-            return (((ntile % GHConstants.NumberOfTilesPerSheet) / _tilesPerRow[TileSheetIdx(ntile)]) * GHConstants.TileHeight);
+            return (((ntile < GHConstants.NumberOfTilesPerSheet ? ntile : ntile % GHConstants.NumberOfTilesPerSheet) / GHConstants.MaxTileSheetWidthInTiles /* _tilesPerRow[tileSheetIdx] */) * GHConstants.TileHeight);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void TileSheetXY(int ntile, out int x, out int y)
+        {
+            //int tileNumberWithinSheet = ntile < GHConstants.NumberOfTilesPerSheet ? ntile : (ntile & (GHConstants.NumberOfTilesPerSheet - 1)); // ntile % GHConstants.NumberOfTilesPerSheet;
+            //int tilesPerRowInSheet = GHConstants.MaxTileSheetWidthInTiles; // _tilesPerRow[tileSheetIdx];
+            //int row = tileNumberWithinSheet >> GHConstants.PowerOf2ForMaxTileSheetWidthInTiles; // tileNumberWithinSheet / tilesPerRowInSheet;
+            int tileNumberWithinSheet = (ntile & (GHConstants.NumberOfTilesPerSheet - 1)); // ntile % GHConstants.NumberOfTilesPerSheet;
+            x = (tileNumberWithinSheet & (GHConstants.MaxTileSheetWidthInTiles - 1)) * GHConstants.TileWidth;
+            y = (tileNumberWithinSheet >> GHConstants.PowerOf2ForMaxTileSheetWidthInTiles) * GHConstants.TileHeight;
+            //x = (tileNumberWithinSheet - row * GHConstants.MaxTileSheetWidthInTiles) * GHConstants.TileWidth;
+            //x = (tileNumberWithinSheet % tilesPerRowInSheet) * GHConstants.TileWidth;
         }
 
         public static List<SelectableShortcutButton> GetSimpleShortcutButtonsToAllocate()
@@ -3023,11 +3506,11 @@ namespace GnollHackX
             List<SelectableShortcutButton> list = new List<SelectableShortcutButton>();
             for (int i = 0; i < 6; i++)
             {
-                int defCmd = GHApp.DefaultShortcutButton(0, i, true).GetCommand();
+                int defCmd = GHApp.DefaultShortcutButton(0, i, true).GHCommand;
                 int listselidx = GHApp.SelectableShortcutButtonIndexInList(defCmd, defCmd);
                 if (listselidx >= 0 && listselidx < SelectableShortcutButtons.Count)
                 {
-                    if(!barlist.Contains(SelectableShortcutButtons[listselidx]))
+                    if (!barlist.Contains(SelectableShortcutButtons[listselidx]))
                         list.Add(SelectableShortcutButtons[listselidx]);
                 }
             }
@@ -3036,14 +3519,14 @@ namespace GnollHackX
 
         public static List<SelectableShortcutButton> GetSimpleBarButtons()
         {
-            List <SelectableShortcutButton> list = new List<SelectableShortcutButton>();
+            List<SelectableShortcutButton> list = new List<SelectableShortcutButton>();
             for (int i = 0; i < 6; i++)
             {
                 string keystr = "SimpleUILayoutCommandButton" + (i + 1);
-                int defCmd = GHApp.DefaultShortcutButton(0, i, true).GetCommand();
+                int defCmd = GHApp.DefaultShortcutButton(0, i, true).GHCommand;
                 int savedCmd = Preferences.Get(keystr, defCmd);
                 int listselidx = GHApp.SelectableShortcutButtonIndexInList(savedCmd, defCmd);
-                if(listselidx >= 0 && listselidx < SelectableShortcutButtons.Count)
+                if (listselidx >= 0 && listselidx < SelectableShortcutButtons.Count)
                     list.Add(SelectableShortcutButtons[listselidx]);
             }
             return list;
@@ -3055,7 +3538,7 @@ namespace GnollHackX
             List<SelectableShortcutButton> list = new List<SelectableShortcutButton>();
             for (int i = 0; i < 13; i++)
             {
-                int defCmd = GHApp.DefaultShortcutButton(0, i, false).GetCommand();
+                int defCmd = GHApp.DefaultShortcutButton(0, i, false).GHCommand;
                 int listselidx = GHApp.SelectableShortcutButtonIndexInList(defCmd, defCmd);
                 if (listselidx >= 0 && listselidx < SelectableShortcutButtons.Count)
                 {
@@ -3072,7 +3555,7 @@ namespace GnollHackX
             for (int i = 0; i < 13; i++)
             {
                 string keystr = "FullUILayoutCommandButton" + (i + 1);
-                int defCmd = GHApp.DefaultShortcutButton(0, i, false).GetCommand();
+                int defCmd = GHApp.DefaultShortcutButton(0, i, false).GHCommand;
                 int savedCmd = Preferences.Get(keystr, defCmd);
                 int listselidx = GHApp.SelectableShortcutButtonIndexInList(savedCmd, defCmd);
                 if (listselidx >= 0 && listselidx < SelectableShortcutButtons.Count)
@@ -3140,17 +3623,19 @@ namespace GnollHackX
                     _moreBtnMatrix[2, 2, 0] = new GHCommandButtonItem("Travel", AppResourceName + ".Assets.UI.travel.png", (int)'_');
                     _moreBtnMatrix[2, 3, 0] = new GHCommandButtonItem("Autostash", AppResourceName + ".Assets.UI.autostash.png", GHUtils.Meta(15));
 
-                    _moreBtnMatrix[2, 0, 1] = new GHCommandButtonItem("Fight", AppResourceName + ".Assets.UI.fight.png", (int)'F');
-                    _moreBtnMatrix[2, 1, 1] = new GHCommandButtonItem("Examine", AppResourceName + ".Assets.UI.examine.png", GHUtils.Meta((int)'x'));
+                    _moreBtnMatrix[2, 0, 1] = new GHCommandButtonItem("Pick-axe", AppResourceName + ".Assets.UI.pickaxe.png", GHUtils.Meta((int)'X'));
+                    _moreBtnMatrix[2, 1, 1] = new GHCommandButtonItem("Engrave Quick", AppResourceName + ".Assets.UI.engravequick.png", GHUtils.Meta('E'));
                     _moreBtnMatrix[2, 2, 1] = new GHCommandButtonItem("Cast Quick", AppResourceName + ".Assets.UI.quickcast.png", GHUtils.Meta(26));
                     _moreBtnMatrix[2, 3, 1] = new GHCommandButtonItem("Zap Quick", AppResourceName + ".Assets.UI.zapquick.png", GHUtils.Meta(27));
 
-                    _moreBtnMatrix[2, 0, 2] = new GHCommandButtonItem("Ride", AppResourceName + ".Assets.UI.ride.png", GHUtils.Meta((int)'R'));
+                    //_moreBtnMatrix[2, 0, 2] = new GHCommandButtonItem("Ride", AppResourceName + ".Assets.UI.ride.png", GHUtils.Meta((int)'R'));
+                    _moreBtnMatrix[2, 0, 2] = new GHCommandButtonItem("Examine", AppResourceName + ".Assets.UI.examine.png", GHUtils.Meta((int)'x'));
                     _moreBtnMatrix[2, 1, 2] = new GHCommandButtonItem("Untrap", AppResourceName + ".Assets.UI.untrap.png", GHUtils.Meta((int)'u'));
                     _moreBtnMatrix[2, 2, 2] = new GHCommandButtonItem("Dig", AppResourceName + ".Assets.UI.dig.png", GHUtils.Ctrl((int)'g'));
                     _moreBtnMatrix[2, 3, 2] = new GHCommandButtonItem("Handedness", AppResourceName + ".Assets.UI.handedness.png", GHUtils.Meta((int)'h'));
 
-                    _moreBtnMatrix[2, 0, 3] = new GHCommandButtonItem("Light", AppResourceName + ".Assets.UI.light.png", GHUtils.Meta((int)'I'));
+                    //_moreBtnMatrix[2, 0, 3] = new GHCommandButtonItem("Light", AppResourceName + ".Assets.UI.light.png", GHUtils.Meta((int)'I'));
+                    _moreBtnMatrix[2, 0, 3] = new GHCommandButtonItem("Fight", AppResourceName + ".Assets.UI.fight.png", (int)'F');
                     _moreBtnMatrix[2, 1, 3] = new GHCommandButtonItem("Loot", AppResourceName + ".Assets.UI.loot.png", GHUtils.Meta((int)'l'));
                     _moreBtnMatrix[2, 2, 3] = new GHCommandButtonItem("Open", AppResourceName + ".Assets.UI.open.png", (int)'o');
                     _moreBtnMatrix[2, 3, 3] = new GHCommandButtonItem("Close", AppResourceName + ".Assets.UI.close.png", (int)'c');
@@ -3176,14 +3661,15 @@ namespace GnollHackX
                             {
                                 for (int j = 0; j < GHConstants.MoreButtonsPerColumn; j++)
                                 {
-                                    for(int bidx = 0; bidx < buttonsOnBar.Count; bidx++)
+                                    for (int bidx = 0; bidx < buttonsOnBar.Count; bidx++)
                                     {
-                                        if (_moreBtnMatrix[p, i, j] != null && _moreBtnMatrix[p, i, j].Command == buttonsOnBar[bidx].GetCommand())
+                                        if (_moreBtnMatrix[p, i, j] != null && _moreBtnMatrix[p, i, j].GHCommand == buttonsOnBar[bidx].GHCommand)
                                         {
                                             foundloc = true;
-                                            _moreBtnMatrix[p, i, j].Text = button.Label;
-                                            _moreBtnMatrix[p, i, j].ImageSourcePath = button.ImageSourcePath;
-                                            _moreBtnMatrix[p, i, j].Command = button.GetCommand();
+                                            _moreBtnMatrix[p, i, j] = new GHCommandButtonItem(button.Label, button.ImageSourcePath, button.GHCommand);
+                                            //_moreBtnMatrix[p, i, j].Text = button.Label;
+                                            //_moreBtnMatrix[p, i, j].ImageSourcePath = button.ImageSourcePath;
+                                            //_moreBtnMatrix[p, i, j].Command = button.GetCommand();
                                             break;
                                         }
                                     }
@@ -3295,18 +3781,19 @@ namespace GnollHackX
                     _moreBtnMatrix[3, 2, 3] = new GHCommandButtonItem("Teleport", AppResourceName + ".Assets.UI.teleport.png", GHUtils.Ctrl((int)'t'));
                     _moreBtnMatrix[3, 3, 3] = new GHCommandButtonItem("Monster", AppResourceName + ".Assets.UI.monster.png", GHUtils.Meta((int)'M'));
 
-                    _moreBtnMatrix[3, 0, 4] = new GHCommandButtonItem("Spells", AppResourceName + ".Assets.UI.spells.png", (int)'+');
+                    _moreBtnMatrix[3, 0, 4] = new GHCommandButtonItem("Engrave Quick", AppResourceName + ".Assets.UI.engravequick.png", GHUtils.Meta((int)'E'));
                     _moreBtnMatrix[3, 1, 4] = new GHCommandButtonItem("Quick Spell", AppResourceName + ".Assets.UI.quickset.png", GHUtils.Meta(4));
                     _moreBtnMatrix[3, 2, 4] = new GHCommandButtonItem("Cast Quick", AppResourceName + ".Assets.UI.quickcast.png", GHUtils.Meta(26));
                     _moreBtnMatrix[3, 3, 4] = new GHCommandButtonItem("Zap Quick", AppResourceName + ".Assets.UI.zapquick.png", GHUtils.Meta(27));
-                    //_moreBtnMatrix[3, 2, 4] = new GHCommandButtonItem("Pick & Stash", AppResourceName + ".Assets.UI.picktobag.png", (int)';');
-                    //_moreBtnMatrix[3, 1, 0] = new GHCommandButtonItem("Pick Up", AppResourceName + ".Assets.UI.pickup.png", (int)',');
 
-                    _moreBtnMatrix[3, 0, 5] = new GHCommandButtonItem("Help", AppResourceName + ".Assets.UI.help.png", (int)'?');
-                    _moreBtnMatrix[3, 1, 5] = new GHCommandButtonItem("Commands", AppResourceName + ".Assets.UI.commands.png", GHUtils.Meta((int)'c'));
+                    //_moreBtnMatrix[3, 0, 5] = new GHCommandButtonItem("Help", AppResourceName + ".Assets.UI.help.png", (int)'?');
+                    //_moreBtnMatrix[3, 1, 5] = new GHCommandButtonItem("Commands", AppResourceName + ".Assets.UI.commands.png", GHUtils.Meta((int)'c'));
+                    //_moreBtnMatrix[3, 1, 5] = new GHCommandButtonItem("Spells", AppResourceName + ".Assets.UI.spells.png", (int)'+');
+                    _moreBtnMatrix[3, 0, 5] = new GHCommandButtonItem("Polearm", AppResourceName + ".Assets.UI.polearm.png", GHUtils.Meta((int)'P'));
+                    _moreBtnMatrix[3, 1, 5] = new GHCommandButtonItem("Pick-axe", AppResourceName + ".Assets.UI.pickaxe.png", GHUtils.Meta((int)'X'));
                     _moreBtnMatrix[3, 2, 5] = new GHCommandButtonItem("Extended", AppResourceName + ".Assets.UI.extended.png", (int)'#');
                     _moreBtnMatrix[3, 3, 5] = new GHCommandButtonItem("Back to Game", AppResourceName + ".Assets.UI.more.png", -101);
-
+                    
                     List<SelectableShortcutButton> buttonsToAllocate = GetFullShortcutButtonsToAllocate();
                     List<SelectableShortcutButton> buttonsOnBar = GetFullBarButtons();
                     foreach (SelectableShortcutButton button in buttonsToAllocate)
@@ -3320,12 +3807,13 @@ namespace GnollHackX
                                 {
                                     for (int bidx = 0; bidx < buttonsOnBar.Count; bidx++)
                                     {
-                                        if (_moreBtnMatrix[p, i, j] != null && _moreBtnMatrix[p, i, j].Command == buttonsOnBar[bidx].GetCommand())
+                                        if (_moreBtnMatrix[p, i, j] != null && _moreBtnMatrix[p, i, j].GHCommand == buttonsOnBar[bidx].GHCommand)
                                         {
                                             foundloc = true;
-                                            _moreBtnMatrix[p, i, j].Text = button.Label;
-                                            _moreBtnMatrix[p, i, j].ImageSourcePath = button.ImageSourcePath;
-                                            _moreBtnMatrix[p, i, j].Command = button.GetCommand();
+                                            _moreBtnMatrix[p, i, j] = new GHCommandButtonItem(button.Label, button.ImageSourcePath, button.GHCommand);
+                                            //_moreBtnMatrix[p, i, j].Text = button.Label;
+                                            //_moreBtnMatrix[p, i, j].ImageSourcePath = button.ImageSourcePath;
+                                            //_moreBtnMatrix[p, i, j].Command = button.GetCommand();
                                             break;
                                         }
                                     }
@@ -3343,6 +3831,17 @@ namespace GnollHackX
                     }
                 }
 
+                int buttonCount = 0;
+                int wizModeCount = 0;
+                _moreBtnList.Clear();
+                GHCommandButtonItem lastReturnBtn = null;
+                SKImage lastReturnBitmap = null;
+                GHCommandButtonItem lastExtendedBtn = null;
+                SKImage lastExtendedBitmap = null;
+                GHCommandButtonItem lastSearchBtn = null;
+                SKImage lastSearchBitmap = null;
+                GHCommandButtonItem lastRestBtn = null;
+                SKImage lastRestBitmap = null;
                 for (int k = 0; k < GHConstants.MoreButtonPages; k++)
                 {
                     for (int i = 0; i < GHConstants.MoreButtonsPerRow; i++)
@@ -3354,6 +3853,33 @@ namespace GnollHackX
                                 try
                                 {
                                     _moreBtnBitmaps[k, i, j] = GetCachedImageSourceBitmap("resource://" + _moreBtnMatrix[k, i, j].ImageSourcePath, true);
+                                    if (_moreBtnMatrix[k, i, j].GHCommand == -101)
+                                    {
+                                        lastReturnBtn = _moreBtnMatrix[k, i, j];
+                                        lastReturnBitmap = _moreBtnBitmaps[k, i, j];
+                                    }
+                                    else if (_moreBtnMatrix[k, i, j].GHCommand == (int)'#')
+                                    {
+                                        lastExtendedBtn = _moreBtnMatrix[k, i, j];
+                                        lastExtendedBitmap = _moreBtnBitmaps[k, i, j];
+                                    }
+                                    else if (_moreBtnMatrix[k, i, j].GHCommand == -102)
+                                    {
+                                        lastSearchBtn = _moreBtnMatrix[k, i, j];
+                                        lastSearchBitmap = _moreBtnBitmaps[k, i, j];
+                                    }
+                                    else if (_moreBtnMatrix[k, i, j].GHCommand == -103)
+                                    {
+                                        lastRestBtn = _moreBtnMatrix[k, i, j];
+                                        lastRestBitmap = _moreBtnBitmaps[k, i, j];
+                                    }
+                                    else
+                                    {
+                                        buttonCount++;
+                                        if (k == 0)
+                                            wizModeCount++;
+                                        _moreBtnList.Add(new GHCommandButtonRect(_moreBtnMatrix[k, i, j], _moreBtnBitmaps[k, i, j], k == 0));
+                                    }
                                 }
                                 catch (Exception ex)
                                 {
@@ -3363,6 +3889,50 @@ namespace GnollHackX
                         }
                     }
                 }
+                _moreBtnList.Sort((a, b) =>
+                {
+                    if (a.CommandButtonItem == null || a.CommandButtonItem.Text == null)
+                        return -1;
+                    if (b.CommandButtonItem == null || b.CommandButtonItem.Text == null)
+                        return 1;
+                    return a.CommandButtonItem.Text.CompareTo(b.CommandButtonItem.Text);
+                });
+                /* Remove duplicates */
+                for (int i = _moreBtnList.Count - 1; i >= 1; i--)
+                {
+                    var btn1 = _moreBtnList[i].CommandButtonItem;
+                    var btn2 = _moreBtnList[i - 1].CommandButtonItem;
+                    if (btn1 != null && btn2 != null && btn1.GHCommand != 0 && btn1.GHCommand == btn2.GHCommand)
+                    {
+                        bool isWizBtn = _moreBtnList[i].IsWizardModeCommand;
+                        _moreBtnList.RemoveAt(i);
+                        buttonCount--;
+                        if (isWizBtn)
+                            wizModeCount--;
+                    }
+                }
+                if (lastRestBtn != null && lastRestBitmap != null)
+                {
+                    buttonCount++;
+                    _moreBtnList.Add((new GHCommandButtonRect(lastRestBtn, lastRestBitmap, false)));
+                }
+                if (lastSearchBtn != null && lastSearchBitmap != null)
+                {
+                    buttonCount++;
+                    _moreBtnList.Add((new GHCommandButtonRect(lastSearchBtn, lastSearchBitmap, false)));
+                }
+                if (lastExtendedBtn != null && lastExtendedBitmap != null)
+                {
+                    buttonCount++;
+                    _moreBtnList.Add((new GHCommandButtonRect(lastExtendedBtn, lastExtendedBitmap, false)));
+                }
+                if (lastReturnBtn != null && lastReturnBitmap != null)
+                {
+                    buttonCount++;
+                    _moreBtnList.Add((new GHCommandButtonRect(lastReturnBtn, lastReturnBitmap, false)));
+                }
+                MoreButtonCount = buttonCount;
+                WizButtonCount = wizModeCount;
             }
         }
 
@@ -3424,6 +3994,7 @@ namespace GnollHackX
 
             _orbGlassBitmap = LoadEmbeddedUIBitmap("orb_glass.png");
             _batteryFrameBitmap = LoadEmbeddedUIBitmap("battery-frame.png");
+            _diskBitmap = LoadEmbeddedUIBitmap("disk.png");
             _fpsBitmap = LoadEmbeddedUIBitmap("fps.png");
             _memoryBitmap = LoadEmbeddedUIBitmap("memory.png");
             _zoomBitmap = LoadEmbeddedUIBitmap("zoom.png");
@@ -3446,6 +4017,46 @@ namespace GnollHackX
                 }
                 redbitmap.SetImmutable();
                 _batteryRedFrameBitmap = SKImage.FromBitmap(redbitmap);
+            }
+
+            using (SKPaint bmpPaint = new SKPaint())
+            {
+                bmpPaint.Color = SKColors.White;
+                var redbitmap = new SKBitmap(_diskBitmap.Width, _diskBitmap.Height, SKImageInfo.PlatformColorType, SKAlphaType.Premul);
+                using (var redcanvas = new SKCanvas(redbitmap))
+                {
+                    redcanvas.Clear(SKColors.Transparent);
+                    bmpPaint.ColorFilter = SKColorFilter.CreateColorMatrix(new float[]
+                        {
+                            1.0f,  0,     0,    0, 0,
+                            0,     0.25f,  0,    0, 0,
+                            0,     0,     0.25f, 0, 0,
+                            0,     0,     0,    1, 0
+                        });
+                    redcanvas.DrawImage(_diskBitmap, 0, 0, bmpPaint);
+                }
+                redbitmap.SetImmutable();
+                _diskRedBitmap = SKImage.FromBitmap(redbitmap);
+            }
+
+            using (SKPaint bmpPaint = new SKPaint())
+            {
+                bmpPaint.Color = SKColors.White;
+                var yellowbitmap = new SKBitmap(_diskBitmap.Width, _diskBitmap.Height, SKImageInfo.PlatformColorType, SKAlphaType.Premul);
+                using (var yellowcanvas = new SKCanvas(yellowbitmap))
+                {
+                    yellowcanvas.Clear(SKColors.Transparent);
+                    bmpPaint.ColorFilter = SKColorFilter.CreateColorMatrix(new float[]
+                        {
+                            1.0f,  0,     0,    0, 0,
+                            0,     1.0f,  0,    0, 0,
+                            0,     0,     0.25f, 0, 0,
+                            0,     0,     0,    1, 0
+                        });
+                    yellowcanvas.DrawImage(_diskBitmap, 0, 0, bmpPaint);
+                }
+                yellowbitmap.SetImmutable();
+                _diskYellowBitmap = SKImage.FromBitmap(yellowbitmap);
             }
 
             _statusWizardBitmap = LoadEmbeddedUIBitmap("status-wizard-mode.png");
@@ -3510,13 +4121,16 @@ namespace GnollHackX
             new SelectableShortcutButton("Drop Item Types", "Drop Types", 'D', false, false, 0, AppResourceName + ".Assets.UI.droptypes.png"),
             new SelectableShortcutButton("Eat", "Eat", 'e', false, false, 0, AppResourceName + ".Assets.UI.eat.png"),
             new SelectableShortcutButton("Engrave", "Engrave", 'E', false, false, 0, AppResourceName + ".Assets.UI.engrave.png"),
+            new SelectableShortcutButton("Engrave Quick", "Engrave!", 'E', false, true, 0, AppResourceName + ".Assets.UI.engravequick.png"),
             new SelectableShortcutButton("Examine Item", "Examine", 'x', false, true, 0, AppResourceName + ".Assets.UI.examine.png"),
             new SelectableShortcutButton("Fire Weapon", "Fire", 'f', false, false, 0, AppResourceName + ".Assets.UI.fire.png"),
             new SelectableShortcutButton("Force Fight", "Fight", 'F', false, false, 0, AppResourceName + ".Assets.UI.fight.png"),
             new SelectableShortcutButton("Inventory", "Inventory", 'i', false, false, 0, AppResourceName + ".Assets.UI.inventory.png"),
             new SelectableShortcutButton("Kick", "Kick", 'd', true, false, 0, AppResourceName + ".Assets.UI.kick.png"),
+            new SelectableShortcutButton("Pick-axe", "Pick-axe", 'X', false, true, 0, AppResourceName + ".Assets.UI.pickaxe.png"),
+            new SelectableShortcutButton("Polearm", "Polearm", 'P', false, true, 0, AppResourceName + ".Assets.UI.polearm.png"),
             new SelectableShortcutButton("Read", "Read", 'r', false, false, 0, AppResourceName + ".Assets.UI.read.png"),
-            new SelectableShortcutButton("Repeat", "Repeat", 'A', true, false, 0, AppResourceName + ".Assets.UI.repeat.png"),
+            new SelectableShortcutButton("Repeat", "Repeat", 'a', true, false, 0, AppResourceName + ".Assets.UI.repeat.png"),
             new SelectableShortcutButton("Rest", "Rest", '\0', false, false, -103, AppResourceName + ".Assets.UI.rest.png"),
             new SelectableShortcutButton("Search", "Search", 's', false, false, 0, AppResourceName + ".Assets.UI.search.png"),
             new SelectableShortcutButton("Search 20 Times", "Search 20", '\0', false, false, -102, AppResourceName + ".Assets.UI.search20.png"),
@@ -3540,7 +4154,7 @@ namespace GnollHackX
         private static readonly SelectableShortcutButton _defSwap = new SelectableShortcutButton("Swap Weapon", "Swap", 'x', false, false, 0, AppResourceName + ".Assets.UI.swap.png");
         private static readonly SelectableShortcutButton _defKick = new SelectableShortcutButton("Kick", "Kick", 'd', true, false, 0, AppResourceName + ".Assets.UI.kick.png");
         private static readonly SelectableShortcutButton _defCast = new SelectableShortcutButton("Cast Spell", "Cast", 'Z', false, false, 0, AppResourceName + ".Assets.UI.cast.png");
-        private static readonly SelectableShortcutButton _defRepeat = new SelectableShortcutButton("Repeat", "Repeat", 'A', true, false, 0, AppResourceName + ".Assets.UI.repeat.png");
+        private static readonly SelectableShortcutButton _defRepeat = new SelectableShortcutButton("Repeat", "Repeat", 'a', true, false, 0, AppResourceName + ".Assets.UI.repeat.png");
 
         private static readonly SelectableShortcutButton _defApply = new SelectableShortcutButton("Apply Item", "Apply", 'a', false, false, 0, AppResourceName + ".Assets.UI.apply.png");
         private static readonly SelectableShortcutButton _defChat = new SelectableShortcutButton("Chat", "Chat", 'C', false, false, 0, AppResourceName + ".Assets.UI.chat.png");
@@ -3552,7 +4166,7 @@ namespace GnollHackX
 
         public static SelectableShortcutButton DefaultShortcutButton(int row, int column, bool issimple)
         {
-            if(issimple)
+            if (issimple)
             {
                 switch (column)
                 {
@@ -3608,16 +4222,16 @@ namespace GnollHackX
 
         public static int SelectableShortcutButtonIndexInList(int cmd, int defcmd)
         {
-            for(int i = 0; i < SelectableShortcutButtons.Count; i++) 
+            for (int i = 0; i < SelectableShortcutButtons.Count; i++)
             {
                 SelectableShortcutButton button = SelectableShortcutButtons[i];
-                if (button.GetCommand() == cmd)
+                if (button.GHCommand == cmd)
                     return i;
             }
             for (int i = 0; i < SelectableShortcutButtons.Count; i++)
             {
                 SelectableShortcutButton button = SelectableShortcutButtons[i];
-                if (button.GetCommand() == defcmd)
+                if (button.GHCommand == defcmd)
                     return i;
             }
             return -1;
@@ -3632,6 +4246,7 @@ namespace GnollHackX
             new MouseCommandItem("Cast", (int)NhGetPosMods.ClickCast),
             new MouseCommandItem("Fire", (int)NhGetPosMods.ClickFire),
             new MouseCommandItem("Zap", (int)NhGetPosMods.ClickZap),
+            new MouseCommandItem("Polearm", (int)NhGetPosMods.ClickPole),
         };
 
         public static readonly List<ScreenScaleItem> ScreenScaleItems = new List<ScreenScaleItem>()
@@ -3738,7 +4353,7 @@ namespace GnollHackX
         {
             /* Send Diagnostic Data via C */
             GnollHackService?.ReportFileDescriptors();
-            if(IsAndroid)
+            if (IsAndroid)
             {
 #if !GNH_MAUI || ANDROID
                 /* Print file descriptors via C# */
@@ -3769,6 +4384,15 @@ namespace GnollHackX
 
         public static void PlayButtonClickedSound()
         {
+            var curGame = CurrentGHGame;
+            if (curGame != null)
+                curGame.ResponseQueue.Enqueue(new GHResponse(curGame, GHRequestType.PlayButtonClickSound));
+            else
+                PlayButtonClickedSoundCore();
+        }
+
+        public static void PlayButtonClickedSoundCore()
+        {
             if (_fmodService != null)
             {
                 try
@@ -3792,6 +4416,15 @@ namespace GnollHackX
         }
 
         public static void PlayMenuSelectSound()
+        {
+            var curGame = CurrentGHGame;
+            if (curGame != null)
+                curGame.ResponseQueue.Enqueue(new GHResponse(curGame, GHRequestType.PlayMenuSelectSound));
+            else
+                PlayMenuSelectSoundCore();
+        }
+
+        public static void PlayMenuSelectSoundCore()
         {
             if (_fmodService != null)
             {
@@ -3819,21 +4452,21 @@ namespace GnollHackX
                 {
                     archive.CreateEntryFromFile(fPath, Path.GetFileName(fPath));
                 }
-                string[] ghsubdirlist = { GHConstants.SaveDirectory, GHConstants.DumplogDirectory, GHConstants.SnapshotDirectory, GHConstants.UserDataDirectory, 
+                string[] ghsubdirlist = { GHConstants.SaveDirectory, GHConstants.DumplogDirectory, GHConstants.SnapshotDirectory, GHConstants.UserDataDirectory,
                     GHConstants.ForumPostQueueDirectory, GHConstants.XlogPostQueueDirectory, GHConstants.BonesPostQueueDirectory, GHConstants.ReplayPostQueueDirectory,
-                    GHConstants.AppLogDirectory }; 
-                    //These may be too large: GHConstants.ReplayDirectory, GHConstants.ReplayDownloadFromCloudDirectory
+                    GHConstants.AppLogDirectory };
+                //These may be too large: GHConstants.ReplayDirectory, GHConstants.ReplayDownloadFromCloudDirectory
                 foreach (string ghsubdir in ghsubdirlist)
                 {
                     string subdirpath = Path.Combine(ghdir, ghsubdir);
-                    if(Directory.Exists(subdirpath))
+                    if (Directory.Exists(subdirpath))
                     {
                         string[] subfiles = Directory.GetFiles(subdirpath);
-                        if(subfiles != null)
+                        if (subfiles != null)
                         {
                             foreach (var fPath in subfiles)
                             {
-                                if(fPath != null)
+                                if (fPath != null)
                                     archive.CreateEntryFromFile(fPath, Path.Combine(ghsubdir, Path.GetFileName(fPath)));
                             }
                         }
@@ -3926,12 +4559,12 @@ namespace GnollHackX
                     string[] subfiles = Directory.GetFiles(subdirpath);
                     foreach (var fPath in subfiles)
                     {
-                        if(!string.IsNullOrWhiteSpace(fPath))
+                        if (!string.IsNullOrWhiteSpace(fPath))
                         {
                             FileInfo fi = new FileInfo(fPath);
                             if (!string.IsNullOrWhiteSpace(fi.Name))
                             {
-                                if(!fi.Name.StartsWith(GHConstants.ReplaySharedZipFileNamePrefix))
+                                if (!fi.Name.StartsWith(GHConstants.ReplaySharedZipFileNamePrefix))
                                     archive.CreateEntryFromFile(fPath, Path.GetFileName(fPath));
                             }
                         }
@@ -4023,101 +4656,159 @@ namespace GnollHackX
             }
         }
 
+        //private static readonly ImmutableDictionary<string, SKImage> _specialSymbolMap = new Dictionary<string, SKImage>
+        //{
+        //    { "&success;", _successBitmap },
+        //    { "&mana;", _manaBitmap },
+        //    { "&cool;", _cooldownBitmap },
+
+        //    { "&casts;", _castsBitmap },
+        //    { "&adds;", _addsBitmap },
+        //    { "&food;", _foodBitmap },
+        //    { "&gold;", _goldBitmap },
+
+        //    { "&spabj;", _spellAbjurationBitmap },
+        //    { "&sparc;", _spellArcaneBitmap },
+        //    { "&spcel;", _spellCelestialBitmap },
+        //    { "&spcle;", _spellClericalBitmap },
+        //    { "&spcon;", _spellConjurationBitmap },
+        //    { "&spdiv;", _spellDivinationBitmap },
+        //    { "&spenc;", _spellEnchantmentBitmap },
+        //    { "&sphea;", _spellHealingBitmap },
+        //    { "&spmov;", _spellMovementBitmap },
+        //    { "&spnat;", _spellNatureBitmap },
+        //    { "&spnec;", _spellNecromancyBitmap },
+        //    { "&sptra;", _spellTransmutationBitmap },
+
+        //    { "&damage;", _damageBitmap },
+
+        //    { "&AC;", _statusACBitmap },
+        //    { "&MC;", _statusMCBitmap },
+
+        //    { "&rec;", _recommendedBitmap }
+        //}.ToImmutableDictionary();
+
         public static SKImage GetSpecialSymbol(string str, out SKRect source_rect)
         {
             source_rect = new SKRect();
-            if (str == null || !str.StartsWith("&"))
+            if (str == null || str.Length < 4 || str[0] != '&') //!str.StartsWith('&'))
                 return null;
 
             SKImage bitmap = null;
-            string trimmed_str = str.Trim();
-            if (trimmed_str == "&success;")
+            string trimmedStr = str.Trim();
+            int strLength = trimmedStr.Length;
+            //if (!_specialSymbolMap.TryGetValue(trimmedStr, out bitmap))
+            //{
+            //    bitmap = null;
+            //}
+            switch (strLength)
             {
-                bitmap = _successBitmap;
-            }
-            else if (trimmed_str == "&mana;")
-            {
-                bitmap = _manaBitmap;
-            }
-            else if (trimmed_str == "&cool;")
-            {
-                bitmap = _cooldownBitmap;
-            }
-            else if (trimmed_str == "&casts;")
-            {
-                bitmap = _castsBitmap;
-            }
-            else if (trimmed_str == "&adds;")
-            {
-                bitmap = _addsBitmap;
-            }
-            else if (trimmed_str == "&food;")
-            {
-                bitmap = _foodBitmap;
-            }
-            else if (trimmed_str == "&gold;")
-            {
-                bitmap = _goldBitmap;
-            }
-            else if (trimmed_str == "&spabj;")
-            {
-                bitmap = _spellAbjurationBitmap;
-            }
-            else if (trimmed_str == "&sparc;")
-            {
-                bitmap = _spellArcaneBitmap;
-            }
-            else if (trimmed_str == "&spcel;")
-            {
-                bitmap = _spellCelestialBitmap;
-            }
-            else if (trimmed_str == "&spcle;")
-            {
-                bitmap = _spellClericalBitmap;
-            }
-            else if (trimmed_str == "&spcon;")
-            {
-                bitmap = _spellConjurationBitmap;
-            }
-            else if (trimmed_str == "&spdiv;")
-            {
-                bitmap = _spellDivinationBitmap;
-            }
-            else if (trimmed_str == "&spenc;")
-            {
-                bitmap = _spellEnchantmentBitmap;
-            }
-            else if (trimmed_str == "&sphea;")
-            {
-                bitmap = _spellHealingBitmap;
-            }
-            else if (trimmed_str == "&spmov;")
-            {
-                bitmap = _spellMovementBitmap;
-            }
-            else if (trimmed_str == "&spnat;")
-            {
-                bitmap = _spellNatureBitmap;
-            }
-            else if (trimmed_str == "&spnec;")
-            {
-                bitmap = _spellNecromancyBitmap;
-            }
-            else if (trimmed_str == "&sptra;")
-            {
-                bitmap = _spellTransmutationBitmap;
-            }
-            else if (trimmed_str == "&damage;")
-            {
-                bitmap = _damageBitmap;
-            }
-            else if (trimmed_str == "&AC;")
-            {
-                bitmap = _statusACBitmap;
-            }
-            else if (trimmed_str == "&MC;")
-            {
-                bitmap = _statusMCBitmap;
+                case 9:
+                    if (trimmedStr == "&success;")
+                    {
+                        bitmap = _successBitmap;
+                    }
+                    break;
+                case 8:
+                    if (trimmedStr == "&damage;")
+                    {
+                        bitmap = _damageBitmap;
+                    }
+                    break;
+                case 7:
+                    if (trimmedStr == "&casts;")
+                    {
+                        bitmap = _castsBitmap;
+                    }
+                    else if (trimmedStr == "&spabj;")
+                    {
+                        bitmap = _spellAbjurationBitmap;
+                    }
+                    else if (trimmedStr == "&sparc;")
+                    {
+                        bitmap = _spellArcaneBitmap;
+                    }
+                    else if (trimmedStr == "&spcel;")
+                    {
+                        bitmap = _spellCelestialBitmap;
+                    }
+                    else if (trimmedStr == "&spcle;")
+                    {
+                        bitmap = _spellClericalBitmap;
+                    }
+                    else if (trimmedStr == "&spcon;")
+                    {
+                        bitmap = _spellConjurationBitmap;
+                    }
+                    else if (trimmedStr == "&spdiv;")
+                    {
+                        bitmap = _spellDivinationBitmap;
+                    }
+                    else if (trimmedStr == "&spenc;")
+                    {
+                        bitmap = _spellEnchantmentBitmap;
+                    }
+                    else if (trimmedStr == "&sphea;")
+                    {
+                        bitmap = _spellHealingBitmap;
+                    }
+                    else if (trimmedStr == "&spmov;")
+                    {
+                        bitmap = _spellMovementBitmap;
+                    }
+                    else if (trimmedStr == "&spnat;")
+                    {
+                        bitmap = _spellNatureBitmap;
+                    }
+                    else if (trimmedStr == "&spnec;")
+                    {
+                        bitmap = _spellNecromancyBitmap;
+                    }
+                    else if (trimmedStr == "&sptra;")
+                    {
+                        bitmap = _spellTransmutationBitmap;
+                    }
+                    break;
+                case 6:
+                    if (trimmedStr == "&mana;")
+                    {
+                        bitmap = _manaBitmap;
+                    }
+                    else if (trimmedStr == "&cool;")
+                    {
+                        bitmap = _cooldownBitmap;
+                    }
+                    else if (trimmedStr == "&adds;")
+                    {
+                        bitmap = _addsBitmap;
+                    }
+                    else if (trimmedStr == "&food;")
+                    {
+                        bitmap = _foodBitmap;
+                    }
+                    else if (trimmedStr == "&gold;")
+                    {
+                        bitmap = _goldBitmap;
+                    }
+                    break;
+                case 5:
+                    if (trimmedStr == "&rec;")
+                    {
+                        bitmap = _recommendedBitmap;
+                    }
+                    break;
+                case 4:
+                    if (trimmedStr == "&AC;")
+                    {
+                        bitmap = _statusACBitmap;
+                    }
+                    else if (trimmedStr == "&MC;")
+                    {
+                        bitmap = _statusMCBitmap;
+                    }
+                    break;
+                default:
+                    break;
             }
 
             if (bitmap != null)
@@ -4131,186 +4822,212 @@ namespace GnollHackX
         public static SKImage GetSpecialSymbol(ReadOnlySpan<char> span, out SKRect source_rect)
         {
             source_rect = new SKRect();
-            if (span.IsEmpty || span[0] != '&')
+            if (span.IsEmpty || span.Length < 4 || span[0] != '&')
                 return null;
 
             SKImage bitmap = null;
             ReadOnlySpan<char> trimmedSpan = span.Trim();
-            if (trimmedSpan.SequenceEqual("&success;"
+            int spanLength = trimmedSpan.Length;
+            switch (spanLength)
+            {
+                case 9:
+                    if (trimmedSpan.SequenceEqual("&success;"
+#if !GNH_MAUI
+                        .AsSpan()
+#endif
+                        ))
+                    {
+                        bitmap = _successBitmap;
+                    }
+                    break;
+                case 8:
+                    if (trimmedSpan.SequenceEqual("&damage;"
+#if !GNH_MAUI
+                        .AsSpan()
+#endif
+                        ))
+                    {
+                        bitmap = _damageBitmap;
+                    }
+                    break;
+                case 7:
+                    if (trimmedSpan.SequenceEqual("&casts;"
+#if !GNH_MAUI
+                        .AsSpan()
+#endif
+                        ))
+                    {
+                        bitmap = _castsBitmap;
+                    }
+                    else if (trimmedSpan.SequenceEqual("&spabj;"
+#if !GNH_MAUI
+                        .AsSpan()
+#endif
+                        ))
+                    {
+                        bitmap = _spellAbjurationBitmap;
+                    }
+                    else if (trimmedSpan.SequenceEqual("&sparc;"
+#if !GNH_MAUI
+                        .AsSpan()
+#endif
+                        ))
+                    {
+                        bitmap = _spellArcaneBitmap;
+                    }
+                    else if (trimmedSpan.SequenceEqual("&spcel;"
+#if !GNH_MAUI
+                        .AsSpan()
+#endif
+                        ))
+                    {
+                        bitmap = _spellCelestialBitmap;
+                    }
+                    else if (trimmedSpan.SequenceEqual("&spcle;"
+#if !GNH_MAUI
+                        .AsSpan()
+#endif
+                        ))
+                    {
+                        bitmap = _spellClericalBitmap;
+                    }
+                    else if (trimmedSpan.SequenceEqual("&spcon;"
+#if !GNH_MAUI
+                        .AsSpan()
+#endif
+                        ))
+                    {
+                        bitmap = _spellConjurationBitmap;
+                    }
+                    else if (trimmedSpan.SequenceEqual("&spdiv;"
+#if !GNH_MAUI
+                        .AsSpan()
+#endif
+                        ))
+                    {
+                        bitmap = _spellDivinationBitmap;
+                    }
+                    else if (trimmedSpan.SequenceEqual("&spenc;"
 #if !GNH_MAUI
                 .AsSpan()
 #endif
-                ))
-            {
-                bitmap = _successBitmap;
-            }
-            else if (trimmedSpan.SequenceEqual("&mana;"
+                        ))
+                    {
+                        bitmap = _spellEnchantmentBitmap;
+                    }
+                    else if (trimmedSpan.SequenceEqual("&sphea;"
 #if !GNH_MAUI
-                .AsSpan()
+                        .AsSpan()
 #endif
-                ))
-            {
-                bitmap = _manaBitmap;
-            }
-            else if (trimmedSpan.SequenceEqual("&cool;"
+                        ))
+                    {
+                        bitmap = _spellHealingBitmap;
+                    }
+                    else if (trimmedSpan.SequenceEqual("&spmov;"
 #if !GNH_MAUI
-                .AsSpan()
+                        .AsSpan()
 #endif
-                ))
-            {
-                bitmap = _cooldownBitmap;
-            }
-            else if (trimmedSpan.SequenceEqual("&casts;"
+                        ))
+                    {
+                        bitmap = _spellMovementBitmap;
+                    }
+                    else if (trimmedSpan.SequenceEqual("&spnat;"
 #if !GNH_MAUI
-                .AsSpan()
+                        .AsSpan()
 #endif
-                ))
-            {
-                bitmap = _castsBitmap;
-            }
-            else if (trimmedSpan.SequenceEqual("&adds;"
+                        ))
+                    {
+                        bitmap = _spellNatureBitmap;
+                    }
+                    else if (trimmedSpan.SequenceEqual("&spnec;"
 #if !GNH_MAUI
-                .AsSpan()
+                        .AsSpan()
 #endif
-                ))
-            {
-                bitmap = _addsBitmap;
-            }
-            else if (trimmedSpan.SequenceEqual("&food;"
+                        ))
+                    {
+                        bitmap = _spellNecromancyBitmap;
+                    }
+                    else if (trimmedSpan.SequenceEqual("&sptra;"
 #if !GNH_MAUI
-                .AsSpan()
+                        .AsSpan()
 #endif
-                ))
-            {
-                bitmap = _foodBitmap;
-            }
-            else if (trimmedSpan.SequenceEqual("&gold;"
+                        ))
+                    {
+                        bitmap = _spellTransmutationBitmap;
+                    }
+                    break;
+                case 6:
+                    if (trimmedSpan.SequenceEqual("&mana;"
 #if !GNH_MAUI
-                .AsSpan()
+                        .AsSpan()
 #endif
-                ))
-            {
-                bitmap = _goldBitmap;
-            }
-            else if (trimmedSpan.SequenceEqual("&spabj;"
+                        ))
+                    {
+                        bitmap = _manaBitmap;
+                    }
+                    else if (trimmedSpan.SequenceEqual("&cool;"
 #if !GNH_MAUI
-                .AsSpan()
+                        .AsSpan()
 #endif
-                ))
-            {
-                bitmap = _spellAbjurationBitmap;
-            }
-            else if (trimmedSpan.SequenceEqual("&sparc;"
+                        ))
+                    {
+                        bitmap = _cooldownBitmap;
+                    }
+                    else if (trimmedSpan.SequenceEqual("&adds;"
 #if !GNH_MAUI
-                .AsSpan()
+                        .AsSpan()
 #endif
-                ))
-            {
-                bitmap = _spellArcaneBitmap;
-            }
-            else if (trimmedSpan.SequenceEqual("&spcel;"
+                        ))
+                    {
+                        bitmap = _addsBitmap;
+                    }
+                    else if (trimmedSpan.SequenceEqual("&food;"
 #if !GNH_MAUI
-                .AsSpan()
+                        .AsSpan()
 #endif
-                ))
-            {
-                bitmap = _spellCelestialBitmap;
-            }
-            else if (trimmedSpan.SequenceEqual("&spcle;"
+                        ))
+                    {
+                        bitmap = _foodBitmap;
+                    }
+                    else if (trimmedSpan.SequenceEqual("&gold;"
 #if !GNH_MAUI
-                .AsSpan()
+                        .AsSpan()
 #endif
-                ))
-            {
-                bitmap = _spellClericalBitmap;
-            }
-            else if (trimmedSpan.SequenceEqual("&spcon;"
+                        ))
+                    {
+                        bitmap = _goldBitmap;
+                    }
+                    break;
+                case 5:
+                    if (trimmedSpan.SequenceEqual("&rec;"
 #if !GNH_MAUI
-                .AsSpan()
+                        .AsSpan()
 #endif
-                ))
-            {
-                bitmap = _spellConjurationBitmap;
-            }
-            else if (trimmedSpan.SequenceEqual("&spdiv;"
+                        ))
+                    {
+                        bitmap = _recommendedBitmap;
+                    }
+                    break;
+                case 4:
+                    if (trimmedSpan.SequenceEqual("&AC;"
 #if !GNH_MAUI
-                .AsSpan()
+                        .AsSpan()
 #endif
-                ))
-            {
-                bitmap = _spellDivinationBitmap;
-            }
-            else if (trimmedSpan.SequenceEqual("&spenc;"
+                        ))
+                    {
+                        bitmap = _statusACBitmap;
+                    }
+                    else if (trimmedSpan.SequenceEqual("&MC;"
 #if !GNH_MAUI
-                .AsSpan()
+                        .AsSpan()
 #endif
-                ))
-            {
-                bitmap = _spellEnchantmentBitmap;
-            }
-            else if (trimmedSpan.SequenceEqual("&sphea;"
-#if !GNH_MAUI
-                .AsSpan()
-#endif
-                ))
-            {
-                bitmap = _spellHealingBitmap;
-            }
-            else if (trimmedSpan.SequenceEqual("&spmov;"
-#if !GNH_MAUI
-                .AsSpan()
-#endif
-                ))
-            {
-                bitmap = _spellMovementBitmap;
-            }
-            else if (trimmedSpan.SequenceEqual("&spnat;"
-#if !GNH_MAUI
-                .AsSpan()
-#endif
-                ))
-            {
-                bitmap = _spellNatureBitmap;
-            }
-            else if (trimmedSpan.SequenceEqual("&spnec;"
-#if !GNH_MAUI
-                .AsSpan()
-#endif
-                ))
-            {
-                bitmap = _spellNecromancyBitmap;
-            }
-            else if (trimmedSpan.SequenceEqual("&sptra;"
-#if !GNH_MAUI
-                .AsSpan()
-#endif
-                ))
-            {
-                bitmap = _spellTransmutationBitmap;
-            }
-            else if (trimmedSpan.SequenceEqual("&damage;"
-#if !GNH_MAUI
-                .AsSpan()
-#endif
-                ))
-            {
-                bitmap = _damageBitmap;
-            }
-            else if (trimmedSpan.SequenceEqual("&AC;"
-#if !GNH_MAUI
-                .AsSpan()
-#endif
-                ))
-            {
-                bitmap = _statusACBitmap;
-            }
-            else if (trimmedSpan.SequenceEqual("&MC;"
-#if !GNH_MAUI
-                .AsSpan()
-#endif
-                ))
-            {
-                bitmap = _statusMCBitmap;
+                        ))
+                    {
+                        bitmap = _statusMCBitmap;
+                    }
+                    break;
+                default:
+                    break;
             }
 
             if (bitmap != null)
@@ -4326,149 +5043,152 @@ namespace GnollHackX
 
         public static void InitBaseCachedBitmaps()
         {
-            //lock (_cachedBitmapsLock)
+            try
             {
-                try
+                _cachedBitmaps.Clear();
+                string[] cachedBitmaps = new string[]
                 {
-                    _cachedBitmaps.Clear();
-                    string[] cachedBitmaps = new string[]
+                AppResourceName + ".Assets.UI.missing_icon.png",
+                AppResourceName + ".Assets.FMOD-Logo-192-White.png",
+                AppResourceName + ".Assets.gnollhack-logo-test-2.png",
+                AppResourceName + ".Assets.gnollhack-icon-v2-512.png",
+                AppResourceName + ".Assets.button_normal.png",
+                AppResourceName + ".Assets.button_disabled.png",
+                AppResourceName + ".Assets.button_selected.png",
+                };
+                foreach (string imagePath in cachedBitmaps)
+                {
+                    using (Stream stream = _assembly.GetManifestResourceStream(imagePath))
                     {
-                    AppResourceName + ".Assets.UI.missing_icon.png",
-                    AppResourceName + ".Assets.FMOD-Logo-192-White.png",
-                    AppResourceName + ".Assets.gnollhack-logo-test-2.png",
-                    AppResourceName + ".Assets.gnollhack-icon-v2-512.png",
-                    AppResourceName + ".Assets.button_normal.png",
-                    AppResourceName + ".Assets.button_disabled.png",
-                    AppResourceName + ".Assets.button_selected.png",
-                    };
-                    foreach (string imagePath in cachedBitmaps)
-                    {
-                        using (Stream stream = _assembly.GetManifestResourceStream(imagePath))
+                        SKBitmap newBitmap = SKBitmap.Decode(stream);
+                        if (newBitmap != null)
                         {
-                            SKBitmap newBitmap = SKBitmap.Decode(stream);
-                            if (newBitmap != null)
-                            {
-                                newBitmap.SetImmutable();
-                                _cachedBitmaps.TryAdd("resource://" + imagePath, SKImage.FromBitmap(newBitmap));
-                            }
+                            newBitmap.SetImmutable();
+                            SKImage res = SKImage.FromBitmap(newBitmap);
+                            _cachedBitmaps.TryAdd("resource://" + imagePath, res);
+                            if (res != null)
+                                AddUsedBitmapBytes(res.Info.BytesSize64);
                         }
                     }
                 }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine(ex.Message);
-                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
             }
         }
 
         public static void InitAdditionalCachedBitmaps()
         {
-            //lock (_cachedBitmapsLock)
+            try
             {
-                try
+                string[] cachedBitmaps = new string[]
                 {
-                    string[] cachedBitmaps = new string[]
+                AppResourceName + ".Assets.UI.yes.png",
+                AppResourceName + ".Assets.UI.yestoall.png",
+                AppResourceName + ".Assets.UI.no.png",
+                AppResourceName + ".Assets.UI.cancel.png",
+                AppResourceName + ".Assets.UI.inventory.png",
+                AppResourceName + ".Assets.UI.leftring.png",
+                AppResourceName + ".Assets.UI.rightring.png",
+                AppResourceName + ".Assets.UI.load.png",
+                AppResourceName + ".Assets.UI.name.png",
+                AppResourceName + ".Assets.UI.dropmany.png",
+                AppResourceName + ".Assets.UI.page-previous.png",
+                AppResourceName + ".Assets.UI.page-next.png",
+                AppResourceName + ".Assets.UI.stone-look-off.png",
+                AppResourceName + ".Assets.UI.stone-look-on.png",
+                AppResourceName + ".Assets.UI.stone-autocenter-off.png",
+                AppResourceName + ".Assets.UI.stone-autocenter-on.png",
+                AppResourceName + ".Assets.UI.stone-minimap-off.png",
+                AppResourceName + ".Assets.UI.stone-minimap-on.png",
+                AppResourceName + ".Assets.UI.stone-travel-off.png",
+                AppResourceName + ".Assets.UI.stone-travel-on.png",
+                AppResourceName + ".Assets.UI.stone-altmap-off.png",
+                AppResourceName + ".Assets.UI.stone-altmap-on.png",
+                AppResourceName + ".Assets.UI.stairs-down.png",
+                AppResourceName + ".Assets.UI.stairs-up.png",
+                AppResourceName + ".Assets.UI.chat.png",
+                AppResourceName + ".Assets.UI.pickup.png",
+                AppResourceName + ".Assets.UI.eat.png",
+                AppResourceName + ".Assets.UI.pray.png",
+                AppResourceName + ".Assets.UI.offer.png",
+                AppResourceName + ".Assets.UI.loot.png",
+                AppResourceName + ".Assets.UI.lastitem.png",
+                AppResourceName + ".Assets.UI.conduct.png",
+                AppResourceName + ".Assets.UI.manual.png",
+                AppResourceName + ".Assets.UI.delphi.png",
+                AppResourceName + ".Assets.UI.oracle.png",
+                AppResourceName + ".Assets.UI.chronicle.png",
+                AppResourceName + ".Assets.UI.music.png",
+                AppResourceName + ".Assets.UI.you.png",
+                AppResourceName + ".Assets.tombstone.png",
+                AppResourceName + ".Assets.UI.achievement-page.png",
+                AppResourceName + ".Assets.UI.achievement-category.png",
+                AppResourceName + ".Assets.UI.achievement-gained.png",
+                AppResourceName + ".Assets.UI.achievement-locked.png",
+                };
+                foreach (string imagePath in cachedBitmaps)
+                {
+                    using (Stream stream = _assembly.GetManifestResourceStream(imagePath))
                     {
-                    AppResourceName + ".Assets.UI.yes.png",
-                    AppResourceName + ".Assets.UI.yestoall.png",
-                    AppResourceName + ".Assets.UI.no.png",
-                    AppResourceName + ".Assets.UI.cancel.png",
-                    AppResourceName + ".Assets.UI.inventory.png",
-                    AppResourceName + ".Assets.UI.leftring.png",
-                    AppResourceName + ".Assets.UI.rightring.png",
-                    AppResourceName + ".Assets.UI.load.png",
-                    AppResourceName + ".Assets.UI.name.png",
-                    AppResourceName + ".Assets.UI.dropmany.png",
-                    AppResourceName + ".Assets.UI.page-previous.png",
-                    AppResourceName + ".Assets.UI.page-next.png",
-                    AppResourceName + ".Assets.UI.stone-look-off.png",
-                    AppResourceName + ".Assets.UI.stone-look-on.png",
-                    AppResourceName + ".Assets.UI.stone-autocenter-off.png",
-                    AppResourceName + ".Assets.UI.stone-autocenter-on.png",
-                    AppResourceName + ".Assets.UI.stone-minimap-off.png",
-                    AppResourceName + ".Assets.UI.stone-minimap-on.png",
-                    AppResourceName + ".Assets.UI.stone-travel-off.png",
-                    AppResourceName + ".Assets.UI.stone-travel-on.png",
-                    AppResourceName + ".Assets.UI.stone-altmap-off.png",
-                    AppResourceName + ".Assets.UI.stone-altmap-on.png",
-                    AppResourceName + ".Assets.UI.stairs-down.png",
-                    AppResourceName + ".Assets.UI.stairs-up.png",
-                    AppResourceName + ".Assets.UI.chat.png",
-                    AppResourceName + ".Assets.UI.pickup.png",
-                    AppResourceName + ".Assets.UI.eat.png",
-                    AppResourceName + ".Assets.UI.pray.png",
-                    AppResourceName + ".Assets.UI.offer.png",
-                    AppResourceName + ".Assets.UI.loot.png",
-                    AppResourceName + ".Assets.UI.lastitem.png",
-                    AppResourceName + ".Assets.UI.conduct.png",
-                    AppResourceName + ".Assets.UI.manual.png",
-                    AppResourceName + ".Assets.UI.delphi.png",
-                    AppResourceName + ".Assets.UI.oracle.png",
-                    AppResourceName + ".Assets.UI.chronicle.png",
-                    AppResourceName + ".Assets.UI.music.png",
-                    AppResourceName + ".Assets.UI.you.png",
-                    AppResourceName + ".Assets.tombstone.png",
-                    };
-                    foreach (string imagePath in cachedBitmaps)
-                    {
-                        using (Stream stream = _assembly.GetManifestResourceStream(imagePath))
+                        SKBitmap newBitmap = SKBitmap.Decode(stream);
+                        if (newBitmap != null)
                         {
-                            SKBitmap newBitmap = SKBitmap.Decode(stream);
-                            if (newBitmap != null)
-                            {
-                                newBitmap.SetImmutable();
-                                _cachedBitmaps.TryAdd("resource://" + imagePath, SKImage.FromBitmap(newBitmap));
-                            }
+                            newBitmap.SetImmutable();
+                            SKImage res = SKImage.FromBitmap(newBitmap);
+                            _cachedBitmaps.TryAdd("resource://" + imagePath, res);
+                            if (res != null)
+                                AddUsedBitmapBytes(res.Info.BytesSize64);
                         }
                     }
                 }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine(ex.Message);
-                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
             }
         }
+
         public static SKImage GetCachedImageSourceBitmap(string sourcePath, bool addToCache)
         {
             if (sourcePath == null || sourcePath == "")
                 return null;
 
-            //lock (_cachedBitmapsLock)
+            try
             {
-                try
+                SKImage bitmap;
+                if (!_cachedBitmaps.TryGetValue(sourcePath, out bitmap))
                 {
-                    SKImage bitmap;
-                    if (!_cachedBitmaps.TryGetValue(sourcePath, out bitmap))
+                    string imagePath = sourcePath.Length > 11 && sourcePath.Substring(0, 11) == "resource://" ? sourcePath.Substring(11) : sourcePath;
+                    Assembly assembly = typeof(App).GetTypeInfo().Assembly;
+                    using (Stream stream = assembly.GetManifestResourceStream(imagePath))
                     {
-                        string imagePath = sourcePath.Length > 11 && sourcePath.Substring(0, 11) == "resource://" ? sourcePath.Substring(11) : sourcePath;
-                        Assembly assembly = typeof(App).GetTypeInfo().Assembly;
-                        using (Stream stream = assembly.GetManifestResourceStream(imagePath))
+                        SKBitmap newBitmap = SKBitmap.Decode(stream);
+                        if (newBitmap != null)
                         {
-                            SKBitmap newBitmap = SKBitmap.Decode(stream);
-                            if (newBitmap != null)
-                            {
-                                newBitmap.SetImmutable();
-                                SKImage newImage = SKImage.FromBitmap(newBitmap);
-                                if (addToCache)
-                                    _cachedBitmaps.TryAdd(sourcePath, newImage);
+                            newBitmap.SetImmutable();
+                            SKImage newImage = SKImage.FromBitmap(newBitmap);
+                            if (addToCache)
+                                _cachedBitmaps.TryAdd(sourcePath, newImage);
+                            if (newImage != null)
+                                AddUsedBitmapBytes(newImage.Info.BytesSize64);
 
-                                return newImage;
-                            }
+                            return newImage;
                         }
                     }
-                    else
-                        return bitmap;
                 }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine(ex.Message);
-                }
-                return null;
+                else
+                    return bitmap;
             }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+            }
+            return null;
         }
 
 
-        //private static readonly object _postingGameStatusLock = new object();
         private static int _postingGameStatus = 0;
         public static bool PostingGameStatus { get { return Interlocked.CompareExchange(ref _postingGameStatus, 0, 0) != 0 || TournamentMode; } set { Interlocked.Exchange(ref _postingGameStatus, value ? 1 : 0); } }
 
@@ -4480,48 +5200,52 @@ namespace GnollHackX
         private static int  _postingDiagnosticData = 0;
         public static bool PostingDiagnosticData { get { return Interlocked.CompareExchange(ref _postingDiagnosticData, 0, 0) != 0; } set { Interlocked.Exchange(ref _postingDiagnosticData, value ? 1 : 0); } }
 #endif
-        //private static readonly object _postingXlogEntriesLock = new object();
         private static int _postingXlogEntries = 0;
         public static bool PostingXlogEntries { get { return Interlocked.CompareExchange(ref _postingXlogEntries, 0, 0) != 0 || TournamentMode; } set { Interlocked.Exchange(ref _postingXlogEntries, value ? 1 : 0); } }
 
-        //private static readonly object _postingReplaysLock = new object();
         private static int _postingReplays = 0;
         public static bool PostingReplays { get { return Interlocked.CompareExchange(ref _postingReplays, 0, 0) != 0 || TournamentMode; } set { Interlocked.Exchange(ref _postingReplays, value ? 1 : 0); } }
 
-        //private static readonly object _postingBonesFilesLock = new object();
         private static int _postingBonesFiles = 0;
         public static bool PostingBonesFiles { get { return Interlocked.CompareExchange(ref _postingBonesFiles, 0, 0) != 0 || TournamentMode; } set { Interlocked.Exchange(ref _postingBonesFiles, value ? 1 : 0); } }
 
-        //private static readonly object _bonesUserListIsBlackLock = new object();
         private static int _bonesUserListIsBlack = 0;
         public static bool BonesUserListIsBlack { get { return Interlocked.CompareExchange(ref _bonesUserListIsBlack, 0, 0) != 0; } set { Interlocked.Exchange(ref _bonesUserListIsBlack, value ? 1 : 0); } }
 
-        //private static readonly object _allowInGameLock = new object();
         private static int _allowBones = 0;
         private static int _allowPet = 0;
         public static bool AllowBones { get { return Interlocked.CompareExchange(ref _allowBones, 0, 0) != 0 || TournamentMode; } set { Interlocked.Exchange(ref _allowBones, value ? 1 : 0); } }
         public static bool AllowPet { get { return Interlocked.CompareExchange(ref _allowPet, 0, 0) != 0; } set { Interlocked.Exchange(ref _allowPet, value ? 1 : 0); } }
+        public static bool MirroredPetsNotGifted { get { return Interlocked.CompareExchange(ref _allowPet, 0, 0) == 0; } set { Interlocked.Exchange(ref _allowPet, value ? 0 : 1); } }
 
-        //private static readonly object _behaviorLock = new object();
         private static int _emptyWishIsNothing = 0;
         private static int _okOnDoubleClick = 0;
         private static int _getPositionArrows = 0;
         private static int _characterClickAction = 0;
         private static int _diceAsRanges = 0;
+        private static int _wornShowsEquipment = 0;
         private static int _autoDig = 0;
         private static int _ignoreStopping = 0;
+        private static int _metricSystem = 0;
 
         private static int _rightMouseCommand;
         private static int _middleMouseCommand;
+        private static string _engraveQuickText;
+        private static int _engraveQuickStyle;
+
         public static bool EmptyWishIsNothing { get { return Interlocked.CompareExchange(ref _emptyWishIsNothing, 0, 0) != 0; } set { Interlocked.Exchange(ref _emptyWishIsNothing, value ? 1 : 0); } }
         public static bool OkOnDoubleClick { get { return Interlocked.CompareExchange(ref _okOnDoubleClick, 0, 0) != 0; } set { Interlocked.Exchange(ref _okOnDoubleClick, value ? 1 : 0); } }
         public static bool GetPositionArrows { get { return Interlocked.CompareExchange(ref _getPositionArrows, 0, 0) != 0; } set { Interlocked.Exchange(ref _getPositionArrows, value ? 1 : 0); } }
         public static bool MirroredCharacterClickAction { get { return Interlocked.CompareExchange(ref _characterClickAction, 0, 0) != 0; } set { Interlocked.Exchange(ref _characterClickAction, value ? 1 : 0); } }
         public static bool MirroredDiceAsRanges { get { return Interlocked.CompareExchange(ref _diceAsRanges, 0, 0) != 0; } set { Interlocked.Exchange(ref _diceAsRanges, value ? 1 : 0); } }
+        public static bool MirroredWornShowsEquipment { get { return Interlocked.CompareExchange(ref _wornShowsEquipment, 0, 0) != 0; } set { Interlocked.Exchange(ref _wornShowsEquipment, value ? 1 : 0); } }
         public static bool MirroredAutoDig { get { return Interlocked.CompareExchange(ref _autoDig, 0, 0) != 0; } set { Interlocked.Exchange(ref _autoDig, value ? 1 : 0); } }
         public static bool MirroredIgnoreStopping { get { return Interlocked.CompareExchange(ref _ignoreStopping, 0, 0) != 0; } set { Interlocked.Exchange(ref _ignoreStopping, value ? 1 : 0); } }
         public static int MirroredRightMouseCommand { get { return Interlocked.CompareExchange(ref _rightMouseCommand, 0, 0); } set { Interlocked.Exchange(ref _rightMouseCommand, value); } }
         public static int MirroredMiddleMouseCommand { get { return Interlocked.CompareExchange(ref _middleMouseCommand, 0, 0); } set { Interlocked.Exchange(ref _middleMouseCommand, value); } }
+        public static string MirroredEngraveQuickText { get { return Interlocked.CompareExchange(ref _engraveQuickText, null, null); } set { Interlocked.Exchange(ref _engraveQuickText, value); } }
+        public static int MirroredEngraveQuickStyle { get { return Interlocked.CompareExchange(ref _engraveQuickStyle, 0, 0); } set { Interlocked.Exchange(ref _engraveQuickStyle, value); } }
+        public static bool MirroredMetricSystem { get { return Interlocked.CompareExchange(ref _metricSystem, 0, 0) != 0; } set { Interlocked.Exchange(ref _metricSystem, value ? 1 : 0); } }
 
         public static string CustomGameStatusLink { get; set; }
         public static string CustomXlogAccountLink { get; set; }
@@ -4659,32 +5383,31 @@ namespace GnollHackX
             }
         }
 
-        //private static readonly object _forcePostBonesLock = new object();
         private static int _forcePostBones = 0;
         public static bool ForcePostBones { get { return Interlocked.CompareExchange(ref _forcePostBones, 0, 0) != 0; } set { Interlocked.Exchange(ref _forcePostBones, value ? 1 : 0); } }
 
-        //private static readonly object _bonesAllowedUsersLock = new object();
         private static string _bonesAllowedUsers = "";
-        public static string BonesAllowedUsers 
-        { 
-            //get { lock (_bonesAllowedUsersLock) { return _bonesAllowedUsers; } } 
-            //set { lock (_bonesAllowedUsersLock) { _bonesAllowedUsers = value; } }
+        public static string BonesAllowedUsers
+        {
             get { return Interlocked.CompareExchange(ref _bonesAllowedUsers, null, null); }
             set { Interlocked.Exchange(ref _bonesAllowedUsers, value); }
         }
 
-        private static readonly object _saveFileTrackingLock = new object();
-        private static bool _saveFileTracking = false;
-        public static bool SaveFileTracking { get { bool t = TournamentMode; lock (_saveFileTrackingLock) { return _saveFileTracking || t; } } set { lock (_saveFileTrackingLock) { _saveFileTracking = value; } } }
+        private static int _saveFileTracking = 0;
+        public static bool SaveFileTracking
+        {
+            get { return TournamentMode || Interlocked.CompareExchange(ref _saveFileTracking, 0, 0) != 0; }
+            set { Interlocked.Exchange(ref _saveFileTracking, value ? 1 : 0); }
+        }
+
         public static bool IsSaveFileTrackingNeeded { get { return IsDesktop || IsMobileRunningOnDesktop; } }
 
-        //private static readonly object _xlogCreditialLock = new object();
         private static string _xlogUserName = "";
         private static string _xlogPassword = "";
 
         public static string XlogUserName { get { return Interlocked.CompareExchange(ref _xlogUserName, null, null); } set { Interlocked.Exchange(ref _xlogUserName, value); } }
         public static string XlogPassword { get { return Interlocked.CompareExchange(ref _xlogPassword, null, null); } set { Interlocked.Exchange(ref _xlogPassword, value); } }
-        public static string XlogAntiForgeryToken 
+        public static string XlogAntiForgeryToken
         {
             get
             {
@@ -4717,14 +5440,11 @@ namespace GnollHackX
 
         public static bool AreCredentialsVerified(string username, string password)
         {
-            //lock (_xlogCreditialLock)
-            {
-                if (!XlogUserNameVerified)
-                    return false;
-                string verifiedUserName = VerifiedUserName;
-                string verifiedPassword = VerifiedPassword;
-                return verifiedUserName != null && verifiedPassword != null && username == verifiedUserName && password == verifiedPassword;
-            }
+            if (!XlogUserNameVerified)
+                return false;
+            string verifiedUserName = VerifiedUserName;
+            string verifiedPassword = VerifiedPassword;
+            return verifiedUserName != null && verifiedPassword != null && username == verifiedUserName && password == verifiedPassword;
         }
 
         public static void TryVerifyXlogUserName()
@@ -4751,7 +5471,7 @@ namespace GnollHackX
 
         public static async Task TryVerifyXlogUserNameAsync()
         {
-            if(!PostingXlogEntries && !PostingReplays && !PostingBonesFiles && !AutoUploadReplays)
+            if (!PostingXlogEntries && !PostingReplays && !PostingBonesFiles && !AutoUploadReplays)
             {
                 SetXlogUserNameVerified(false, null, null);
                 return;
@@ -4838,7 +5558,7 @@ namespace GnollHackX
             if (secrets == null) return 0;
             if (sd == null) return 0;
             int cnt = 0;
-            foreach (SecretsFile sf in CurrentSecrets.files)
+            foreach (SecretsFile sf in CurrentSettings.files)
             {
                 if (sf.target_directory == sd.name && IsSecretsFileSavedToDisk(sf)) cnt++;
             }
@@ -4854,7 +5574,7 @@ namespace GnollHackX
 
         public static async Task AddLoadableSoundBanks()
         {
-            foreach (SecretsFile sf in CurrentSecrets.files)
+            foreach (SecretsFile sf in CurrentSettings.files)
             {
                 if (sf.type == "sound_bank")
                 {
@@ -4874,13 +5594,13 @@ namespace GnollHackX
                     else //In assets directory
                     {
                         /* Assetpacks in .NET MAUI Android Release configuration work as in Xamarin */
-//#if GNH_MAUI && !(ANDROID && !DEBUG)
-//                        string sdir = Path.Combine(PlatformService.GetAssetsPath(), "Platforms", GHApp.IsAndroid ? "Android" : GHApp.IsiOS ? "iOS" : "Unknown", sf.source_directory);
-//                        string rfile = Path.Combine("Platforms", GHApp.IsAndroid ? "Android" : GHApp.IsiOS ? "iOS" : "Unknown", sf.source_directory, sf.name);
-//#else
+                        //#if GNH_MAUI && !(ANDROID && !DEBUG)
+                        //                        string sdir = Path.Combine(PlatformService.GetAssetsPath(), "Platforms", GHApp.IsAndroid ? "Android" : GHApp.IsiOS ? "iOS" : "Unknown", sf.source_directory);
+                        //                        string rfile = Path.Combine("Platforms", GHApp.IsAndroid ? "Android" : GHApp.IsiOS ? "iOS" : "Unknown", sf.source_directory, sf.name);
+                        //#else
                         string sdir = Path.Combine(PlatformService.GetAssetsPath(), sf.source_directory);
                         string rfile = Path.Combine(sf.source_directory, sf.name);
-//#endif
+                        //#endif
                         string sfile = Path.Combine(sdir, sf.name);
 
                         if (IsReadToMemoryBank(sf))  //Read to memory first and use from there
@@ -4896,7 +5616,7 @@ namespace GnollHackX
         {
             string ghdir = GHPath;
 
-            foreach (SecretsFile sf in CurrentSecrets.files)
+            foreach (SecretsFile sf in CurrentSettings.files)
             {
                 if (!IsSecretsFileSavedToDisk(sf))
                 {
@@ -4913,12 +5633,12 @@ namespace GnollHackX
                     }
                 }
             }
-            foreach (SecretsDirectory sd in CurrentSecrets.directories)
+            foreach (SecretsDirectory sd in CurrentSettings.directories)
             {
                 if (string.IsNullOrWhiteSpace(sd.name))
                     continue;
 
-                if (CountSecretsFilesSavedToDirectory(CurrentSecrets, sd) > 0)
+                if (CountSecretsFilesSavedToDirectory(CurrentSettings, sd) > 0)
                     continue;
 
                 string sdir = Path.Combine(ghdir, sd.name);
@@ -5080,7 +5800,7 @@ namespace GnollHackX
                         Debug.WriteLine("AntiForgeryToken: " + XlogAntiForgeryToken);
 
                         string adjusted_entry_string = "";
-                        if(!string.IsNullOrWhiteSpace(xlogentry_string))
+                        if (!string.IsNullOrWhiteSpace(xlogentry_string))
                         {
                             adjusted_entry_string = xlogentry_string
                                     + "\tplatform=" + DeviceInfo.Platform.ToString()?.ToLower()
@@ -5179,15 +5899,15 @@ namespace GnollHackX
 
                             if (!res.IsSuccess && !is_from_queue && !string.IsNullOrWhiteSpace(xlogentry_string))
                             {
-                                MaybeWriteGHLog((string.IsNullOrEmpty(xlogentry_string) ? "Server authentication failed." : "Sending XLog entry failed.") + " Writing the send request to disk. Status Code: " + (int)res.StatusCode + ", Message: "+ res.Message);
+                                MaybeWriteGHLog((string.IsNullOrEmpty(xlogentry_string) ? "Server authentication failed." : "Sending XLog entry failed.") + " Writing the send request to disk. Status Code: " + (int)res.StatusCode + ", Message: " + res.Message);
                                 SaveXLogEntryToDisk(status_type, status_datatype, xlogentry_string, xlogattachments);
-                            }                            
+                            }
                         }
                         content1.Dispose();
                         content2.Dispose();
                         content3.Dispose();
                         content4.Dispose();
-                        foreach(FileStream fs in filestreams)
+                        foreach (FileStream fs in filestreams)
                         {
                             fs.Dispose();
                         }
@@ -5210,7 +5930,7 @@ namespace GnollHackX
             }
             if (xlogattachments != null)
             {
-                if(res.IsSuccess)
+                if (res.IsSuccess)
                 {
                     foreach (var attachment in xlogattachments)
                     {
@@ -5366,12 +6086,6 @@ namespace GnollHackX
                                             await DisplayMessageBox(displayPage, "Save File Tracking Error", "Sending save file tracking information to the server failed. Status Code: " + (int)res.StatusCode + ", Error: " + res.Message, "OK");
                                     }
                                 }
-
-                                //if (!res.IsSuccess && !is_from_queue && !string.IsNullOrWhiteSpace(xlogentry_string))
-                                //{
-                                //    WriteGHLog((string.IsNullOrEmpty(xlogentry_string) ? "Server authentication failed." : "Sending XLog entry failed.") + " Writing the send request to disk. Status Code: " + (int)res.StatusCode + ", Message: " + res.Message);
-                                //    SaveXLogEntryToDisk(status_type, status_datatype, xlogentry_string, xlogattachments);
-                                //}
                             }
                             content1.Dispose();
                             content2.Dispose();
@@ -5522,12 +6236,6 @@ namespace GnollHackX
                                             await DisplayMessageBox(displayPage, "Save File Tracking Error", "Save file tracking verification failed upon loading a saved game. Status Code: " + (int)res.StatusCode + ", Error: " + res.Message, "OK");
                                     }
                                 }
-
-                                //if (!res.IsSuccess && !is_from_queue && !string.IsNullOrWhiteSpace(xlogentry_string))
-                                //{
-                                //    WriteGHLog((string.IsNullOrEmpty(xlogentry_string) ? "Server authentication failed." : "Sending XLog entry failed.") + " Writing the send request to disk. Status Code: " + (int)res.StatusCode + ", Message: " + res.Message);
-                                //    SaveXLogEntryToDisk(status_type, status_datatype, xlogentry_string, xlogattachments);
-                                //}
                             }
                             content1.Dispose();
                             content2.Dispose();
@@ -5717,7 +6425,7 @@ namespace GnollHackX
                                 res.Message = ex.Message;
                             }
 
-                            if(res.IsSuccess)
+                            if (res.IsSuccess)
                             {
                                 MaybeWriteGHLog("Forum post successfully sent" + (is_from_queue ? " from the post queue" : "") + ". (" + (int)res.StatusCode + ")");
                             }
@@ -5728,7 +6436,7 @@ namespace GnollHackX
                                 SaveForumPostToDisk(is_game_status, status_type, status_datatype, message, forumpostattachments, forcesend);
                             }
                         }
-                        if(content1 != null)
+                        if (content1 != null)
                             content1.Dispose();
                         if (content != null)
                             content.Dispose();
@@ -5753,7 +6461,7 @@ namespace GnollHackX
 
             if (forumpostattachments != null)
             {
-                if(res.IsSuccess)
+                if (res.IsSuccess)
                 {
                     foreach (var attachment in forumpostattachments)
                     {
@@ -5948,12 +6656,12 @@ namespace GnollHackX
                             {
                                 using (HttpResponseMessage response = await client.PostAsync(postaddress, multicontent, cts.Token))
                                 {
-                                    if(response.Content.Headers.ContentType.MediaType == "application/octet-stream")
+                                    if (response.Content.Headers.ContentType.MediaType == "application/octet-stream")
                                         bytearray = await response.Content.ReadAsByteArrayAsync();
                                     res.IsSuccess = response.IsSuccessStatusCode;
                                     res.HasHttpStatusCode = true;
                                     res.StatusCode = response.StatusCode;
-                                    if(res.IsSuccess)
+                                    if (res.IsSuccess)
                                     {
                                         MaybeWriteGHLog("Bones file successfully sent" + (is_from_queue ? " from the post queue" : "") + ". (" + (int)res.StatusCode + "): " + full_filepath);
                                         if (res.StatusCode == HttpStatusCode.OK)
@@ -6002,10 +6710,10 @@ namespace GnollHackX
                                                                     }
                                                                     didWriteBonesFileSuccessfully = true;
 
-                                                                    if(response.Headers.TryGetValues("X-GH-BonesFilePath", out IEnumerable<string> bonesfilepathienum))
+                                                                    if (response.Headers.TryGetValues("X-GH-BonesFilePath", out IEnumerable<string> bonesfilepathienum))
                                                                     {
                                                                         var bonesfilepathlist = bonesfilepathienum.ToList();
-                                                                        if(bonesfilepathlist.Count > 0)
+                                                                        if (bonesfilepathlist.Count > 0)
                                                                             receivedBonesServerFilePath = bonesfilepathlist[0];
                                                                     }
                                                                 }
@@ -6052,7 +6760,7 @@ namespace GnollHackX
                                         {
                                             str = await response.Content.ReadAsStringAsync();
                                         }
-                                        catch (Exception ex) 
+                                        catch (Exception ex)
                                         {
                                             MaybeWriteGHLog("Reading bones response content failed: " + ex.Message);
                                         }
@@ -6223,7 +6931,7 @@ namespace GnollHackX
                                 {
                                     using (HttpResponseMessage response = await client.PostAsync(postaddress, multicontent, cts.Token))
                                     {
-                                        if(response.IsSuccessStatusCode)
+                                        if (response.IsSuccessStatusCode)
                                         {
                                             MaybeWriteGHLog("Bones receipt confirmation of server bones file " + receivedBonesServerFilePath + " sent successfully (" + (int)response.StatusCode + ").");
                                         }
@@ -6518,15 +7226,15 @@ namespace GnollHackX
             else if (IsSteam)
                 platform_with_version += " Steam";
 
-            ulong TotalMemInBytes = TotalMemory;
-            ulong TotalMemInMB = (TotalMemInBytes / 1024) / 1024;
-            ulong FreeDiskSpaceInBytes = GHApp.PlatformService.GetDeviceFreeDiskSpaceInBytes();
-            ulong FreeDiskSpaceInGB = ((FreeDiskSpaceInBytes / 1024) / 1024) / 1024;
-            ulong TotalDiskSpaceInBytes = GHApp.PlatformService.GetDeviceTotalDiskSpaceInBytes();
-            ulong TotalDiskSpaceInGB = ((TotalDiskSpaceInBytes / 1024) / 1024) / 1024;
+            ulong totalMemInBytes = TotalMemory;
+            ulong totalMemInMB = (totalMemInBytes / 1024) / 1024;
+            ulong freeDiskSpaceInBytes = PlatformService?.GetDeviceFreeDiskSpaceInBytes() ?? 0;
+            ulong freeDiskSpaceInGB = ((freeDiskSpaceInBytes / 1024) / 1024) / 1024;
+            ulong totalDiskSpaceInBytes = PlatformService?.GetDeviceTotalDiskSpaceInBytes() ?? 0;
+            ulong totalDiskSpaceInGB = ((totalDiskSpaceInBytes / 1024) / 1024) / 1024;
 
-            string totmem = TotalMemInMB + " MB";
-            string diskspace = FreeDiskSpaceInGB + " GB" + " / " + TotalDiskSpaceInGB + " GB";
+            string totmem = totalMemInMB + " MB";
+            string diskspace = freeDiskSpaceInGB + " GB" + " / " + totalDiskSpaceInGB + " GB";
 
             string player_name = TournamentMode ? LastUsedTournamentPlayerName : LastUsedPlayerName;
             if (string.IsNullOrEmpty(player_name))
@@ -6564,10 +7272,13 @@ namespace GnollHackX
             else
                 Debug.WriteLine(loggedtext);
         }
-        public static void MaybeWriteLowLevelGHLog(string loggedtext)
+        public static void MaybeWriteLowLevelGHLog(string loggedtext, bool addBreadcrumb = false, string category = null)
         {
             if (string.IsNullOrWhiteSpace(loggedtext))
                 return;
+
+            if (addBreadcrumb)
+                AddSentryBreadcrumb(loggedtext, category);
 
             if (IsDebugLowLevelLoggingOn)
                 WriteGHLog(loggedtext);
@@ -6575,12 +7286,31 @@ namespace GnollHackX
                 Debug.WriteLine(loggedtext);
         }
 
+        public static readonly ConcurrentQueue<string> PendingScreenLogMessages = new ConcurrentQueue<string>();
+        public static void MaybeWriteScreenLog(string loggedText)
+        {
+            if (IsDebugScreenLoggingOn)
+            {
+                PendingScreenLogMessages.Enqueue(loggedText);
+            }
+        }
+
+        public static void MaybeWriteScreenLog(bool screenLogging, string loggedText)
+        {
+            if (screenLogging)
+            {
+                PendingScreenLogMessages.Enqueue(loggedText);
+            }
+        }
+
         private static readonly object _ghlogLock = new object();
-        public static void WriteGHLog(string loggedtext)
+        public static void WriteGHLog(string loggedText)
         {
             try
             {
-                Debug.WriteLine(loggedtext);
+                Debug.WriteLine(loggedText);
+                MaybeWriteScreenLog(loggedText);
+
                 string logdir = Path.Combine(GHPath, GHConstants.AppLogDirectory);
                 string logfullpath = Path.Combine(logdir, GHConstants.AppLogFileName);
                 if (!Directory.Exists(logdir))
@@ -6608,7 +7338,7 @@ namespace GnollHackX
                         }
                         var now = DateTime.Now;
                         File.AppendAllText(logfullpath, now.ToString("yyyy-MM-dd HH:mm:ss zzz") + ": "
-                            + loggedtext
+                            + loggedText
                             + " [" + GetPortVersionString() + "]"
                             + Environment.NewLine);
                     }
@@ -6633,7 +7363,7 @@ namespace GnollHackX
                 case (byte)RecordedFunctionID.DisplayWindow:
                 case (byte)RecordedFunctionID.DisplayPopupText:
                 case (byte)RecordedFunctionID.InitializeWindows:
-                case (byte)RecordedFunctionID.ExitHack:                    
+                case (byte)RecordedFunctionID.ExitHack:
                     return true;
                 default:
                     return false;
@@ -6685,12 +7415,12 @@ namespace GnollHackX
 
         public static string GetReplayFileName(ulong versionCode, long timeStampInBinary, int contNumber, string playerName, int firstTurn, bool newFormat)
         {
-            return (contNumber > 0 ? GHConstants.ReplayContinuationFileNamePrefix : GHConstants.ReplayFileNamePrefix) 
-                + (playerName != null ? playerName + "-" : "") 
-                + (firstTurn >= 0 ? "T" + firstTurn + "-" : "") 
-                + (newFormat ? VersionNumberToFileNameSuffix(versionCode) : versionCode.ToString()) 
-                + GHConstants.ReplayFileNameMiddleDivisor + (newFormat ? ((ulong)timeStampInBinary).ToString() :  timeStampInBinary.ToString()) 
-                + (contNumber > 0 ? (GHConstants.ReplayFileContinuationNumberDivisor + contNumber.ToString()) : "") 
+            return (contNumber > 0 ? GHConstants.ReplayContinuationFileNamePrefix : GHConstants.ReplayFileNamePrefix)
+                + (playerName != null ? playerName + "-" : "")
+                + (firstTurn >= 0 ? "T" + firstTurn + "-" : "")
+                + (newFormat ? VersionNumberToFileNameSuffix(versionCode) : versionCode.ToString())
+                + GHConstants.ReplayFileNameMiddleDivisor + (newFormat ? ((ulong)timeStampInBinary).ToString() : timeStampInBinary.ToString())
+                + (contNumber > 0 ? (GHConstants.ReplayFileContinuationNumberDivisor + contNumber.ToString()) : "")
                 + GHConstants.ReplayFileNameSuffix;
         }
 
@@ -6723,7 +7453,7 @@ namespace GnollHackX
                     if (File.Exists(unZippedFileName))
                         File.Delete(unZippedFileName);
 
-                    if(isGZip)
+                    if (isGZip)
                     {
                         using (FileStream compressedFileStream = File.Open(replayFileName, FileMode.Open))
                         {
@@ -6808,7 +7538,7 @@ namespace GnollHackX
 
         public static bool StopReplay { get { lock (_replayLock) { return _stopReplay; } } set { lock (_replayLock) { _stopReplay = value; } } }
         public static bool PauseReplay { get { lock (_replayLock) { return _pauseReplay; } } set { lock (_replayLock) { _pauseReplay = value; } } }
-        public static double ReplaySpeed { get { lock (_replayLock) { return _replaySpeed; } } set { lock (_replayLock) { _replaySpeed = value; } } }
+        public static double ReplaySpeed { get { lock (_replayLock) { return _replaySpeed == 0.0 ? 1.0 : _replaySpeed; } } set { lock (_replayLock) { _replaySpeed = value; } } }
         public static int GoToTurn { get { lock (_replayLock) { return _replayGotoTurn; } } set { lock (_replayLock) { _replayGotoTurn = value; if (value == -1) _originalReplayTurn = -1; else _originalReplayTurn = _replayTurn; } } }
         public static int OriginalReplayTurn { get { lock (_replayLock) { return _originalReplayTurn; } } }
         public static int ReplayTurn { get { lock (_replayLock) { return _replayTurn; } } set { lock (_replayLock) { _replayTurn = value; } } }
@@ -6858,7 +7588,7 @@ namespace GnollHackX
         {
             if (game == null)
                 return PlayReplayResult.GameIsNull;
-            if(string.IsNullOrWhiteSpace(replayFileName))
+            if (string.IsNullOrWhiteSpace(replayFileName))
                 return PlayReplayResult.FilePathIsNullOrEmpty;
 
             string knownPlayerName = null;
@@ -6964,11 +7694,11 @@ namespace GnollHackX
                                 ulong verno = br.ReadUInt64();
                                 ulong vercompat = br.ReadUInt64();
 
-                                bool isValid = GHVersionNumber == verno ? true : 
+                                bool isValid = GHVersionNumber == verno ? true :
                                     GHVersionNumber > verno ? GHVersionCompatibility <= verno : /* If the replay is made with an older GnollHack version than the current app, check that current app version's compatibility covers the replay's version */
                                     vercompat <= GHVersionNumber; /* If the replay is made with a newer GnollHack version than the current app, check that replay's version compatibility covers the current app version */
 
-                                if(isValid)
+                                if (isValid)
                                 {
                                     /* Read the rest of the header */
                                     ulong date = br.ReadUInt64();
@@ -7013,7 +7743,7 @@ namespace GnollHackX
                                             }
                                             else if (PauseReplay && !IsReplaySearching)
                                                 Thread.Sleep(GHConstants.PollingInterval);
-                                        } 
+                                        }
                                         while (PauseReplay && !IsReplaySearching);
 
                                         switch (cmd)
@@ -7030,7 +7760,7 @@ namespace GnollHackX
                                                     rawFileName = Path.Combine(replayPath, GetReplayFileName(nextfile_versionnumber, nextfile_timestamp, nextfile_replay_continuation, knownPlayerName, knownFirstTurn, true));
                                                     if (isZip)
                                                         rawFileName += usedZipSuffix;
-                                                    for(int i = 0; i < 8; i++) /* Support for various other name formats */
+                                                    for (int i = 0; i < 8; i++) /* Support for various other name formats */
                                                     {
                                                         if (File.Exists(rawFileName))
                                                             break;
@@ -7120,9 +7850,9 @@ namespace GnollHackX
                                                     }
                                                     lock (Glyph2TileLock)
                                                     {
-                                                        if(gl2ti.Length > 0)
+                                                        if (gl2ti.Length > 0)
                                                             Glyph2Tile = gl2ti;
-                                                        if(gltifl.Length > 0)
+                                                        if (gltifl.Length > 0)
                                                             GlyphTileFlags = gltifl;
                                                         Tile2Animation = ti2an;
                                                         Tile2Enlargement = ti2en;
@@ -7132,8 +7862,8 @@ namespace GnollHackX
                                                         ReplacementOffsets = reoff;
                                                         UsedTileSheets = nosheets;
                                                         TotalTiles = notiles;
-                                                        for (int j = 0; j < tilesperrow_sz; j++)
-                                                            TilesPerRow[j] = tilesperrow[j];
+                                                        //for (int j = 0; j < tilesperrow_sz; j++)
+                                                        //    TilesPerRow[j] = tilesperrow[j];
                                                         if ((versionFlags & (ulong)ReplayVersionFlags.HasOffsetData) != 0)
                                                         {
                                                             AnimationOff = animoff;
@@ -7379,8 +8109,8 @@ namespace GnollHackX
                                                 {
                                                     //game.ClientCallback_DelayOutput();
                                                     double speed = ReplaySpeed;
-                                                    if (speed == 0)
-                                                        speed = 1.0;
+                                                    //if (speed == 0.0)
+                                                    //    speed = 1.0;
                                                     int used_ms = (int)((double)GHConstants.DelayOutputDurationInMilliseconds / speed);
                                                     if (used_ms > 0)
                                                         game.ClientCallback_DelayOutputMilliseconds(used_ms);
@@ -7390,8 +8120,8 @@ namespace GnollHackX
                                                 {
                                                     int ms = br.ReadInt32();
                                                     double speed = ReplaySpeed;
-                                                    if (speed == 0) 
-                                                        speed = 1.0;
+                                                    //if (speed == 0.0) 
+                                                    //    speed = 1.0;
                                                     int used_ms = (int)((double)ms / speed);
                                                     if (used_ms > 0)
                                                         game.ClientCallback_DelayOutputMilliseconds(used_ms);
@@ -7442,17 +8172,17 @@ namespace GnollHackX
                                                     for (int i = 0; i < condlen; i++)
                                                         condcolors[i] = br.ReadInt16();
 
-                                                    if(fieldidx == (int)NhStatusFields.BL_TIME && !string.IsNullOrWhiteSpace(text) && int.TryParse(text.Trim(), out int curTurn))
+                                                    if (fieldidx == (int)NhStatusFields.BL_TIME && !string.IsNullOrWhiteSpace(text) && int.TryParse(text.Trim(), out int curTurn))
                                                     {
                                                         ReplayTurn = curTurn;
-                                                        if(knownFirstTurn == -1)
+                                                        if (knownFirstTurn == -1)
                                                             knownFirstTurn = curTurn;
                                                     }
                                                     else if (fieldidx == (int)NhStatusFields.BL_REALTIME && !string.IsNullOrWhiteSpace(text))
                                                     {
                                                         ReplayRealTime = text;
                                                     }
-                                                    if(GoToTurn >= 0)
+                                                    if (GoToTurn >= 0)
                                                     {
                                                         if (ReplayTurn >= GoToTurn && GoToTurn >= OriginalReplayTurn) /* Was searching for a túrn in the future */
                                                             GoToTurn = -1;
@@ -7462,7 +8192,7 @@ namespace GnollHackX
                                                             breakwhile = true;
                                                         }
                                                     }
-                                                    if(ReplaySearchRegexString != null && ReplayRestarted && ReplayTurn >= StartSearchReplayTurn)
+                                                    if (ReplaySearchRegexString != null && ReplayRestarted && ReplayTurn >= StartSearchReplayTurn)
                                                     {
                                                         string txt = ReplaySearchRegexString;
                                                         ReplaySearchRegexString = null;
@@ -8000,7 +8730,8 @@ namespace GnollHackX
                                                 }
                                                 break;
                                             default:
-                                                breakwhile = true; /* error; quitting */
+                                                if (cmd <= 0 || cmd > (int)RecordedFunctionID.NumberOfFunctionCalls + 32)
+                                                    breakwhile = true; /* error; quitting; otherwise, likely a new function call added in a newer game version */
                                                 break;
                                         }
                                     } while (!breakwhile);
@@ -8179,7 +8910,7 @@ namespace GnollHackX
             BlobServiceClient client = null;
             if (string.IsNullOrWhiteSpace(connectionString))
                 return client;
-            
+
             try
             {
                 client = new BlobServiceClient(connectionString);
@@ -8354,7 +9085,7 @@ namespace GnollHackX
             if (!Directory.Exists(baseDir))
                 GHApp.CheckCreateDirectory(baseDir);
             string targetDir = baseDir;
-            if(!string.IsNullOrWhiteSpace(prefix) && prefix.Length > 0)
+            if (!string.IsNullOrWhiteSpace(prefix) && prefix.Length > 0)
             {
                 string modPrefix = prefix[prefix.Length - 1] == GHConstants.AzureBlobStorageDelimiter[0] ? prefix.Substring(0, prefix.Length - 1) : prefix;
                 targetDir = Path.Combine(targetDir, modPrefix);
@@ -8367,7 +9098,7 @@ namespace GnollHackX
             else
                 targetFile = blobName.Substring(prefix.Length);
             string targetPath = Path.Combine(targetDir, targetFile);
-            if(File.Exists(targetPath))
+            if (File.Exists(targetPath))
             {
                 FileInfo fi = new FileInfo(targetPath);
                 if (fi.Length != fileLength || fileLength <= 0)
@@ -8383,7 +9114,7 @@ namespace GnollHackX
         {
             try
             {
-                if (IsWindows && !forceExternalBrowser) 
+                if (IsWindows && !forceExternalBrowser)
                 {
                     var wikiPage = new WikiPage(title, uri.ToString());
                     await Navigation.PushModalAsync(wikiPage);
@@ -8402,7 +9133,7 @@ namespace GnollHackX
         public static bool IsPageOnTopOfModalNavigationStack(Page page)
         {
             Page topPage = PageFromTopOfModalNavigationStack();
-            if (topPage == null) 
+            if (topPage == null)
                 return false;
             return topPage == page;
         }
@@ -8431,7 +9162,7 @@ namespace GnollHackX
             string res;
 
             int pluspos = fullverid.IndexOf("+");
-            if(pluspos >= 0)
+            if (pluspos >= 0)
             {
                 res = fullverid.Substring(0, pluspos);
 #if !WINDOWS
@@ -8474,7 +9205,7 @@ namespace GnollHackX
         public static void SaveLastUsedTournamentPlayerName(string used_player_name)
         {
             LastUsedTournamentPlayerName = used_player_name;
-            MainThread.BeginInvokeOnMainThread(() => 
+            MainThread.BeginInvokeOnMainThread(() =>
             {
                 try
                 {
@@ -8518,7 +9249,6 @@ namespace GnollHackX
                 }
             });
         }
-
 
         private static readonly object _discoveredMusicLock = new object();
         private static List<DiscoveredMusic> _discoveredMusicList = new List<DiscoveredMusic>();
@@ -8571,7 +9301,7 @@ namespace GnollHackX
             }
         }
 
-        public static void SaveDiscoveredMusic()
+        public static void ProcessDiscoveredMusic()
         {
             bool changed = false;
             long bits = 0L;
@@ -8599,7 +9329,7 @@ namespace GnollHackX
                         }
                     }
                 }
-                if(changed)
+                if (changed)
                 {
                     _discoveredMusicBits = bits;
                 }
@@ -8608,7 +9338,7 @@ namespace GnollHackX
             }
             if (changed)
             {
-                SetDiscoveredTracks(bits, true);
+                SetDiscoveredTracks(bits, true, false);
             }
         }
 
@@ -8739,12 +9469,12 @@ namespace GnollHackX
                         if (val != val2)
                         {
                             DeleteUserData();
-                            SetDiscoveredTracks(val, false);
+                            SetDiscoveredTracks(val, false, true);
                         }
                     }
                     else
                     {
-                        SetDiscoveredTracks(val, false);
+                        SetDiscoveredTracks(val, false, true);
                     }
                 }
                 else
@@ -8771,25 +9501,24 @@ namespace GnollHackX
 
         public static long GetUserData(string key, long defVal)
         {
-            if(string.IsNullOrEmpty(key))
+            if (string.IsNullOrEmpty(key))
                 return defVal;
             if (_userData == null)
                 return defVal;
-            long res;
-            if (_userData.LongDictionary.TryGetValue(key, out res))
+            if (_userData.LongDictionary.TryGetValue(key, out long res))
                 return res;
             return defVal;
         }
 
-        public static void SetDiscoveredTracks(long val, bool preferencesToo)
+        public static void SetDiscoveredTracks(long val, bool preferencesToo, bool initial)
         {
-            MainThread.BeginInvokeOnMainThread(() => 
+            MainThread.BeginInvokeOnMainThread(() =>
             {
                 try
                 {
                     if (preferencesToo)
                         Preferences.Set("DiscoveredMusicBits", val);
-                    AddAndWriteUserData("DiscoveredMusicBits", val);
+                    AddUserData("DiscoveredMusicBits", val, initial, out long changedBits);
                 }
                 catch (Exception ex)
                 {
@@ -8798,7 +9527,632 @@ namespace GnollHackX
             });
         }
 
+        public static void AddGainedAchievements()
+        {
+            for (int i = 0; i < GHConstants.NumGuiAchievementLongs; i++)
+            {
+                long val = GetUserData(GHConstants.AchievementLongPrefix + i, 0L);
+                _achievements[i] = val;
+            }
+        }
+
+        public static void CalculateAchievementsInCategory(int categoryId, out int gainedCount, out int visibleCount)
+        {
+            int achievementLongIdx;
+            int achievementBitIdx;
+            long achievementBit;
+            var achievementList = AchievementDefinitions;
+            gainedCount = visibleCount = 0;
+            for (int i = 0; i < achievementList.Length; i++)
+            {
+                Achievement achievement = achievementList[i];
+                if (achievement == null)
+                    continue;
+                if (categoryId >= 0 && achievement.CategoryId != categoryId)
+                    continue;
+                achievementLongIdx = i / 64;
+                achievementBitIdx = i % 64;
+                achievementBit = 1L << achievementBitIdx;
+                if (!IsAchievementVisible(i))
+                    continue;
+                visibleCount++;
+                if ((_achievements[achievementLongIdx] & achievementBit) != 0L)
+                    gainedCount++;
+            }
+        }
+
+        public static void InitAchievements()
+        {
+            /* Most important ones, starting and main quests */
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_FOUND_AMULET_OF_YENDOR] =
+                new Achievement("The Amulet of Yendor", "Find and obtain the possession of the fabled Amulet of Yendor",
+                (int)gui_achievement_categories.Playthrough, -1);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_CASTLE] =
+                new Achievement("Bottom of the Dungeon", "Reach the bottom of the Dungeons of Doom",
+                (int)gui_achievement_categories.Exploration, 0);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_COMPLETED_OPTIONAL_QUEST] =
+                new Achievement("Optional Quest", "Complete the optional quest with any character",
+                (int)gui_achievement_categories.Playthrough, 0);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_COMPLETED_THE_QUEST] =
+                new Achievement("The Quest", "Complete the Quest branch",
+                (int)gui_achievement_categories.Playthrough, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_ENTERED_THE_QUEST);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_FOUND_BELL_OF_OPENING] =
+                new Achievement("The Bell of Opening", "Find and obtain the possession of the Bell of Opening",
+                (int)gui_achievement_categories.Playthrough, 0, false);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_FOUND_CANDELABRUM_OF_INVOCATION] =
+                new Achievement("The Candelabrum of Invocation", "Find and obtain the possession of the Candelarbrum of Invocation",
+                (int)gui_achievement_categories.Playthrough, 0, false);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_FOUND_BOOK_OF_THE_DEAD] =
+                new Achievement("The Book of the Dead", "Find and obtain the possession of the Book of the Dead",
+                (int)gui_achievement_categories.Playthrough, 0, false);
+
+
+            /* Gameplay */
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_PLAYED_GAME_IN_CLASSIC_MODE] =
+                new Achievement("Play in Classic Mode", "Start a game in classic mode",
+                (int)gui_achievement_categories.Gameplay, 0);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_IDENTIFIED_AN_ITEM] =
+                new Achievement("Identify an Item", "Use any of the identification means in the game",
+                (int)gui_achievement_categories.Gameplay, 0);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_USED_WAND_OF_PROBING] =
+                new Achievement("Probing", "Use a wand or spell of probing to probe something",
+                (int)gui_achievement_categories.Gameplay, 0);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_MADE_A_WISH] =
+                new Achievement("Make a Wish", "Wish for an object using any means in the game",
+                (int)gui_achievement_categories.Gameplay, 0);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_CONSULTED_ORACLE] =
+                new Achievement("Consult the Oracle", "Locate the Oracle and buy a consultation",
+                (int)gui_achievement_categories.Gameplay, 0);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ENGRAVED_ELBERETH] =
+                new Achievement("Engrave Elbereth", "Engrave the name of Elbereth on the ground to protect you",
+                (int)gui_achievement_categories.Gameplay, 0, false);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_SOLVED_CASTLE_TUNE] =
+                new Achievement("Castle Tune", "Solve the castle tune to control the drawbridge",
+                (int)gui_achievement_categories.Playthrough, 0, false);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_GENOCIDED_MONSTERS] =
+                new Achievement("Genocide", "Genocide a type of monsters using any means available in the game",
+                (int)gui_achievement_categories.Gameplay, 0, false);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_BROKE_CHEST_LOCK_BY_KICKING] =
+                new Achievement("Kick Chest Lock", "Break the lock on a locked chest or box by kicking",
+                (int)gui_achievement_categories.Gameplay, 0);
+            //AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_KICKED_IN_LOCKED_DOOR] =
+            //    new Achievement("Kick In Locked Door", "Break a locked door by kicking",
+            //    (int)gui_achievement_categories.Gameplay, 0, false);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_FOUND_SECRET_DOOR_OR_PASSAGE] =
+                new Achievement("Secret Door or Passage", "Find a secret door or passage by searching or other means",
+                (int)gui_achievement_categories.Gameplay, 0);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_POLYMORPHED_FORM] =
+                new Achievement("Polymorph Self", "Polymorphed one's own form",
+                (int)gui_achievement_categories.Gameplay, 0, false);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DISARMED_TRAP] =
+                new Achievement("Disarm Trap", "Disarm any trap in the game",
+                (int)gui_achievement_categories.Gameplay, 0, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_IDENTIFIED_BLESSEDNESS_ON_ALTAR] =
+                new Achievement("Blessedness on Altar", "Determine an object's blessed or cursed status by dropping it on an altar",
+                (int)gui_achievement_categories.Gameplay, 0, false);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_PRAYED] =
+                new Achievement("Praying", "Pray successfully to your god",
+                (int)gui_achievement_categories.Gameplay, 0, false);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_SACRIFICED] =
+                new Achievement("Sacrifice", "Sacrifice a suitable corpse to your god on an altar",
+                (int)gui_achievement_categories.Gameplay, 0, false);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_WAS_GIFTED_ARTIFACT] =
+                new Achievement("Gift of God", "Receive an item gifted by your god",
+                (int)gui_achievement_categories.Gameplay, 0, false);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_WAS_CROWNED] =
+                new Achievement("Crowning", "Become crowned by your god",
+                (int)gui_achievement_categories.Gameplay, 0, false);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_CREATED_HOLY_WATER_ON_ALTAR] =
+                new Achievement("Create Holy Water", "Create holy water by praying on an altar",
+                (int)gui_achievement_categories.Gameplay, 0, false);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_CONVERTED_ALTAR] =
+                new Achievement("Convert an Altar", "Convert an altar to your alignment by sacrificing a corpse on it",
+                (int)gui_achievement_categories.Gameplay, 0, false);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DETERMINED_CURSED_STATUS_WITH_PET] =
+                new Achievement("Cursed Item Eschewed", "Observe a pet reluctantly step over a cursed item on the floor",
+                (int)gui_achievement_categories.Gameplay, 0, false);
+
+            /* Experience levels */
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_5] =
+                new Achievement("Experience Level 5", "Reach experience level 5 with any character", "Experience Level 05",
+                (int)gui_achievement_categories.Gameplay, 0);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_10] =
+                new Achievement("Experience Level 10", "Reach experience level 10 with any character",
+                (int)gui_achievement_categories.Gameplay, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_5);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_15] =
+                new Achievement("Experience Level 15", "Reach experience level 15 with any character",
+                (int)gui_achievement_categories.Gameplay, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_10);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_20] =
+                new Achievement("Experience Level 20", "Reach experience level 20 with any character",
+                (int)gui_achievement_categories.Gameplay, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_15);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_25] =
+                new Achievement("Experience Level 25", "Reach experience level 25 with any character",
+                (int)gui_achievement_categories.Gameplay, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_20);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_30] =
+                new Achievement("Experience Level 30", "Reach experience level 30 with any character",
+                (int)gui_achievement_categories.Gameplay, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_25);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_35] =
+                new Achievement("Experience Level 35", "Reach experience level 35 with any character",
+                (int)gui_achievement_categories.Gameplay, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_30);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_40] =
+                new Achievement("Experience Level 40", "Reach experience level 40 with any character",
+                (int)gui_achievement_categories.Gameplay, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_35);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_45] =
+                new Achievement("Experience Level 45", "Reach experience level 45 with any character",
+                (int)gui_achievement_categories.Gameplay, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_40);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_50] =
+                new Achievement("Experience Level 50", "Reach experience level 50 with any character",
+                (int)gui_achievement_categories.Gameplay, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_45);
+
+            /* Combat */
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_WIZARD_OF_YENDOR] =
+                new Achievement("Defeat the Wizard", "Defeat the Wizard of Yendor",
+                (int)gui_achievement_categories.Combat, 0);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_MEDUSA] =
+                new Achievement("Defeat Medusa", "Defeat Medusa, a legendary monster with a petrifying gaze",
+                (int)gui_achievement_categories.Combat, 0, false);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_QUEST_NEMESIS] =
+                new Achievement("Defeat Quest Nemesis", "Defeat a quest nemesis",
+                (int)gui_achievement_categories.Combat, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_ENTERED_THE_QUEST);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_VLAD_THE_IMPALER] =
+                new Achievement("Defeat Vlad the Impaler", "Defeat Vlad the Impaler, Lord of the Vampires",
+                (int)gui_achievement_categories.Combat, 0, false);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_HIGH_PRIEST_OF_MOLOCH] =
+                new Achievement("Defeat High Priest of Moloch", "Defeat the High Priest of Moloch at the Sanctum",
+                (int)gui_achievement_categories.Combat, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_SANCTUM);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_YACC] =
+                new Achievement("Defeat Yacc", "Defeat Yacc, the Demon Lord of Bovines",
+                (int)gui_achievement_categories.Combat, 0, false);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_MODRON_PRIMUS] =
+                new Achievement("Defeat Modron Primus", "Defeat the Modron Primus, Ruler of the Modrons",
+                (int)gui_achievement_categories.Combat, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_PROTONUS);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_DEMOGORGON] =
+                new Achievement("Defeat Demogorgon", "Defeat Demogorgon, the Prince of Demons",
+                (int)gui_achievement_categories.Combat, 0, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_ASMODEUS] =
+                new Achievement("Defeat Asmodeus", "Defeat Asmodeus, Arch-Devil and Ruler of Nine Hells",
+                (int)gui_achievement_categories.Combat, 0, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_DISPATER] =
+                new Achievement("Defeat Dispater", "Defeat Dispater, Arch-Devil and ruler of Dis",
+                (int)gui_achievement_categories.Combat, 0, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_BAALZEBUB] =
+                new Achievement("Defeat Baalzebub", "Defeat Baalzebub, Arch-Devil and Lord of Lies",
+                (int)gui_achievement_categories.Combat, 0, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_ORCUS] =
+                new Achievement("Defeat Orcus", "Defeat Orcus, the Demon Prince of the Undead",
+                (int)gui_achievement_categories.Combat, 0, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_YEENAGHU] =
+                new Achievement("Defeat Yeenaghu", "Defeat Yeenaghu, the Demon Lord of Gnolls",
+                (int)gui_achievement_categories.Combat, 0, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_JUBILEX] =
+                new Achievement("Defeat Jubilex", "Defeat Jubilex, the Faceless Lord, Demon Lord of Slimes",
+                (int)gui_achievement_categories.Combat, 0, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_GERYON] =
+                new Achievement("Defeat Geryon", "Defeat Geryon, the Arch-Devil",
+                (int)gui_achievement_categories.Combat, 0, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_BAPHOMET] =
+                new Achievement("Defeat Baphomet", "Defeat Baphomet, the Demon Prince of Minotaurs",
+                (int)gui_achievement_categories.Combat, 0, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_ALL_DEMON_PRINCES] =
+                new Achievement("Defeat Lords of Gehennom", "Defeat all arch-devils, demon lords, and demon princes",
+                (int)gui_achievement_categories.Combat, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_ENTERED_GEHENNOM);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_TARRASQUE] =
+                new Achievement("Defeat Tarrasque", "Defeat the Tarrasque, the great reptilian punisher",
+                (int)gui_achievement_categories.Combat, 0, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_DEATH] =
+                new Achievement("Defeat Death", "Defeat Death, one of the horsemen of the apocalypse",
+                (int)gui_achievement_categories.Combat, 0, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_PESTILENCE] =
+                new Achievement("Defeat Pestilence", "Defeat Pestilence, one of the horsemen of the apocalypse",
+                (int)gui_achievement_categories.Combat, 0, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_FAMINE] =
+                new Achievement("Defeat Famine", "Defeat Famine, one of the horsemen of the apocalypse",
+                (int)gui_achievement_categories.Combat, 0, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_ALL_RIDERS] =
+                new Achievement("Defeat All Horsemen", "Defeat Death, Famine, and Pestilence",
+                (int)gui_achievement_categories.Combat, 0, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_CERBERUS] =
+                new Achievement("Defeat Cerberus", "Defeat Cerberus, the three-headed hell hound",
+                (int)gui_achievement_categories.Combat, 0, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_AMONKET] =
+                new Achievement("Defeat Amonket", "Defeat Amonket, the ruler of the Greater Mummies",
+                (int)gui_achievement_categories.Combat, 0, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_CROESUS] =
+                new Achievement("Defeat Croesus", "Defeat Croesus, the ruler of Fort Ludious",
+                (int)gui_achievement_categories.Combat, 0, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_GARGANTUAN_MIMIC] =
+                new Achievement("Defeat Gargantuan Mimic", "Defeat the Gargantuan Mimic, the largest and meanest mimic in the Dungeons of Doom",
+                (int)gui_achievement_categories.Combat, 0, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_XAN] =
+                new Achievement("Defeat Xan", "Defeat a xan, a troublesome insect",
+                (int)gui_achievement_categories.Combat, 0);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_ORC_AND_A_PIE] =
+                new Achievement("Orc and a Pie", "Defeat the orc guarding a pie",
+                (int)gui_achievement_categories.Combat, 0, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_ORC_CAPTAIN_AND_A_PIE] =
+                new Achievement("Orc Captain and Many Pies", "Defeat the orc captain guarding a box full of pies",
+                (int)gui_achievement_categories.Combat, 0, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_LICH] =
+                new Achievement("Defeat Lich", "Defeat any type of lich, a high-level undead wizard",
+                (int)gui_achievement_categories.Combat, 0);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_MASTER_LICH] =
+                new Achievement("Defeat Master Lich", "Defeat a lich of at least master level",
+                (int)gui_achievement_categories.Combat, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_LICH);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_ARCH_LICH] =
+                new Achievement("Defeat Arch-Lich", "Defeat an arch-lich, the most powerful type of lich",
+                (int)gui_achievement_categories.Combat, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_MASTER_LICH);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_TENTACLED_ONE] =
+                new Achievement("Defeat Tentacled One", "Defeat any type of a tentacled one, a brain-eating horror",
+                (int)gui_achievement_categories.Combat, 0, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_ELDER_TENTACLED_ONE] =
+                new Achievement("Defeat Elder Tentacled One", "Defeat an elder tentacled one, a powerful brain-eating horror",
+                (int)gui_achievement_categories.Combat, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_TENTACLED_ONE);
+
+
+            /* Exploration */
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_DUNGEON_LEVEL_5] =
+                new Achievement("Dungeon Level 5", "Reach dungeon level 5 with any character", "Dungeon Level 05",
+                (int)gui_achievement_categories.Exploration, 0);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_DUNGEON_LEVEL_10] =
+                new Achievement("Dungeon Level 10", "Reach dungeon level 10 with any character",
+                (int)gui_achievement_categories.Exploration, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_DUNGEON_LEVEL_5);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_DUNGEON_LEVEL_15] =
+                new Achievement("Dungeon Level 15", "Reach dungeon level 15 with any character",
+                (int)gui_achievement_categories.Exploration, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_DUNGEON_LEVEL_10);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_DUNGEON_LEVEL_20] =
+                new Achievement("Dungeon Level 20", "Reach dungeon level 20 with any character",
+                (int)gui_achievement_categories.Exploration, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_DUNGEON_LEVEL_15);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_MEDUSA_ISLAND] =
+                new Achievement("Medusa Level", "Reach the Medusa's Island in the Dungeons of Doom",
+                (int)gui_achievement_categories.Exploration, 0, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ENTERED_GNOMISH_MINES] =
+                new Achievement("Gnomish Mines", "Find and enter the Gnomish Mines",
+                (int)gui_achievement_categories.Exploration, 0, false);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_MINE_TOWN] =
+                new Achievement("Visit Mine Town", "Find and visit Mine Town",
+                (int)gui_achievement_categories.Exploration, 0, false);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_MINES_END] =
+                new Achievement("Reach Mines' End", "Descend to the bottom of the Gnomish Mines",
+                (int)gui_achievement_categories.Exploration, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_ENTERED_GNOMISH_MINES);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_FOUND_GLADSTONE] =
+                new Achievement("Find Gladstone", "Find and obtain the possession of the Gladstone",
+                (int)gui_achievement_categories.Exploration, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_ENTERED_GNOMISH_MINES);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ENTERED_SOKOBAN] =
+                new Achievement("Sokoban", "Find Sokoban, a tower with a boulder puzzle",
+                (int)gui_achievement_categories.Exploration, 0, false);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_TOP_OF_SOKOBAN] =
+                new Achievement("Reach the Top of Sokoban", "Reach the top level of Sokoban",
+                (int)gui_achievement_categories.Exploration, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_ENTERED_SOKOBAN);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_SOLVED_SOKOBAN] =
+                new Achievement("Solve Sokoban", "Solve the Sokoban puzzles",
+                (int)gui_achievement_categories.Exploration, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_ENTERED_SOKOBAN);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ENTERED_LARGE_CIRCULAR_DUNGEON] =
+                new Achievement("Large Circular Dungeon", "Find the Large Circular Dungeon",
+                (int)gui_achievement_categories.Exploration, 0, false);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_QUANTUM_CORE] =
+                new Achievement("Reach Quantum Core", "Find and enter the Quantum Core",
+                (int)gui_achievement_categories.Exploration, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_ENTERED_LARGE_CIRCULAR_DUNGEON);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ENTERED_FORT_LUDIOUS] =
+                new Achievement("Fort Ludious", "Find Fort Ludious",
+                (int)gui_achievement_categories.Exploration, 0, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ENTERED_HELLISH_PASTURES] =
+                new Achievement("Hellish Pastures", "Locate and enter the Hellish Pastures, a special branch of Gehennom",
+                (int)gui_achievement_categories.Exploration, 0, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ENTERED_PLANE_OF_THE_MODRON] =
+                new Achievement("Plane of the Modron", "Locate and enter the Plane of Modron",
+                (int)gui_achievement_categories.Exploration, 0, false);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_PROTONUS] =
+                new Achievement("Protonus", "Enter the final level to the Plane of the Modron",
+                (int)gui_achievement_categories.Exploration, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_ENTERED_THE_QUEST);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_FOUND_PRIME_CODEX] =
+                new Achievement("The Prime Codex", "Find and obtain the possession of the Prime Codex",
+                (int)gui_achievement_categories.Exploration, 0, false);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ENTERED_GEHENNOM] =
+                new Achievement("Gehennom", "Reach Gehennom",
+                (int)gui_achievement_categories.Exploration, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_CASTLE);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_BOTTOM_OF_GEHENNOM] =
+                new Achievement("Invocation Level", "Reach the bottom of Gehennom",
+                (int)gui_achievement_categories.Exploration, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_ENTERED_GEHENNOM);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_VALLEY_OF_THE_DEAD] =
+                new Achievement("Valley of the Dead", "Reach the Valley of the Dead",
+                (int)gui_achievement_categories.Exploration, 0, false);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_WIZARD_TOWER] =
+                new Achievement("Wizard's Tower", "Reach the Tower of the Wizard of Yendor",
+                (int)gui_achievement_categories.Exploration, 0, false);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ENTERED_VLAD_TOWER] =
+                new Achievement("Vlad's Tower", "Reach the Tower of the Vlad the Impaler",
+                (int)gui_achievement_categories.Exploration, 0, false);
+
+
+            /* Playthrough */
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ENTERED_THE_QUEST] =
+                new Achievement("Enter the Quest", "Locate and enter the Quest branch",
+                (int)gui_achievement_categories.Playthrough, 0, false);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_FINAL_QUEST_LEVEL] =
+                new Achievement("Lair of Quest Nemesis", "Enter the final quest level to face the quest nemesis",
+                (int)gui_achievement_categories.Playthrough, 0, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_FOUND_VIBRATING_SQUARE] =
+                new Achievement("Vibrating Square", "Find the vibrating square at the bottom of Gehennom",
+                (int)gui_achievement_categories.Playthrough, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_BOTTOM_OF_GEHENNOM);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_PERFORMED_THE_RITUAL] =
+                new Achievement("Invocation Ritual", "Perform the Invocation Ritual",
+                (int)gui_achievement_categories.Playthrough, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_FOUND_VIBRATING_SQUARE);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_SANCTUM] =
+                new Achievement("Sanctum of Moloch", "Enter the Sanctum of Moloch",
+                (int)gui_achievement_categories.Playthrough, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_PERFORMED_THE_RITUAL);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ENTERED_ELEMENTAL_PLANES] =
+                new Achievement("Elemental Planes", "Reach the end game",
+                (int)gui_achievement_categories.Playthrough, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_FOUND_AMULET_OF_YENDOR);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ENTERED_ASTRAL_PLANE] =
+                new Achievement("Astral Plane", "Reach the final level of the end game",
+                (int)gui_achievement_categories.Playthrough, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_FOUND_AMULET_OF_YENDOR);
+
+            /* Ascension */
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED] =
+                new Achievement("Ascended", "Win the game by ascending a character to demigodhood",
+                (int)gui_achievement_categories.Ascension, 0);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_IN_CLASSIC_MODE] =
+                new Achievement("Ascended in Classic Mode", "Ascended a character in classic mode",
+                (int)gui_achievement_categories.Ascension, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY] =
+                new Achievement("Ascended at Expert", "Ascended a character at expert difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -1, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_IN_CLASSIC_MODE);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY] =
+                new Achievement("Ascended at Master", "Ascended a character at master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -2, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_IN_CLASSIC_MODE);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY] =
+                new Achievement("Ascended at Grand Master", "Ascended a character at grand master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -3, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_IN_CLASSIC_MODE);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_WITH_AT_LEAST_ONE_MILLION_POINTS] =
+                new Achievement("Ascended with Million Points", "Ascended a character with at least a million points", "Ascended with 001 Million Points",
+                (int)gui_achievement_categories.Ascension, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_WITH_AT_LEAST_FIVE_MILLION_POINTS] =
+                new Achievement("Ascended with 5 Million Points", "Ascended a character with at least 5 million points", "Ascended with 005 Million Points",
+                (int)gui_achievement_categories.Ascension, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_WITH_AT_LEAST_ONE_MILLION_POINTS);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_WITH_AT_LEAST_TEN_MILLION_POINTS] =
+                new Achievement("Ascended with 10 Million Points", "Ascended a character with at least 10 million points", "Ascended with 010 Million Points",
+                (int)gui_achievement_categories.Ascension, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_WITH_AT_LEAST_FIVE_MILLION_POINTS);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_WITH_AT_LEAST_FIFTY_MILLION_POINTS] =
+                new Achievement("Ascended with 50 Million Points", "Ascended a character with at least 50 million points", "Ascended with 050 Million Points",
+                (int)gui_achievement_categories.Ascension, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_WITH_AT_LEAST_TEN_MILLION_POINTS);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_WITH_AT_LEAST_HUNDRED_MILLION_POINTS] =
+                new Achievement("Ascended with 100 Million Points", "Ascended a character with at least 100 million points", "Ascended with 100 Million Points",
+                (int)gui_achievement_categories.Ascension, 0, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_WITH_AT_LEAST_FIFTY_MILLION_POINTS);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_ARCHAEOLOGIST_AT_EXPERT_DIFFICULTY] =
+                new Achievement("Ascended Archaeologist at Expert", "Ascended an archaeologist at expert difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -1, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_BARBARIAN_AT_EXPERT_DIFFICULTY] =
+                new Achievement("Ascended Barbarian at Expert", "Ascended a barbarian at expert difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -1, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_CAVEMAN_AT_EXPERT_DIFFICULTY] =
+                new Achievement("Ascended Caveman/woman at Expert", "Ascended a caveman/woman at expert difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -1, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_HEALER_AT_EXPERT_DIFFICULTY] =
+                new Achievement("Ascended Healer at Expert", "Ascended a healer at expert difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -1, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_KNIGHT_AT_EXPERT_DIFFICULTY] =
+                new Achievement("Ascended Knight at Expert", "Ascended a knight at expert difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -1, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_MONK_AT_EXPERT_DIFFICULTY] =
+                new Achievement("Ascended Monk at Expert", "Ascended a monk at expert difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -1, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_PRIEST_AT_EXPERT_DIFFICULTY] =
+                new Achievement("Ascended Priest at Expert", "Ascended a priest at expert difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -1, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_RANGER_AT_EXPERT_DIFFICULTY] =
+                new Achievement("Ascended Ranger at Expert", "Ascended a ranger at expert difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -1, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_ROGUE_AT_EXPERT_DIFFICULTY] =
+                new Achievement("Ascended Rogue at Expert", "Ascended a rogue at expert difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -1, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_SAMURAI_AT_EXPERT_DIFFICULTY] =
+                new Achievement("Ascended Samurai at Expert", "Ascended a samurai at expert difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -1, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_VALKYRIE_AT_EXPERT_DIFFICULTY] =
+                new Achievement("Ascended Valkyrie at Expert", "Ascended a valkyrie at expert difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -1, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_TOURIST_AT_EXPERT_DIFFICULTY] =
+                new Achievement("Ascended Tourist at Expert", "Ascended a tourist at expert difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -1, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_WIZARD_AT_EXPERT_DIFFICULTY] =
+                new Achievement("Ascended Wizard at Expert", "Ascended a wizard at expert difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -1, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_ALL_ROLES_AT_EXPERT_DIFFICULTY] =
+                new Achievement("Ascended All Roles at Expert", "Ascended all roles at expert difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -11, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITHIN_40000_TURNS] =
+                new Achievement("Ascended within 40000 turns at Expert", "Ascended a character within 40,000 turns at expert difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -1, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITHIN_35000_TURNS] =
+                new Achievement("Ascended within 35000 turns at Expert", "Ascended a character within 35,000 turns at expert difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -1, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITHIN_40000_TURNS);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITHIN_30000_TURNS] =
+                new Achievement("Ascended within 30000 turns at Expert", "Ascended a character within 30,000 turns at expert difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -1, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITHIN_35000_TURNS);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITHIN_25000_TURNS] =
+                new Achievement("Ascended within 25000 turns at Expert", "Ascended a character within 25,000 turns at expert difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -1, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITHIN_30000_TURNS);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITHIN_20000_TURNS] =
+                new Achievement("Ascended within 20000 turns at Expert", "Ascended a character within 20,000 turns at expert difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -1, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITHIN_25000_TURNS);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITHIN_15000_TURNS] =
+                new Achievement("Ascended within 15000 turns at Expert", "Ascended a character within 15,000 turns at expert difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -1, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITHIN_20000_TURNS);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_ARCHAEOLOGIST_AT_MASTER_DIFFICULTY] =
+                new Achievement("Ascended Archaeologist at Master", "Ascended an archaeologist at master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -2, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_BARBARIAN_AT_MASTER_DIFFICULTY] =
+                new Achievement("Ascended Barbarian at Master", "Ascended a barbarian at master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -2, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_CAVEMAN_AT_MASTER_DIFFICULTY] =
+                new Achievement("Ascended Caveman/woman at Master", "Ascended a caveman/woman at master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -2, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_HEALER_AT_MASTER_DIFFICULTY] =
+                new Achievement("Ascended Healer at Master", "Ascended a healer at master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -2, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_KNIGHT_AT_MASTER_DIFFICULTY] =
+                new Achievement("Ascended Knight at Master", "Ascended a knight at master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -2, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_MONK_AT_MASTER_DIFFICULTY] =
+                new Achievement("Ascended Monk at Master", "Ascended a monk at master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -2, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_PRIEST_AT_MASTER_DIFFICULTY] =
+                new Achievement("Ascended Priest at Master", "Ascended a priest at master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -2, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_RANGER_AT_MASTER_DIFFICULTY] =
+                new Achievement("Ascended Ranger at Master", "Ascended a ranger at master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -2, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_ROGUE_AT_MASTER_DIFFICULTY] =
+                new Achievement("Ascended Rogue at Master", "Ascended a rogue at master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -2, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_SAMURAI_AT_MASTER_DIFFICULTY] =
+                new Achievement("Ascended Samurai at Master", "Ascended a samurai at master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -2, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_VALKYRIE_AT_MASTER_DIFFICULTY] =
+                new Achievement("Ascended Valkyrie at Master", "Ascended a valkyrie at master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -2, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_TOURIST_AT_MASTER_DIFFICULTY] =
+                new Achievement("Ascended Tourist at Master", "Ascended a tourist at master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -2, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_WIZARD_AT_MASTER_DIFFICULTY] =
+                new Achievement("Ascended Wizard at Master", "Ascended a wizard at master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -2, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_ALL_ROLES_AT_MASTER_DIFFICULTY] =
+                new Achievement("Ascended All Roles at Master", "Ascended all roles at master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -12, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITHIN_40000_TURNS] =
+                new Achievement("Ascended within 40000 turns at Master", "Ascended a character within 40,000 turns at master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -2, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITHIN_35000_TURNS] =
+                new Achievement("Ascended within 35000 turns at Master", "Ascended a character within 35,000 turns at master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -2, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITHIN_40000_TURNS);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITHIN_30000_TURNS] =
+                new Achievement("Ascended within 30000 turns at Master", "Ascended a character within 30,000 turns at master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -2, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITHIN_35000_TURNS);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITHIN_25000_TURNS] =
+                new Achievement("Ascended within 25000 turns at Master", "Ascended a character within 25,000 turns at master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -2, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITHIN_30000_TURNS);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITHIN_20000_TURNS] =
+                new Achievement("Ascended within 20000 turns at Master", "Ascended a character within 20,000 turns at master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -2, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITHIN_25000_TURNS);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITHIN_15000_TURNS] =
+                new Achievement("Ascended within 15000 turns at Master", "Ascended a character within 15,000 turns at master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -2, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITHIN_20000_TURNS);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_ARCHAEOLOGIST_AT_GRAND_MASTER_DIFFICULTY] =
+                new Achievement("Ascended Archaeologist at Grand Master", "Ascended an archaeologist at grand master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -3, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_BARBARIAN_AT_GRAND_MASTER_DIFFICULTY] =
+                new Achievement("Ascended Barbarian at Grand Master", "Ascended a barbarian at grand master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -3, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_CAVEMAN_AT_GRAND_MASTER_DIFFICULTY] =
+                new Achievement("Ascended Caveman/woman at Grand Master", "Ascended a caveman/woman at grand master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -3, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_HEALER_AT_GRAND_MASTER_DIFFICULTY] =
+                new Achievement("Ascended Healer at Grand Master", "Ascended a healer at grand master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -3, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_KNIGHT_AT_GRAND_MASTER_DIFFICULTY] =
+                new Achievement("Ascended Knight at Grand Master", "Ascended a knight at grand master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -3, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_MONK_AT_GRAND_MASTER_DIFFICULTY] =
+                new Achievement("Ascended Monk at Grand Master", "Ascended a monk at grand master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -3, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_PRIEST_AT_GRAND_MASTER_DIFFICULTY] =
+                new Achievement("Ascended Priest at Grand Master", "Ascended a priest at grand master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -3, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_RANGER_AT_GRAND_MASTER_DIFFICULTY] =
+                new Achievement("Ascended Ranger at Grand Master", "Ascended a ranger at grand master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -3, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_ROGUE_AT_GRAND_MASTER_DIFFICULTY] =
+                new Achievement("Ascended Rogue at Grand Master", "Ascended a rogue at grand master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -3, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_SAMURAI_AT_GRAND_MASTER_DIFFICULTY] =
+                new Achievement("Ascended Samurai at Grand Master", "Ascended a samurai at grand master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -3, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_VALKYRIE_AT_GRAND_MASTER_DIFFICULTY] =
+                new Achievement("Ascended Valkyrie at Grand Master", "Ascended a valkyrie at grand master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -3, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_TOURIST_AT_GRAND_MASTER_DIFFICULTY] =
+                new Achievement("Ascended Tourist at Grand Master", "Ascended a tourist at grand master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -3, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_WIZARD_AT_GRAND_MASTER_DIFFICULTY] =
+                new Achievement("Ascended Wizard at Grand Master", "Ascended a wizard at grand master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -3, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_ALL_ROLES_AT_GRAND_MASTER_DIFFICULTY] =
+                new Achievement("Ascended All Roles at Grand Master", "Ascended all roles at grand master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -13, false);
+
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITHIN_40000_TURNS] =
+                new Achievement("Ascended within 40000 turns at Grand Master", "Ascended a character within 40,000 turns at grand master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -3, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITHIN_35000_TURNS] =
+                new Achievement("Ascended within 35000 turns at Grand Master", "Ascended a character within 35,000 turns at grand master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -3, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITHIN_40000_TURNS);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITHIN_30000_TURNS] =
+                new Achievement("Ascended within 30000 turns at Grand Master", "Ascended a character within 30,000 turns at grand master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -3, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITHIN_35000_TURNS);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITHIN_25000_TURNS] =
+                new Achievement("Ascended within 25000 turns at Grand Master", "Ascended a character within 25,000 turns at grand master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -3, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITHIN_30000_TURNS);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITHIN_20000_TURNS] =
+                new Achievement("Ascended within 20000 turns at Grand Master", "Ascended a character within 20,000 turns at grand master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -3, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITHIN_25000_TURNS);
+            AchievementDefinitions[(int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITHIN_15000_TURNS] =
+                new Achievement("Ascended within 15000 turns at Grand Master", "Ascended a character within 15,000 turns at grand master difficulty in classic mode",
+                (int)gui_achievement_categories.Ascension, -3, (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITHIN_20000_TURNS);
+
+        }
+
+
         private static GHUserData _userData = null;
+        private static int _userDataNeedsSavingToDisk = 0;
+        public static bool UserDataNeedsSavingToDisk { get { return Interlocked.CompareExchange(ref _userDataNeedsSavingToDisk, 0, 0) != 0; } set { Interlocked.Exchange(ref _userDataNeedsSavingToDisk, value ? 1 : 0); } }
         public static void ReadUserData()
         {
             string dirPath = Path.Combine(GHPath, GHConstants.UserDataDirectory);
@@ -8858,84 +10212,619 @@ namespace GnollHackX
                 _userData.Clear();
         }
 
-        public static void AddAndWriteUserData(string key, long val)
+        public static bool AddUserData(string key, long val, bool initial, out long changedVal, bool addBit = false)
         {
-            string dirPath = Path.Combine(GHPath, GHConstants.UserDataDirectory);
-            string filePath = Path.Combine(dirPath, GHConstants.UserDataFileName);
-            if(_userData == null)
+            bool addSuccessful = false;
+            if (_userData == null)
                 _userData = new GHUserData();
-            if(_userData != null)
+            changedVal = 0;
+            if (_userData != null)
             {
                 /* Add first */
-                bool addSuccessful = false;
-                if (_userData.LongDictionary.ContainsKey(key))
+                if (key != null)
                 {
-                    try
+                    if (_userData.LongDictionary.ContainsKey(key))
                     {
-                        _userData.LongDictionary[key] = val;
-                        addSuccessful = true;
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine(ex.Message);
-                    }
-                }
-                else
-                {
-#if GNH_MAUI
-                    addSuccessful = _userData.LongDictionary.TryAdd(key, val);
-#else
-                    try
-                    {
-                        _userData.LongDictionary.Add(key, val);
-                        addSuccessful = true;
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine(ex.Message);
-                    }
-#endif
-                }
-
-                /* Then write to disk */
-                if (addSuccessful)
-                {
-                    try
-                    {
-                        if (File.Exists(filePath))
-                            File.Delete(filePath);
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine(ex.Message);
-                    }
-                    try
-                    {
-                        if (!Directory.Exists(dirPath))
-                            CheckCreateDirectory(dirPath);
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine(ex.Message);
-                    }
-                    try
-                    {
-                        using (FileStream fs = File.OpenWrite(filePath))
+                        try
                         {
-                            using (StreamWriter sr = new StreamWriter(fs))
+                            if (addBit)
                             {
-                                string json = JsonConvert.SerializeObject(_userData);
-                                sr.Write(json);
+                                long oldVal = _userData.LongDictionary[key];
+                                long newVal = oldVal | val;
+                                if (newVal != oldVal)
+                                {
+                                    _userData.LongDictionary[key] = newVal;
+                                    changedVal = newVal & ~oldVal;
+                                    addSuccessful = true;
+                                }
+                            }
+                            else
+                            {
+                                if (_userData.LongDictionary[key] != val)
+                                {
+                                    _userData.LongDictionary[key] = val;
+                                    changedVal = val;
+                                    addSuccessful = true;
+                                }
                             }
                         }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine(ex.Message);
+                        }
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        Debug.WriteLine(ex.Message);
+#if GNH_MAUI
+                        addSuccessful = _userData.LongDictionary.TryAdd(key, val);
+                        if (addSuccessful)
+                            changedVal = val;
+#else
+                        try
+                        {
+                            _userData.LongDictionary.Add(key, val);
+                            addSuccessful = true;
+                            changedVal = val;
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine(ex.Message);
+                        }
+#endif
                     }
+                }
+
+                /* Then queue for writing to disk (and only if the value did change) */
+                if (addSuccessful && !initial)
+                {
+                    UserDataNeedsSavingToDisk = true;
+                }
+            }
+            return addSuccessful;
+        }
+
+        public static bool AddUserData(string key, bool val, bool initial = false)
+        {
+            bool addSuccessful = false;
+            if (_userData == null)
+                _userData = new GHUserData();
+            if (_userData != null)
+            {
+                /* Add first */
+                if (key != null)
+                {
+                    if (_userData.BoolDictionary.ContainsKey(key))
+                    {
+                        try
+                        {
+                            if (_userData.BoolDictionary[key] != val)
+                            {
+                                _userData.BoolDictionary[key] = val;
+                                addSuccessful = true;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine(ex.Message);
+                        }
+                    }
+                    else
+                    {
+#if GNH_MAUI
+                        addSuccessful = _userData.BoolDictionary.TryAdd(key, val);
+#else
+                        try
+                        {
+                            _userData.BoolDictionary.Add(key, val);
+                            addSuccessful = true;
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine(ex.Message);
+                        }
+#endif
+                    }
+                }
+
+                /* Then queue for writing to disk (and only if the value did change) */
+                if (addSuccessful && !initial)
+                {
+                    UserDataNeedsSavingToDisk = true;
+                }
+            }
+            return addSuccessful;
+        }
+
+        public static void CheckWriteUserDataToDisk()
+        {
+            if (UserDataNeedsSavingToDisk)
+            {
+                try
+                {
+                    WriteUserDataToDisk();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine(ex.Message);
                 }
             }
         }
+
+        public static void WriteUserDataToDisk()
+        {
+            string dirPath = Path.Combine(GHPath, GHConstants.UserDataDirectory);
+            string filePath = Path.Combine(dirPath, GHConstants.UserDataFileName);
+            try
+            {
+                if (File.Exists(filePath))
+                    File.Delete(filePath);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+            }
+            try
+            {
+                if (!Directory.Exists(dirPath))
+                    CheckCreateDirectory(dirPath);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+            }
+            if (_userData == null)
+                return;
+            try
+            {
+                using (FileStream fs = File.OpenWrite(filePath))
+                {
+                    using (StreamWriter sr = new StreamWriter(fs))
+                    {
+                        string json = JsonConvert.SerializeObject(_userData);
+                        sr.Write(json);
+                    }
+                }
+                UserDataNeedsSavingToDisk = false;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+            }
+        }
+
+        public static readonly AchievementCategory[] AchievementCategories =
+        {
+            new AchievementCategory("Gameplay"),
+            new AchievementCategory("Combat"),
+            new AchievementCategory("Exploration"),
+            new AchievementCategory("Playthrough"),
+            new AchievementCategory("Ascension"),
+        };
+
+        public static readonly AchievementTier[] AchievementTiers =
+        {
+            new AchievementTier("Novice", 0),
+            new AchievementTier("Explorer", 
+                new List<List<int>>()
+                {
+                    new List<int>() { (int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_5 },
+                    new List<int>() { (int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_DUNGEON_LEVEL_5 },
+                }),
+            new AchievementTier("Dungeoneer",
+                new List<List<int>>()
+                {
+                    new List<int>() { (int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_10, },
+                    new List<int>() { (int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_DUNGEON_LEVEL_10 },
+                }),
+            new AchievementTier("Venturer",
+                new List<List<int>>()
+                {
+                    new List<int>() { (int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_15, },
+                    new List<int>() { (int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_DUNGEON_LEVEL_15 },
+                    new List<int>() { (int)gui_achievement_types.GUI_ACHIEVEMENT_ENTERED_THE_QUEST },
+                }),
+            new AchievementTier("Adventurer",
+                new List<List<int>>()
+                {
+                    new List<int>() { (int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_20, },
+                    new List<int>() { (int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_CASTLE },
+                    new List<int>() { (int)gui_achievement_types.GUI_ACHIEVEMENT_FOUND_BELL_OF_OPENING },
+                    new List<int>() { (int)gui_achievement_types.GUI_ACHIEVEMENT_COMPLETED_THE_QUEST },
+                }),
+            new AchievementTier("Grand Adventurer",
+                new List<List<int>>()
+                {
+                    new List<int>() { (int)gui_achievement_types.GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_25, },
+                    new List<int>() { (int)gui_achievement_types.GUI_ACHIEVEMENT_ENTERED_GEHENNOM, },
+                }),
+            new AchievementTier("Hero",
+                new List<List<int>>()
+                {
+                    new List<int>() { (int)gui_achievement_types.GUI_ACHIEVEMENT_FOUND_CANDELABRUM_OF_INVOCATION, },
+                    new List<int>() { (int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_VLAD_THE_IMPALER, },
+                }),
+            new AchievementTier("Grand Hero",
+                new List<List<int>>()
+                {
+                    new List<int>() { (int)gui_achievement_types.GUI_ACHIEVEMENT_FOUND_BOOK_OF_THE_DEAD, },
+                    new List<int>() { (int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_WIZARD_OF_YENDOR, },
+                }),
+            new AchievementTier("Hero of Yendor",
+                new List<List<int>>()
+                {
+                    new List<int>() { (int)gui_achievement_types.GUI_ACHIEVEMENT_FOUND_AMULET_OF_YENDOR, },
+                }),
+            new AchievementTier("Ascended Hero of Yendor",
+                new List<List<int>>()
+                {
+                    new List<int>() { (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED, },
+                }),
+            new AchievementTier("Ascended Grand Hero of Yendor",
+                new List<List<int>>()
+                {
+                    new List<int>() { (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_IN_CLASSIC_MODE, },
+                }),
+            new AchievementTier("Ascended Grand Hero of Yendor", "Expert Class", (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY),
+            new AchievementTier("Ascended Grand Hero of Yendor", "Master Class", (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY),
+            new AchievementTier("Ascended Grand Hero of Yendor", "Grand Master Class", (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY),
+        };
+
+        public static readonly AchievementBundle[] AchievementBundles =
+        {
+            new AchievementBundle((int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_ALL_ROLES_AT_EXPERT_DIFFICULTY,
+                new List<int>{
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_ARCHAEOLOGIST_AT_EXPERT_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_BARBARIAN_AT_EXPERT_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_CAVEMAN_AT_EXPERT_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_HEALER_AT_EXPERT_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_KNIGHT_AT_EXPERT_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_MONK_AT_EXPERT_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_PRIEST_AT_EXPERT_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_RANGER_AT_EXPERT_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_ROGUE_AT_EXPERT_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_SAMURAI_AT_EXPERT_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_VALKYRIE_AT_EXPERT_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_TOURIST_AT_EXPERT_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_WIZARD_AT_EXPERT_DIFFICULTY,
+                }),
+            new AchievementBundle((int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_ALL_ROLES_AT_MASTER_DIFFICULTY,
+                new List<int>{
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_ARCHAEOLOGIST_AT_MASTER_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_BARBARIAN_AT_MASTER_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_CAVEMAN_AT_MASTER_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_HEALER_AT_MASTER_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_KNIGHT_AT_MASTER_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_MONK_AT_MASTER_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_PRIEST_AT_MASTER_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_RANGER_AT_MASTER_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_ROGUE_AT_MASTER_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_SAMURAI_AT_MASTER_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_VALKYRIE_AT_MASTER_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_TOURIST_AT_MASTER_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_WIZARD_AT_MASTER_DIFFICULTY,
+                }),
+            new AchievementBundle((int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_ALL_ROLES_AT_GRAND_MASTER_DIFFICULTY,
+                new List<int>{
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_ARCHAEOLOGIST_AT_GRAND_MASTER_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_BARBARIAN_AT_GRAND_MASTER_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_CAVEMAN_AT_GRAND_MASTER_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_HEALER_AT_GRAND_MASTER_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_KNIGHT_AT_GRAND_MASTER_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_MONK_AT_GRAND_MASTER_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_PRIEST_AT_GRAND_MASTER_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_RANGER_AT_GRAND_MASTER_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_ROGUE_AT_GRAND_MASTER_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_SAMURAI_AT_GRAND_MASTER_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_VALKYRIE_AT_GRAND_MASTER_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_TOURIST_AT_GRAND_MASTER_DIFFICULTY,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_ASCENDED_WIZARD_AT_GRAND_MASTER_DIFFICULTY,
+                }),
+            new AchievementBundle((int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_ALL_RIDERS,
+                new List<int>{
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_DEATH,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_FAMINE,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_PESTILENCE,
+                }),
+            new AchievementBundle((int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_ALL_DEMON_PRINCES,
+                new List<int>{
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_DEMOGORGON,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_ASMODEUS,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_DISPATER,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_BAALZEBUB,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_ORCUS,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_YEENAGHU,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_JUBILEX,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_GERYON,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_BAPHOMET,
+                    (int)gui_achievement_types.GUI_ACHIEVEMENT_DEFEATED_YACC,
+                }),
+        };
+
+        public static readonly Achievement[] AchievementDefinitions = new Achievement[(int)gui_achievement_types.NUM_GUI_ACHIEVEMENTS];
+
+        /* Access only from the main thread */
+        private static long[] _achievements = new long[GHConstants.NumGuiAchievementLongs];
+        /* Access from any thread */
+        public static readonly ConcurrentQueue<int> AchievementQueue = new ConcurrentQueue<int>();
+
+        public static bool IsAchievementGained(int achievementId)
+        {
+            if (achievementId < 0 || achievementId >= (int)gui_achievement_types.NUM_GUI_ACHIEVEMENTS)
+                return false;
+
+            int achievementLongIdx = achievementId / 64;
+            int achievementBitIdx = achievementId % 64;
+            long achievementBit = 1L << achievementBitIdx;
+            return (_achievements[achievementLongIdx] & achievementBit) != 0L;
+        }
+
+        public static bool IsAchievementGainedWithNewBits(int achievementId, long[] newBitArray)
+        {
+            if (achievementId < 0 || achievementId >= (int)gui_achievement_types.NUM_GUI_ACHIEVEMENTS)
+                return false;
+
+            int achievementLongIdx = achievementId / 64;
+            int achievementBitIdx = achievementId % 64;
+            long achievementBit = 1L << achievementBitIdx;
+            return ((_achievements[achievementLongIdx] | newBitArray[achievementLongIdx]) & achievementBit) != 0L;
+        }
+
+        public static bool IsAchievementVisible(int achievementId)
+        {
+            if (achievementId < 0 || achievementId >= (int)gui_achievement_types.NUM_GUI_ACHIEVEMENTS)
+                return false;
+            Achievement achivement = AchievementDefinitions[achievementId];
+            if (achivement == null)
+                return false;
+            if (achivement.IsVisible)
+                return true;
+            if (IsAchievementGained(achievementId))
+                return true;
+            if (achivement.MadeVisibleById > 0)
+                return IsAchievementGained(achivement.MadeVisibleById);
+            return false;
+        }
+
+        public static List<int> GetAchievementsGained()
+        {
+            List<int> achievementsGained = new List<int>();
+            if (_userData == null)
+                return achievementsGained;
+            for (int i = 0; i < GHConstants.NumGuiAchievementLongs; i++)
+            {
+                if (_userData.LongDictionary.TryGetValue(GHConstants.GainedAchievementLongPrefix + i, out long bits))
+                {
+                    if (bits != 0)
+                    {
+                        for (int j = 0; j < 64; j++)
+                        {
+                            long bit = 1L << j;
+                            if ((bits & bit) != 0)
+                            {
+                                achievementsGained.Add(i * 64 + j);
+                            }
+                        }
+                    }
+                }
+            }
+            return achievementsGained;
+        }
+
+        public static List<int> GetAchievementsUnlocked(List<int> achievementsGained)
+        {
+            List<int> achievementsUnlocked = new List<int>();
+            if (achievementsGained != null && achievementsGained.Count > 0)
+            {
+                foreach (int achievementId in achievementsGained)
+                {
+                    for (int i = 0; i < (int)gui_achievement_types.NUM_GUI_ACHIEVEMENTS; i++)
+                    {
+                        Achievement achievement = AchievementDefinitions[i];
+                        if (achievement == null || achievement.IsVisible || achievement.MadeVisibleById != achievementId)
+                            continue;
+                        if (!achievementsUnlocked.Contains(i) && !achievementsGained.Contains(i))
+                            achievementsUnlocked.Add(i);
+                    }
+                }
+            }
+            return achievementsUnlocked;
+        }
+
+        public static void ClearAchievementsFromMemory()
+        {
+            Array.Clear(_achievements, 0, _achievements.Length);
+        }
+
+        public static void ClearAchievementsGained()
+        {
+            if (_userData == null)
+                return;
+
+            bool didSomething = false;
+            for (int i = 0; i < GHConstants.NumGuiAchievementLongs; i++)
+            {
+                if (_userData.LongDictionary.ContainsKey(GHConstants.GainedAchievementLongPrefix + i))
+                {
+                    _userData.LongDictionary.Remove(GHConstants.GainedAchievementLongPrefix + i);
+                    didSomething = true;
+                }
+            }
+            if (didSomething)
+            {
+                WriteUserDataToDisk();
+                UserDataNeedsSavingToDisk = false;
+            }
+        }
+
+        public static bool IsNewAchievementTierGained()
+        {
+            if (_userData == null)
+                return false;
+            if (_userData.BoolDictionary.ContainsKey(GHConstants.GainedAchievementTierKey))
+                return true;
+            else return false;
+        }
+
+        public static void ClearAchievementTierGained()
+        {
+            if (_userData == null)
+                return;
+
+            bool didSomething = false;
+            if (_userData.BoolDictionary.ContainsKey(GHConstants.GainedAchievementTierKey))
+            {
+                _userData.BoolDictionary.Remove(GHConstants.GainedAchievementTierKey);
+                didSomething = true;
+            }
+            if (didSomething)
+            {
+                WriteUserDataToDisk();
+                UserDataNeedsSavingToDisk = false;
+            }
+        }
+
+        public static void AddPendingAchievement(int achievementId)
+        {
+            AchievementQueue.Enqueue(achievementId);
+        }
+
+        public static void ProcessPendingAchievements()
+        {
+            if (AchievementQueue.IsEmpty)
+                return;
+
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                long[] resultBits = new long[GHConstants.NumGuiAchievementLongs];
+                Array.Clear(resultBits, 0, resultBits.Length);
+                bool didDoSomething = false;
+                while (AchievementQueue.TryDequeue(out int achievementId))
+                {
+                    didDoSomething = true;
+                    int achievementLongIdx = achievementId / 64;
+                    int achievementBitIdx = achievementId % 64;
+                    long achievementBit = 1L << achievementBitIdx;
+                    resultBits[achievementLongIdx] |= achievementBit;
+                }
+                if (!didDoSomething)
+                    return;
+
+                /* Check bundles and mark their achievements gained */
+                foreach (var bundle in AchievementBundles)
+                {
+                    if (IsAchievementGained(bundle.AchievementId))
+                        continue;
+                    bool areAllComponentAchievementsGained = true;
+                    foreach(int componentAchievementId in bundle.BundleAchievements)
+                    {
+                        if (!IsAchievementGainedWithNewBits(componentAchievementId, resultBits))
+                        {
+                            areAllComponentAchievementsGained = false;
+                            break;
+                        }
+                    }
+                    if (areAllComponentAchievementsGained)
+                    {
+                        int achievementLongIdx = bundle.AchievementId / 64;
+                        int achievementBitIdx = bundle.AchievementId % 64;
+                        long achievementBit = 1L << achievementBitIdx;
+                        resultBits[achievementLongIdx] |= achievementBit;
+                    }
+                }
+
+                /* Record old tier */
+                AchievementTier oldTier = GetAchievementTier();
+
+                for (int i = 0; i < GHConstants.NumGuiAchievementLongs; i++)
+                {
+                    if (resultBits[i] == 0)
+                        continue;
+
+                    /* Write achievements to memory */
+                    _achievements[i] |= resultBits[i];
+
+                    /* Write achievements to user data, which will be marked to be written to disk later */
+                    try
+                    {
+                        if (AddUserData(GHConstants.AchievementLongPrefix + i, resultBits[i], false, out long changedBits, true))
+                            AddUserData(GHConstants.GainedAchievementLongPrefix + i, changedBits, false, out long changedGainedBits, true);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex.Message);
+                    }
+                }
+
+                /* Check new tier */
+                AchievementTier newTier = GetAchievementTier();
+                if (oldTier != newTier)
+                    AddUserData(GHConstants.GainedAchievementTierKey, true);
+            });
+        }
+
+        public static bool IsTierAchieved(AchievementTier tier)
+        {
+            if (tier == null)
+                return false;
+            if (tier.UnlockAchievements.Count == 0)
+                return true;
+
+            foreach(List<int> unlockOrList in tier.UnlockAchievements)
+            {
+                bool areAllAchived = true;
+                foreach(int unlockAchievement in unlockOrList)
+                {
+                    if (!IsAchievementGained(unlockAchievement))
+                    {
+                        areAllAchived = false;
+                        break;
+                    }
+                }
+                if (areAllAchived)
+                    return true;
+            }
+            return false;
+        }
+
+        public static AchievementTier GetAchievementTier()
+        {
+            int numTiers = AchievementTiers.Length;
+            for (int i = numTiers - 1; i >= 1; i--)
+            {
+                if (IsTierAchieved(AchievementTiers[i]))
+                    return AchievementTiers[i];
+            }
+
+            return AchievementTiers[0];
+        }
+
+
+        //public static void AddAchievement(int achievementId)
+        //{
+        //    MainThread.BeginInvokeOnMainThread(() =>
+        //    {
+        //        int achievementLongIdx = achievementId / 64;
+        //        int achievementBitIdx = achievementId % 64;
+        //        long achievementBit = 1L << achievementBitIdx;
+        //        string key = GHConstants.AchievementLongPrefix + achievementLongIdx;
+        //        string gainedkey = GHConstants.GainedAchievementLongPrefix + achievementLongIdx;
+
+        //        /* Write achievements to memory */
+        //        _achievements[achievementLongIdx] |= achievementBit;
+
+        //        /* Write achievements to user data, which will be marked to be written to disk later */
+        //        try
+        //        {
+        //            if (AddUserData(key, achievementBit, false, true))
+        //                AddUserData(gainedkey, achievementBit, false, true);
+        //        }
+        //        catch (Exception ex)
+        //        {
+        //            Debug.WriteLine(ex.Message);
+        //        }
+        //    });
+        //}
+
 
         //private static long _lockCount = 0;
         //private static long _lock5tickCount = 0;
@@ -8981,14 +10870,18 @@ namespace GnollHackX
             Page topPage = PageFromTopOfModalNavigationStack();
             if (topPage == null)
                 return CurrentMainPage?.HandleKeyPress(key, isCtrl, isMeta) ?? false;
-            else if (topPage is GamePage)
-                return ((GamePage)topPage).HandleKeyPress(key, isCtrl, isMeta);
-            else if (topPage is GameMenuPage)
-                return ((GameMenuPage)topPage).HandleKeyPress(key, isCtrl, isMeta);
-            else if (topPage is AboutPage)
-                return ((AboutPage)topPage).HandleKeyPress(key, isCtrl, isMeta);
-            else if (topPage is VaultPage)
-                return ((VaultPage)topPage).HandleKeyPress(key, isCtrl, isMeta);
+            else if (topPage is IKeyPressHandlingPage)
+                return ((IKeyPressHandlingPage)topPage).HandleKeyPress(key, isCtrl, isMeta);
+            //else if (topPage is GamePage)
+            //    return ((GamePage)topPage).HandleKeyPress(key, isCtrl, isMeta);
+            //else if (topPage is GameMenuPage)
+            //    return ((GameMenuPage)topPage).HandleKeyPress(key, isCtrl, isMeta);
+            //else if (topPage is AboutPage)
+            //    return ((AboutPage)topPage).HandleKeyPress(key, isCtrl, isMeta);
+            //else if (topPage is VaultPage)
+            //    return ((VaultPage)topPage).HandleKeyPress(key, isCtrl, isMeta);
+            //else if (topPage is AchievementsPage)
+            //    return ((AchievementsPage)topPage).HandleKeyPress(key, isCtrl, isMeta);
             else
                 return false;
         }
@@ -9013,22 +10906,24 @@ namespace GnollHackX
             Page topPage = PageFromTopOfModalNavigationStack();
             if(topPage == null)
                 return CurrentMainPage?.HandleSpecialKeyPress(spkey, isCtrl, isMeta, isShift) ?? false;
-            else if (topPage is GamePage)
-                return ((GamePage)topPage).HandleSpecialKeyPress(spkey, isCtrl, isMeta, isShift);
-            else if (topPage is GameMenuPage)
-                return ((GameMenuPage)topPage).HandleSpecialKeyPress(spkey, isCtrl, isMeta, isShift);
-            else if (topPage is NamePage)
-                return ((NamePage)topPage).HandleSpecialKeyPress(spkey, isCtrl, isMeta, isShift);
-            else if (topPage is SettingsPage)
-                return ((SettingsPage)topPage).HandleSpecialKeyPress(spkey, isCtrl, isMeta, isShift);
-            else if (topPage is OutRipPage)
-            {
-                if (spkey == GHSpecialKey.Escape || spkey == GHSpecialKey.Enter || spkey == GHSpecialKey.Space)
-                {
-                    ((OutRipPage)topPage).CloseOutrip();
-                    return true;
-                }
-            }
+            else if (topPage is ISpecialKeyPressHandlingPage)
+                return ((ISpecialKeyPressHandlingPage)topPage).HandleSpecialKeyPress(spkey, isCtrl, isMeta, isShift);
+            //else if (topPage is GamePage)
+            //    return ((GamePage)topPage).HandleSpecialKeyPress(spkey, isCtrl, isMeta, isShift);
+            //else if (topPage is GameMenuPage)
+            //    return ((GameMenuPage)topPage).HandleSpecialKeyPress(spkey, isCtrl, isMeta, isShift);
+            //else if (topPage is NamePage)
+            //    return ((NamePage)topPage).HandleSpecialKeyPress(spkey, isCtrl, isMeta, isShift);
+            //else if (topPage is SettingsPage)
+            //    return ((SettingsPage)topPage).HandleSpecialKeyPress(spkey, isCtrl, isMeta, isShift);
+            //else if (topPage is OutRipPage)
+            //{
+            //    if (spkey == GHSpecialKey.Escape || spkey == GHSpecialKey.Enter || spkey == GHSpecialKey.Space)
+            //    {
+            //        ((OutRipPage)topPage).CloseOutrip();
+            //        return true;
+            //    }
+            //}
             else if (spkey == GHSpecialKey.Escape && topPage is ICloseablePage)
             {
                 ((ICloseablePage)topPage).ClosePage();
@@ -9037,6 +10932,428 @@ namespace GnollHackX
 
             return false;
         }
+
+#if GNH_MAUI && ENABLE_RUNTIME_EFFECTS
+        private static string _skslLightning = @"
+            uniform float time;      // 0 → 1 animation progress
+            uniform float tileSize;  // tile size in pixels
+
+            float hash(float2 p) {
+                return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453);
+            }
+
+            float noise(float2 p) {
+                float2 i = floor(p);
+                float2 f = fract(p);
+
+                float a = hash(i);
+                float b = hash(i + float2(1.0, 0.0));
+                float c = hash(i + float2(0.0, 1.0));
+                float d = hash(i + float2(1.0, 1.0));
+
+                float2 u = f * f * (3.0 - 2.0 * f);
+
+                return mix(a, b, u.x) +
+                       (c - a) * u.y * (1.0 - u.x) +
+                       (d - b) * u.x * u.y;
+            }
+
+            half4 main(float2 fragCoord)
+            {
+                // fragCoord is now local to the effect rect
+                // convert to tile-scaled coordinates
+                float2 dir = fragCoord / tileSize;
+
+                float dist = length(dir);
+
+                float progress = time;
+
+                // expanding radius (in tiles)
+                float radius = progress * 1.5;
+
+                // lightning shock ring
+                float ring = smoothstep(radius, radius - 0.15, dist);
+
+                // lightning filament distortion
+                float angle = atan(dir.y, dir.x);
+                float flicker = noise(float2(angle * 6.0, time * 10.0));
+                float spikes = step(0.7, flicker);
+
+                float lightning = ring * spikes;
+
+                // central flash
+                float core = smoothstep(0.4, 0.0, dist) * (1.0 - progress);
+
+                float intensity = lightning + core;
+
+                // fade out
+                intensity *= (1.0 - progress);
+
+                float3 color = mix(
+                    float3(0.2, 0.6, 1.0),
+                    float3(1.0, 1.0, 1.0),
+                    intensity
+                );
+
+                return half4(color * intensity, intensity);
+            }
+            ";
+
+        private static string _skslFlameHit = @"
+            uniform float tileSize;
+            uniform float time;
+
+            float hash(float2 p)
+            {
+                return fract(sin(dot(p, float2(127.1,311.7))) * 43758.5453);
+            }
+
+            float noise(float2 p)
+            {
+                float2 i = floor(p);
+                float2 f = fract(p);
+
+                float a = hash(i);
+                float b = hash(i + float2(1.0,0.0));
+                float c = hash(i + float2(0.0,1.0));
+                float d = hash(i + float2(1.0,1.0));
+
+                float2 u = f*f*(3.0-2.0*f);
+
+                return mix(a,b,u.x) +
+                       (c-a)*u.y*(1.0-u.x) +
+                       (d-b)*u.x*u.y;
+            }
+
+            float fbm(float2 p)
+            {
+                float v = 0.0;
+                float a = 0.5;
+
+                v += a * noise(p); p *= 2.0; a *= 0.5;
+                v += a * noise(p); p *= 2.0; a *= 0.5;
+                v += a * noise(p); p *= 2.0; a *= 0.5;
+                v += a * noise(p);
+
+                return v;
+            }
+
+            half4 main(float2 fragCoord)
+            {
+                // fragCoord is now local to the effect center
+                float2 p = fragCoord / tileSize;
+
+                float dist = length(p);
+
+                float t = time * 2.5;
+
+                // flame turbulence
+                float n = fbm(p * 4.0 + float2(0.0, -t * 3.0));
+
+                // compact radial falloff
+                float falloff = smoothstep(0.7, 0.0, dist);
+                float intensity = 1.0;
+                float flame = n * falloff * intensity;
+
+                float r = flame * 3.0;
+                float g = flame * 1.6;
+                float b = flame * 0.4;
+
+                float alpha = flame;
+
+                return half4(r, g, b, alpha);
+            }
+            ";
+
+        private static string _skslFreezeHit = @"
+            uniform float tileSize;
+            uniform float time;        // 0 → 1 animation progress
+
+            float hash(float2 p) {
+                return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453);
+            }
+
+            float noise(float2 p) {
+                float2 i = floor(p);
+                float2 f = fract(p);
+
+                float a = hash(i);
+                float b = hash(i + float2(1.0,0.0));
+                float c = hash(i + float2(0.0,1.0));
+                float d = hash(i + float2(1.0,1.0));
+
+                float2 u = f*f*(3.0-2.0*f);
+
+                return mix(a,b,u.x) +
+                       (c-a)*u.y*(1.0-u.x) +
+                       (d-b)*u.x*u.y;
+            }
+
+            half4 main(float2 fragCoord)
+            {
+                // Local effect coordinates: (0,0) = impact center
+                float2 p = fragCoord / tileSize;
+                float dist = length(p);
+                float progress = time;
+
+                // Expanding frost ring
+                float radius = progress * 1.3;
+                float ring = smoothstep(radius, radius - 0.15, dist);
+
+                // Angular ice shards
+                float angle = atan(p.y, p.x);
+                float shards = abs(sin(angle * 12.0 + noise(p * 3.0 + time * 5.0) * 2.0));
+                shards = pow(shards, 6.0);
+                shards *= ring;
+
+                // Central frost core
+                float core = smoothstep(0.35, 0.0, dist) * (1.0 - progress);
+
+                // Frost texture
+                float frostNoise = noise(p * 5.0 + time * 3.0) * 0.4;
+                frostNoise *= smoothstep(0.8, 0.0, dist) * (1.0 - progress);
+
+                float intensity = 1.0;
+                float frost = (shards + core) * intensity + frostNoise;
+
+                // Fade out over time
+                frost *= (1.0 - progress);
+
+                // Icy color palette
+                float3 color = mix(
+                    float3(0.6, 0.85, 1.0),   // ice blue
+                    float3(1.0, 1.0, 1.0),    // frost white
+                    frost
+                );
+
+                return half4(color * frost, frost);
+            }
+            ";
+
+        private static string _skslMagicHit = @"
+            uniform float tileSize;
+            uniform float time;        // 0 → 1 animation progress
+
+            float hash(float2 p) {
+                return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453);
+            }
+
+            float noise(float2 p) {
+                float2 i = floor(p);
+                float2 f = fract(p);
+
+                float a = hash(i);
+                float b = hash(i + float2(1.0,0.0));
+                float c = hash(i + float2(0.0,1.0));
+                float d = hash(i + float2(1.0,1.0));
+
+                float2 u = f*f*(3.0-2.0*f);
+
+                return mix(a,b,u.x) +
+                       (c-a)*u.y*(1.0-u.x) +
+                       (d-b)*u.x*u.y;
+            }
+
+            half4 main(float2 fragCoord)
+            {
+                // Local tile-space coordinates
+                float2 p = fragCoord / tileSize;
+                float dist = length(p);
+                float progress = time;
+
+                // Expanding energy ring
+                float radius = progress * 1.3;
+                float ring = smoothstep(radius, radius - 0.15, dist);
+
+                // Arcane swirling sparks
+                float angle = atan(p.y, p.x);
+                float swirl = sin(angle * 6.0 + time * 10.0);
+                swirl = abs(swirl);
+                swirl = pow(swirl, 4.0);
+                swirl *= ring;
+
+                // Flickering small sparks
+                float sparkNoise = noise(p * 6.0 + time * 8.0);
+                float sparks = step(0.82, sparkNoise) * (1.0 - progress);
+                sparks *= smoothstep(0.9, 0.0, dist);
+
+                // Core pulse
+                float core = smoothstep(0.35, 0.0, dist) * (1.0 - progress);
+                float intensity = 1.0;
+                float energy = (swirl + sparks + core) * intensity;
+                energy *= (1.0 - progress);
+
+                // Arcane color palette
+                float3 color = mix(
+                    float3(0.4, 0.2, 1.0),  // deep arcane
+                    float3(0.8, 0.6, 1.0),  // magical glow
+                    energy
+                );
+
+                return half4(color * energy, energy);
+            }
+            ";
+
+        private static string _skslStunHit = @"
+            uniform float tileSize;
+            uniform float time;        // 0 → 1 animation progress
+
+            float hash(float2 p) {
+                return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453);
+            }
+
+            float noise(float2 p) {
+                float2 i = floor(p);
+                float2 f = fract(p);
+
+                float a = hash(i);
+                float b = hash(i + float2(1.0,0.0));
+                float c = hash(i + float2(0.0,1.0));
+                float d = hash(i + float2(1.0,1.0));
+
+                float2 u = f*f*(3.0-2.0*f);
+
+                return mix(a,b,u.x) +
+                       (c-a)*u.y*(1.0-u.x) +
+                       (d-b)*u.x*u.y;
+            }
+
+            half4 main(float2 fragCoord)
+            {
+                // Local tile-space coordinates
+                float2 p = fragCoord / tileSize;
+                float dist = length(p);
+                float progress = time;
+
+                // Expanding energy ring
+                float radius = progress * 1.3;
+                float ring = smoothstep(radius, radius - 0.15, dist);
+
+                // Arcane swirling sparks
+                float angle = atan(p.y, p.x);
+                float swirl = sin(angle * 6.0 + time * 10.0);
+                swirl = abs(swirl);
+                swirl = pow(swirl, 4.0);
+                swirl *= ring;
+
+                // Flickering small sparks
+                float sparkNoise = noise(p * 6.0 + time * 8.0);
+                float sparks = step(0.82, sparkNoise) * (1.0 - progress);
+                sparks *= smoothstep(0.9, 0.0, dist);
+
+                // Core pulse
+                float core = smoothstep(0.35, 0.0, dist) * (1.0 - progress);
+                float intensity = 1.0;
+                float energy = (swirl + sparks + core) * intensity;
+                energy *= (1.0 - progress);
+
+                // Arcane color palette
+                float3 color = mix(
+                    float3(0.4, 0.2, 1.0),  // deep arcane
+                    float3(0.8, 0.6, 1.0),  // magical glow
+                    energy
+                );
+
+                return half4(color * energy, energy);
+            }
+            ";
+
+        private static string _skslDeathMagic = @"
+            uniform float tileSize;
+            uniform float time;        // 0 → 1 animation progress
+
+            float hash(float2 p) {
+                return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453);
+            }
+
+            float noise(float2 p) {
+                float2 i = floor(p);
+                float2 f = fract(p);
+
+                float a = hash(i);
+                float b = hash(i + float2(1.0,0.0));
+                float c = hash(i + float2(0.0,1.0));
+                float d = hash(i + float2(1.0,1.0));
+
+                float2 u = f*f*(3.0-2.0*f);
+
+                return mix(a,b,u.x) +
+                       (c-a)*u.y*(1.0-u.x) +
+                       (d-b)*u.x*u.y;
+            }
+
+            half4 main(float2 fragCoord)
+            {
+                // Local coordinates (0,0) = impact center
+                float2 p = fragCoord / tileSize;
+                float dist = length(p);
+                float progress = time;
+
+                // Expanding shadowy ring
+                float radius = progress * 1.3;
+                float ring = smoothstep(radius, radius - 0.15, dist);
+
+                // Wispy necrotic tendrils
+                float angle = atan(p.y, p.x);
+                float tendril = sin(angle * 10.0 + time * 8.0);
+                tendril = abs(tendril);
+                tendril = pow(tendril, 5.0);
+                tendril *= ring;
+
+                // Core necrotic pulse
+                float core = smoothstep(0.35, 0.0, dist) * (1.0 - progress);
+
+                // Fading wisps noise
+                float wisps = noise(p * 6.0 + time * 4.0) * 0.4;
+                wisps *= smoothstep(0.8, 0.0, dist) * (1.0 - progress);
+
+                float intensity = 1.0;
+                float deathEnergy = (tendril + core + wisps) * intensity;
+                deathEnergy *= (1.0 - progress);
+
+                // Dark death color palette (green-purple-black)
+                float3 color = mix(
+                    float3(0.3, 0.0, 0.4),   // deep purple
+                    float3(0.6, 1.0, 0.4),   // sickly green
+                    deathEnergy
+                );
+
+                return half4(color * deathEnergy, deathEnergy);
+            }
+            ";
+
+        public static SKRuntimeEffect LightningEffect = null;
+        public static SKRuntimeEffect FlameHitEffect = null;
+        public static SKRuntimeEffect FreezeHitEffect = null;
+        public static SKRuntimeEffect MagicHitEffect = null;
+        public static SKRuntimeEffect StunHitEffect = null;
+        public static SKRuntimeEffect DeathMagicEffect = null;
+
+        private static int _runtimeEffectsInited = 0;
+        public static bool RuntimeEffectsInited { get { return Interlocked.CompareExchange(ref _runtimeEffectsInited, 0, 0) != 0; } set { Interlocked.Exchange(ref _runtimeEffectsInited, value ? 1 : 0); } }
+
+        public static void InitRuntimeEffects()
+        {
+            if (GHConstants.EnableExperimentalFeatures && Interlocked.Exchange(ref _runtimeEffectsInited, 1) == 0)
+            {
+                try
+                {
+                    string error;
+                    LightningEffect = SKRuntimeEffect.CreateShader(_skslLightning, out error);
+                    FlameHitEffect = SKRuntimeEffect.CreateShader(_skslFlameHit, out error);
+                    FreezeHitEffect = SKRuntimeEffect.CreateShader(_skslFreezeHit, out error);
+                    MagicHitEffect = SKRuntimeEffect.CreateShader(_skslMagicHit, out error);
+                    StunHitEffect = SKRuntimeEffect.CreateShader(_skslStunHit, out error);
+                    DeathMagicEffect = SKRuntimeEffect.CreateShader(_skslDeathMagic, out error);
+                }
+                catch (Exception ex)
+                {
+                    RuntimeEffectsInited = false; /* Change back to false in the case of error */
+                    Debug.WriteLine(ex);
+                }
+            }
+        }
+#endif
 
         //private static readonly object _keyboardHookLock = new object();
         private static int _isKeyboardHookEnabled = 1;
@@ -9134,6 +11451,139 @@ namespace GnollHackX
             // Nothing
         }
 #endif
+
+#if ANDROID
+        class TrimCallbacks : Java.Lang.Object, IComponentCallbacks2
+        {
+            public void OnConfigurationChanged(Android.Content.Res.Configuration newConfig)
+            {
+            }
+
+            public void OnLowMemory()
+            {
+                HandleMemoryWarning(MemoryPressureLevel.Complete);
+            }
+
+            public void OnTrimMemory(TrimMemory level)
+            {
+                var mapped = level switch
+                {
+                    >= TrimMemory.Complete => MemoryPressureLevel.Complete,
+                    >= TrimMemory.Background => MemoryPressureLevel.Background,
+                    >= TrimMemory.RunningCritical => MemoryPressureLevel.Critical,
+                    >= TrimMemory.RunningLow => MemoryPressureLevel.Medium,
+                    >= TrimMemory.RunningModerate => MemoryPressureLevel.Low,
+                    _ => MemoryPressureLevel.Low
+                };
+
+                HandleMemoryWarning(mapped);
+            }
+        }
+
+        static TrimCallbacks _memoryWarningCallbacks = null;
+#elif IOS
+        static NSObject _memoryObserver = null;
+#endif
+
+        static void InitializeMemoryWarnings()
+        {
+            try
+            {
+#if ANDROID
+                var app = Android.App.Application.Context as Android.App.Application;
+                _memoryWarningCallbacks = new TrimCallbacks();
+                app?.RegisterComponentCallbacks(_memoryWarningCallbacks);
+#elif IOS
+                _memoryObserver = NSNotificationCenter.DefaultCenter.AddObserver(
+                    UIKit.UIApplication.DidReceiveMemoryWarningNotification,
+                    _ => HandleMemoryWarning(MemoryPressureLevel.Complete));
+#elif WINDOWS
+                //Does not seem to be supported
+                //MemoryManager.AppMemoryUsageIncreased += OnMemoryUsageIncreased;
+#endif
+
+                MaybeWriteGHLog("InitializeMemoryWarnings successful");
+            }
+            catch (Exception ex)
+            {
+                MaybeWriteGHLog("InitializeMemoryWarnings failed: " + ex.Message);
+            }
+        }
+
+        public static void ShutDownMemoryWarnings()
+        {
+            try
+            {
+#if ANDROID
+                if (_memoryWarningCallbacks != null)
+                {
+                    var app = Android.App.Application.Context as Android.App.Application;
+                    app?.UnregisterComponentCallbacks(_memoryWarningCallbacks);
+                    _memoryWarningCallbacks = null;
+                }
+#elif IOS
+                if (_memoryObserver != null)
+                {
+                    NSNotificationCenter.DefaultCenter.RemoveObserver(_memoryObserver);
+                    _memoryObserver.Dispose();
+                    _memoryObserver = null;
+                }
+#elif WINDOWS
+                //Does not seem to be supported
+                //MemoryManager.AppMemoryUsageLimitChanging -= OnMemoryUsageIncreased;
+#endif
+
+                MaybeWriteGHLog("ShutDownMemoryWarnings successful");
+            }
+            catch (Exception ex)
+            {
+                MaybeWriteGHLog("ShutDownMemoryWarnings failed: " + ex.Message);
+            }
+        }
+
+#if WINDOWS
+        private static void OnMemoryUsageIncreased(object sender, object e)
+        {
+            var level = MemoryManager.AppMemoryUsageLevel switch
+            {
+                AppMemoryUsageLevel.Low => MemoryPressureLevel.Low,
+                AppMemoryUsageLevel.Medium => MemoryPressureLevel.Medium,
+                AppMemoryUsageLevel.High => MemoryPressureLevel.Critical,
+                AppMemoryUsageLevel.OverLimit => MemoryPressureLevel.Complete,
+                _ => MemoryPressureLevel.Low
+            };
+
+            HandleMemoryWarning(level);
+        }
+#endif
+    }
+
+    public enum MemoryPressureLevel
+    {
+        /// <summary>
+        /// Mild pressure – free caches if convenient.
+        /// </summary>
+        Low,
+
+        /// <summary>
+        /// Significant pressure – release non-essential resources.
+        /// </summary>
+        Medium,
+
+        /// <summary>
+        /// Critical – release everything possible immediately
+        /// </summary>
+        Critical,
+
+        /// <summary>
+        /// Background
+        /// </summary>
+        Background,
+
+        /// <summary>
+        /// Imminent termination likely.
+        /// </summary>
+        Complete
     }
 
     public class LogPostResponseInfo

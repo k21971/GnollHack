@@ -59,6 +59,23 @@ namespace GnollHackX.Droid
 #pragma warning restore CS0618 // Type or member is obsolete            }
             }
         }
+        public ulong GetUsedMemoryInBytes()
+        {
+            try
+            {
+                //var activityManager = (ActivityManager)Platform.CurrentActivity.GetSystemService(Context.ActivityService);
+                //var pid = Android.OS.Process.MyPid();
+                //var memoryInfo = activityManager.GetProcessMemoryInfo(new int[] { pid })[0];
+                //int totalPss = memoryInfo.TotalPss; // in KB
+                //return (ulong)totalPss * 1024UL;
+                var process = System.Diagnostics.Process.GetCurrentProcess();
+                return (ulong)(process?.PrivateMemorySize64 ?? 0);
+            }
+            catch
+            {
+                return 0;
+            }
+        }
 
         public ulong GetDeviceMemoryInBytes()
         {
@@ -98,8 +115,8 @@ namespace GnollHackX.Droid
                 //Using StatFS
                 var path = new StatFs(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData));
                 long blockSize = path.BlockSizeLong;
-                long avaliableBlocks = path.AvailableBlocksLong;
-                long freeSpace = blockSize * avaliableBlocks;
+                long avalaibleBlocks = path.AvailableBlocksLong;
+                long freeSpace = blockSize * avalaibleBlocks;
                 return (ulong)freeSpace;
             }
             catch
@@ -142,8 +159,19 @@ namespace GnollHackX.Droid
                 GHApp.AddSentryBreadcrumb("CloseApplication", GHConstants.SentryGnollHackGeneralCategoryName);
                 RevertAnimatorDuration(true);
 #if GNH_MAUI
-                //Platform.CurrentActivity.FinishAffinity();
-                //Platform.CurrentActivity.Finish();
+                /* FinishAffinity seems to leave MAUI in an unstable state, so need to hard quit */
+                try
+                {
+                    Process.KillProcess(Process.MyPid());
+                }
+                catch (Exception) 
+                {
+                    //GHApp.MaybeWriteGHLog(ex.Message);
+                }
+                /* Try also this way if KillProcess didn't work */
+                Java.Lang.JavaSystem.Exit(0);
+
+                /* KillProcess and JavaSystem.Exit both failed if we end up here */
                 Microsoft.Maui.Controls.Application.Current.Quit();
 #else
                 MainActivity.CurrentMainActivity.FinishAffinity();

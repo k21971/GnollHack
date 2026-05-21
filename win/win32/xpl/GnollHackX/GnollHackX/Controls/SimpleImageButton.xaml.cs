@@ -28,18 +28,18 @@ namespace GnollHackX.Controls
             InitializeComponent();
             SizeChanged += SimpleImageButton_SizeChanged;
             PropertyChanged += SimpleImageButton_PropertyChanged;
+            ThreadSafeWidth = Width;
+            ThreadSafeHeight = Height;
+            ThreadSafeX = X;
+            ThreadSafeY = Y;
+            ThreadSafeIsVisible = IsVisible;
+            if (Parent == null || !(Parent is IThreadSafeView))
+                ThreadSafeParent = null;
+            else
+                ThreadSafeParent = new WeakReference<IThreadSafeView>((IThreadSafeView)Parent);
             lock (_propertyLock)
             {
-                _threadSafeWidth = Width;
-                _threadSafeHeight = Height;
-                _threadSafeX = X;
-                _threadSafeY = Y;
-                _threadSafeIsVisible = IsVisible ? 1 : 0;
                 _threadSafeMargin = Margin;
-                if (Parent == null || !(Parent is IThreadSafeView))
-                    _threadSafeParent = null;
-                else
-                    _threadSafeParent = new WeakReference<IThreadSafeView>((IThreadSafeView)Parent);
             }
             ViewButton.Clicked += ViewButton_Clicked;
 #if WINDOWS
@@ -163,22 +163,24 @@ namespace GnollHackX.Controls
             //bool tooWide = 35.0 * bigRowNoOfButtons + (bigRowNoOfButtons - 1) * 6 > canvaswidth;
             //int noOfButtons = canvaswidth > canvasheight && !tooWide ? bigRowNoOfButtons : PortraitButtonsInRow > 0 ? PortraitButtonsInRow : UIUtils.PortraitButtonsInRow(usingDesktopButtons, usingSimpleCmdLayout);
             //double imgsidewidth = Math.Min(75.0, Math.Max(35.0, (canvaswidth - (noOfButtons - 1) * 6) / Math.Max(1, noOfButtons)));
-            double imgsidewidth = UIUtils.CalculateButtonSideWidth(canvasViewWidth, canvasViewHeight, usingDesktopButtons, usingSimpleCmdLayout, stoneButtonRows, inverseCanvasScale, customScale, LandscapeButtonsInRow, PortraitButtonsInRow, true);
+            double imgsidewidth = UIUtils.CalculateButtonSideWidth(canvasViewWidth, canvasViewHeight, usingDesktopButtons, usingSimpleCmdLayout, stoneButtonRows, inverseCanvasScale, customScale, LandscapeButtonsInRow, PortraitButtonsInRow, true, false);
             GridWidth = imgsidewidth;
             GridHeight = imgsidewidth;
         }
 
         private void ViewButton_Clicked(object sender, EventArgs e)
         {
+            GHApp.AddSentryBreadcrumb("SimpleImageButton: " + ImgSourcePath, GHConstants.SentryGnollHackButtonClickCategoryName);
             BtnClicked?.Invoke(this, e);
         }
 
-        private readonly object _propertyLock = new object();
         private double _threadSafeWidth = 0;
         private double _threadSafeHeight = 0;
         private double _threadSafeX = 0;
         private double _threadSafeY = 0;
         private int _threadSafeIsVisible = 1;
+
+        private readonly object _propertyLock = new object();
         private Thickness _threadSafeMargin = new Thickness();
         WeakReference<IThreadSafeView> _threadSafeParent = null;
 
@@ -188,15 +190,10 @@ namespace GnollHackX.Controls
         public double ThreadSafeY { get { return Interlocked.CompareExchange(ref _threadSafeY, 0.0, 0.0); } private set { Interlocked.Exchange(ref _threadSafeY, value); } }
         public bool ThreadSafeIsVisible { get { return Interlocked.CompareExchange(ref _threadSafeIsVisible, 0, 0) != 0; } private set { Interlocked.Exchange(ref _threadSafeIsVisible, value ? 1 : 0); } }
         public Thickness ThreadSafeMargin { get { lock (_propertyLock) { return _threadSafeMargin; } } private set { lock (_propertyLock) { _threadSafeMargin = value; } } }
-        public WeakReference<IThreadSafeView> ThreadSafeParent { get { lock (_propertyLock) { return _threadSafeParent; } } private set { lock (_propertyLock) { _threadSafeParent = value; } } }
+        public WeakReference<IThreadSafeView> ThreadSafeParent { get { return Interlocked.CompareExchange(ref _threadSafeParent, null, null); } private set { Interlocked.Exchange(ref _threadSafeParent, value); } }
 
         private void SimpleImageButton_SizeChanged(object sender, EventArgs e)
         {
-            //lock (_propertyLock)
-            //{
-            //    _threadSafeWidth = Width;
-            //    _threadSafeHeight = Height;
-            //}
             ThreadSafeWidth = Width;
             ThreadSafeHeight = Height;
         }

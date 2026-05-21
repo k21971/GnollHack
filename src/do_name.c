@@ -900,6 +900,7 @@ enum game_cursor_types cursor_style;
 
         if (c == Cmd.spkeys[NHKF_GETPOS_HELP] || redraw_cmd(c)) 
         {
+            debugprint_pos();
             if (c == Cmd.spkeys[NHKF_GETPOS_HELP])
                 getpos_help(force, goal);
             else /* ^R */
@@ -1469,7 +1470,7 @@ do_mname()
         if (!alreadynamed(mtmp, monnambuf, buf))
             pline("%s will not accept the name %s.", upstart(monnambuf), buf);
     }
-    else if(((!has_mname(mtmp) || (is_tame(mtmp) && !is_charmed(mtmp))) && is_animal(mtmp->data) && is_peaceful(mtmp)) || (mtmp->mon_flags & MON_FLAGS_YOUR_CHILD))
+    else if(((!has_mname(mtmp) || (is_tame(mtmp) && !is_charmed_or_controlled(mtmp))) && is_animal(mtmp->data) && is_peaceful(mtmp)) || (mtmp->mon_flags & MON_FLAGS_YOUR_CHILD))
     {
         /* Peaceful animals who do not have names and tame animals can be named, others do not accept your naming */
         (void)christen_monst(mtmp, buf);
@@ -1939,6 +1940,7 @@ namefloorobj()
         docall(obj, (char*)0);
     }
     if (fakeobj && obj) {
+        debugprint("namefloorobj");
         obj->where = OBJ_FREE; /* object_from_map() sets it to OBJ_FLOOR */
         dealloc_obj(obj);
     }

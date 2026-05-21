@@ -2,12 +2,9 @@
 using Android.Content.PM;
 using Android.Content.Res;
 using Android.OS;
-using Android.Views;
 using Android.Runtime;
+using Android.Views;
 using GnollHackX;
-//using Xamarin.Google.Android.Play.Core.AssetPacks;
-//using Xamarin.Google.Android.Play.Core.AssetPacks.Model;
-
 
 namespace GnollHackM;
 
@@ -17,6 +14,7 @@ public class MainActivity : MauiAppCompatActivity
     public static Activity CurrentMainActivity = null;
     public static bool DefaultShowNavigationBar = false;
     public static AssetManager StaticAssets;
+
     protected override void OnCreate(Bundle savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
@@ -24,11 +22,37 @@ public class MainActivity : MauiAppCompatActivity
         Platform.Init(this, savedInstanceState);
         IsHardKeyboardConnected = Resources?.Configuration?.HardKeyboardHidden == HardKeyboardHidden.No ? true : false;
         GHApp.InitializeGC();
-        Window.AddFlags(WindowManagerFlags.Fullscreen);
-        if (DefaultShowNavigationBar)
+        Window?.AddFlags(WindowManagerFlags.Fullscreen);
+        if (DefaultShowNavigationBar) 
             ShowOsNavigationBar();
         else
             HideOsNavigationBar();
+
+        CreateSaveGameNotificationChannel();
+    }
+
+    private void CreateSaveGameNotificationChannel()
+    {
+        if (Build.VERSION.SdkInt >= BuildVersionCodes.O)
+        {
+            try
+            {
+                var channel = new NotificationChannel(
+                    GHConstants.SAVE_GAME_NOTIFICATION_CHANNEL_ID,
+                    "Game Save Progress",
+                    NotificationImportance.Default)
+                {
+                    Description = "Used while saving your game data."
+                };
+
+                var manager = (NotificationManager)GetSystemService(NotificationService);
+                manager.CreateNotificationChannel(channel);
+            }
+            catch (Exception ex)
+            {
+                GHApp.MaybeWriteGHLog(ex.Message);
+            }
+        }
     }
 
     public override bool OnKeyDown([GeneratedEnum] Keycode keyCode, KeyEvent e)
@@ -66,7 +90,7 @@ public class MainActivity : MauiAppCompatActivity
     public static void HideOsNavigationBar()
     {
         Activity activity = CurrentMainActivity;
-        if (activity == null)
+        if (activity == null || activity.Window == null)
             return;
         if (Build.VERSION.SdkInt >= BuildVersionCodes.R)
         {
@@ -80,17 +104,20 @@ public class MainActivity : MauiAppCompatActivity
         else
         {
 #pragma warning disable CS0618 // Type or member is obsolete
-            SystemUiFlags systemUiVisibility = (SystemUiFlags)activity.Window.DecorView.SystemUiVisibility;
-            systemUiVisibility |= SystemUiFlags.HideNavigation;
-            systemUiVisibility |= SystemUiFlags.Immersive;
-            activity.Window.DecorView.SystemUiVisibility = (StatusBarVisibility)systemUiVisibility;
+            if (activity.Window.DecorView != null)
+            {
+                SystemUiFlags systemUiVisibility = (SystemUiFlags)activity.Window.DecorView.SystemUiVisibility;
+                systemUiVisibility |= SystemUiFlags.HideNavigation;
+                systemUiVisibility |= SystemUiFlags.Immersive;
+                activity.Window.DecorView.SystemUiVisibility = (StatusBarVisibility)systemUiVisibility;
+            }
 #pragma warning restore CS0618 // Type or member is obsolete
         }
     }
     public static void ShowOsNavigationBar()
     {
         Activity activity = CurrentMainActivity;
-        if (activity == null)
+        if (activity == null || activity.Window == null)
             return;
         if (Build.VERSION.SdkInt >= BuildVersionCodes.R)
         {
@@ -102,10 +129,13 @@ public class MainActivity : MauiAppCompatActivity
         else
         {
 #pragma warning disable CS0618 // Type or member is obsolete
-            SystemUiFlags systemUiVisibility = (SystemUiFlags)activity.Window.DecorView.SystemUiVisibility;
-            systemUiVisibility &= ~SystemUiFlags.HideNavigation;
-            systemUiVisibility &= ~SystemUiFlags.Immersive;
-            activity.Window.DecorView.SystemUiVisibility = (StatusBarVisibility)systemUiVisibility;
+            if (activity.Window.DecorView != null)
+            {
+                SystemUiFlags systemUiVisibility = (SystemUiFlags)activity.Window.DecorView.SystemUiVisibility;
+                systemUiVisibility &= ~SystemUiFlags.HideNavigation;
+                systemUiVisibility &= ~SystemUiFlags.Immersive;
+                activity.Window.DecorView.SystemUiVisibility = (StatusBarVisibility)systemUiVisibility;
+            }
 #pragma warning restore CS0618 // Type or member is obsolete
         }
     }

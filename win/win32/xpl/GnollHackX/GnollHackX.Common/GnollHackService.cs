@@ -72,8 +72,12 @@ namespace GnollHackX.Unknown
         public static extern int RunGnollHack(
             [MarshalAs(UnmanagedType.LPStr)] string gnhdir,
             [MarshalAs(UnmanagedType.LPStr)] string cmdlineargs,
-            [MarshalAs(UnmanagedType.LPStr)] string preset_player_name,
-            [MarshalAs(UnmanagedType.LPStr)] string recovery_name,
+            [MarshalAs(UnmanagedType.LPStr)] string engrave_quicktext,
+            [MarshalAs(UnmanagedType.LPStr)] string last_used_player_name,
+            int right_mouse_button,
+            int middle_mouse_button,
+            int engrave_quickstyle,
+            int reserved_int,
             ulong runflags,
             ulong foundmanuals,
             ulong wincaps1,
@@ -313,6 +317,8 @@ namespace GnollHackX.Unknown
         [DllImport(PlatformConstants.dll)]
         public static extern void LibSetCharacterClickAction(int new_value);
         [DllImport(PlatformConstants.dll)]
+        public static extern void LibSetMetricSystem(int new_value);
+        [DllImport(PlatformConstants.dll)]
         public static extern int LibGetGetPositionArrows();
         [DllImport(PlatformConstants.dll)]
         public static extern void LibSetGetPositionArrows(int new_value);
@@ -320,6 +326,12 @@ namespace GnollHackX.Unknown
         public static extern int LibGetDiceAsRanges();
         [DllImport(PlatformConstants.dll)]
         public static extern void LibSetDiceAsRanges(int new_value);
+        [DllImport(PlatformConstants.dll)]
+        public static extern int LibGetWornShowsEquipment();
+        [DllImport(PlatformConstants.dll)]
+        public static extern void LibSetWornShowsEquipment(int new_value);
+        [DllImport(PlatformConstants.dll)]
+        public static extern void LibSetNoPetsPreference(int new_value);
         [DllImport(PlatformConstants.dll)]
         public static extern void LibSetAutoDig(int new_value);
         [DllImport(PlatformConstants.dll)]
@@ -330,6 +342,11 @@ namespace GnollHackX.Unknown
         public static extern void LibSetMouseCommand(int new_value, int is_middle);
 
         [DllImport(PlatformConstants.dll)]
+        public static extern void LibSetEngraveQuickText(string newValue);
+        [DllImport(PlatformConstants.dll)]
+        public static extern void LibSetEngraveQuickStyle(int newValue);
+
+        [DllImport(PlatformConstants.dll)]
         public static extern IntPtr LibGetEventPathForGHSound(int ghsound);
         [DllImport(PlatformConstants.dll)]
         public static extern float LibGetVolumeForGHSound(int ghsound);
@@ -338,7 +355,11 @@ namespace GnollHackX.Unknown
         public static extern void LibSetExitHack(int newValue);
 
         [DllImport(PlatformConstants.dll)]
-        public static extern void LibExitGnhThread();
+        public static extern void LibExitGnhThread(int used_exit_hack_code);
+        [DllImport(PlatformConstants.dll)]
+        public static extern void LibTerminateGnollHack(int used_exit_hack_code);
+        [DllImport(PlatformConstants.dll)]
+        public static extern IntPtr LibGetCommandFunctionPointer(int cmd);
 
         private void LoadNativeLibrary(string libName)
         {
@@ -408,7 +429,7 @@ namespace GnollHackX.Unknown
                 }
                 if (found)
                 {
-                    if (file.Name != "logfile" && file.Name != "xlogfile")
+                    if (file.Name != "logfile" && file.Name != "xlogfile" && file.Name != "record" && file.Name != "defaults.gnh")
                         file.Delete();
                 }
             }
@@ -707,16 +728,16 @@ namespace GnollHackX.Unknown
             }
         }
 
-        public async Task InitializeSecrets(Secrets secrets)
+        public async Task InitializeFilesInSettings(Secrets settings)
         {
-            if (secrets == null)
+            if (settings == null)
                 return;
 
             string filesdir = GetGnollHackPath();
 #if __ANDROID__
             AssetManager assets = MainActivity.StaticAssets;
 #endif
-            foreach (SecretsDirectory sdir in secrets.directories)
+            foreach (SecretsDirectory sdir in settings.directories)
             {
                 string fulldirepath = Path.Combine(filesdir, sdir.name);
                 if (!Directory.Exists(fulldirepath))
@@ -729,7 +750,7 @@ namespace GnollHackX.Unknown
                 }
             }
             //int packfilemaxsize = 512 * 1024 * 1024;
-            foreach (SecretsFile sfile in secrets.files)
+            foreach (SecretsFile sfile in settings.files)
             {
                 string assetfile = sfile.name;
                 string sfiledir = sfile.source_directory;
@@ -1169,6 +1190,11 @@ namespace GnollHackX.Unknown
             LibSetCharacterClickAction(newValue ? 1 : 0);
         }
 
+        public void SetMetricSystem(bool newValue)
+        {
+            LibSetMetricSystem(newValue ? 1 : 0);
+        }
+
         public bool GetGetPositionArrows()
         {
             return LibGetGetPositionArrows() != 0;
@@ -1187,6 +1213,22 @@ namespace GnollHackX.Unknown
         {
             LibSetDiceAsRanges(newValue ? 1 : 0);
         }
+
+        public bool GetWornShowsEquipment()
+        {
+            return LibGetWornShowsEquipment() != 0;
+        }
+
+        public void SetWornShowsEquipment(bool newValue)
+        {
+            LibSetWornShowsEquipment(newValue ? 1 : 0);
+        }
+
+        public void SetNoPetsPreference(bool newValue)
+        {
+            LibSetNoPetsPreference(newValue ? 1 : 0);
+        }
+
         public void SetAutoDig(bool newValue)
         {
             LibSetAutoDig(newValue ? 1 : 0);
@@ -1205,6 +1247,14 @@ namespace GnollHackX.Unknown
         {
             LibSetMouseCommand(newValue, isMiddle ? 1 : 0);
         }
+        public void SetEngraveQuickText(string newValue)
+        {
+            LibSetEngraveQuickText(newValue);
+        }
+        public void SetEngraveQuickStyle(int newValue)
+        {
+            LibSetEngraveQuickStyle(newValue);
+        }
 
         public string GetEventPathForGHSound(int ghsound)
         {
@@ -1222,31 +1272,48 @@ namespace GnollHackX.Unknown
         {
             LibSetExitHack(newValue);
         }
-        public void ExitGnhThread()
+
+        public void ExitGnhThread(exit_hack_types used_exit_hack_code)
         {
-            LibExitGnhThread();
+            LibExitGnhThread((int)used_exit_hack_code);
+        }
+
+        public void TerminateGnollHack(exit_hack_types used_exit_hack_code)
+        {
+            LibTerminateGnollHack((int)used_exit_hack_code);
+        }
+        public IntPtr GetCommandFunctionPointer(int cmd)
+        {
+            return LibGetCommandFunctionPointer(cmd);
         }
 
         public int StartGnollHack(GHGame ghGame)
         {
+            GHApp.AddSentryBreadcrumb("StartGnollHack", GHConstants.SentryGnollHackGeneralCategoryName);
             GHApp.SetMirroredOptionsToDefaults();
             string filesdir = GetGnollHackPath();
             bool allowbones = GHApp.AllowBones;
-            bool allowpet = GHApp.AllowPet;
             bool getposarrows = GHApp.GetPositionArrows;
+            bool nopet = GHApp.MirroredPetsNotGifted;
             bool characterclickaction = GHApp.MirroredCharacterClickAction;
+            bool metricsystem = GHApp.MirroredMetricSystem;
             bool diceasranges = GHApp.MirroredDiceAsRanges;
+            bool wornshowsequipment = GHApp.MirroredWornShowsEquipment;
             bool autodig = GHApp.MirroredAutoDig;
             bool ignorestopping = GHApp.MirroredIgnoreStopping;
             bool defaultvikeys = GHApp.DefaultVIKeys;
-            ulong rightmouse = (ulong)GHApp.MirroredRightMouseCommand << GHConstants.RightMouseBitIndex;
-            ulong middlemouse = (ulong)GHApp.MirroredMiddleMouseCommand << GHConstants.MiddleMouseBitIndex;
+            string engravetext = GHApp.MirroredEngraveQuickText;
+            int rightmousebutton = GHApp.MirroredRightMouseCommand;
+            int middlemousebutton = GHApp.MirroredMiddleMouseCommand;
+            int engravequickstyle = GHApp.MirroredEngraveQuickStyle;
+            //ulong rightmouse = (ulong)GHApp.MirroredRightMouseCommand << GHConstants.RightMouseBitIndex;
+            //ulong middlemouse = (ulong)GHApp.MirroredMiddleMouseCommand << GHConstants.MiddleMouseBitIndex;
             ulong runflags = (ulong)(ghGame.WizardMode ? RunGnollHackFlags.WizardMode : 0) |
                 (ulong)(GHApp.FullVersionMode ? RunGnollHackFlags.FullVersion : 0) |
                 (ulong)(ghGame.ModernMode ? RunGnollHackFlags.ModernMode : 0) |
                 (ulong)(ghGame.CasualMode ? RunGnollHackFlags.CasualMode : 0) |
                 (ulong)(allowbones ? 0 : RunGnollHackFlags.DisableBones) |
-                (ulong)(allowpet ? 0 : RunGnollHackFlags.NoPet) |
+                (ulong)(nopet ? RunGnollHackFlags.NoPet : 0) |
                 (ulong)(GHApp.TournamentMode ? RunGnollHackFlags.TournamentMode : 0) |
                 (ulong)(RunGnollHackFlags.SaveFileTrackingSupported) |
                 (ulong)(GHApp.IsSaveFileTrackingNeeded ? RunGnollHackFlags.SaveFileTrackingNeeded : 0) |
@@ -1254,19 +1321,25 @@ namespace GnollHackX.Unknown
                 (ulong)(GHApp.IsDebug ? RunGnollHackFlags.GUIDebugMode : 0) |
                 (ulong)(getposarrows ? RunGnollHackFlags.GetPositionArrows : 0) | /* Set the iflag to right value */
                 (ulong)(characterclickaction ? RunGnollHackFlags.CharacterClickAction : 0) | /* Use the default; GHApp.CharacterClickAction may contain the option value from the last game */
-                (ulong)(diceasranges ? RunGnollHackFlags.DiceAsRanges : 0) | /* Use the default; GHApp.DiceAsRanges may contain the option value from the last game */
+                (ulong)(metricsystem ? RunGnollHackFlags.MetricSystem : 0) |
+                (ulong)(diceasranges ? RunGnollHackFlags.DiceAsRanges : 0) | 
+                (ulong)(wornshowsequipment ? RunGnollHackFlags.WornShowsEquipment : 0) |
                 (ulong)(autodig ? RunGnollHackFlags.AutoDig : 0) | /* Use the default; GHApp.AutoDig may contain the option value from the last game */
                 (ulong)(ignorestopping ? RunGnollHackFlags.IgnoreStopping : 0) | /* Use the default; GHApp.IgnoreStopping may contain the option value from the last game */
                 (ulong)(defaultvikeys ? RunGnollHackFlags.DefaultVIKeys : 0) | /* Use the default */
-                rightmouse | middlemouse | (ulong)ghGame.StartFlags;
+                (ulong)ghGame.StartFlags;
             ulong foundManuals = GHApp.FoundManuals;
             string lastusedplname = GHApp.TournamentMode && !ghGame.PlayingReplay ? GHApp.LastUsedTournamentPlayerName : GHApp.LastUsedPlayerName;
 
             return RunGnollHack(
                 filesdir,
                 "",
-                "",
+                engravetext,
                 lastusedplname,
+                rightmousebutton,
+                middlemousebutton,
+                engravequickstyle,
+                0,
                 runflags,
                 foundManuals,
                 0,

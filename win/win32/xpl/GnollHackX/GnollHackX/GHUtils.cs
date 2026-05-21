@@ -8,6 +8,8 @@ using System.Text;
 using System.Text.RegularExpressions;
 #if GNH_MAUI
 using GnollHackM;
+#else
+using GnollHackX.Controls;
 #endif
 
 namespace GnollHackX
@@ -16,12 +18,84 @@ namespace GnollHackX
     {
         public static int Ctrl(int c)
         {
-            return (0x1f & (c));
+            return (0x1f & c); // (0x40 & c) != 0 ? (0x1f & c) : (0x80 | (0x1f & c));
         }
+        public static bool IsCtrl(int c)
+        {
+            return c > 0 && (c & ~0x1f) == 0 && !IsMeta(c);
+        }
+        public static int UnCtrl(int c)
+        {
+            return !IsCtrl(c) ? c : (c | 0x60); // (c & 0x80) != 0 ? ((c & ~0x80) | 0x20) : (c | 0x60);
+        }
+        public static int UnMetaCtrl(int c)
+        {
+            return UnMeta(UnCtrl(c));
+        }
+
         public static int Meta(int c)
         {
-            return (0x80 | (c));
+            return (0x80 | c);
         }
+        public static bool IsMeta(int c)
+        {
+            return (c & 0x80) != 0; // && (c & ~0x1f) != 0
+        }
+        public static int UnMeta(int c)
+        {
+            return !IsMeta(c) ? c : (c & ~0x80);
+        }
+
+        private static StringBuilder _stringBuilder = new StringBuilder(50);
+        public static string ConstructShortcutText(char btnLetter, bool btnCtrl, bool btnMeta)
+        {
+            if (btnLetter == (char)0)
+                return GHApp.IsiOS ? " " : "";
+            _stringBuilder.Clear();
+            if (btnMeta)
+                _stringBuilder.Append("Alt+");
+            if (btnCtrl)
+                _stringBuilder.Append("Ctrl+");
+            _stringBuilder.Append(btnLetter);
+            return _stringBuilder.ToString();
+        }
+        public static string ConstructShortcutText(string btnLetterString, bool btnCtrl, bool btnMeta)
+        {
+            if (string.IsNullOrEmpty(btnLetterString))
+                return GHApp.IsiOS ? " " : "";
+            _stringBuilder.Clear();
+            if (btnMeta)
+                _stringBuilder.Append("Alt+");
+            if (btnCtrl)
+                _stringBuilder.Append("Ctrl+");
+            _stringBuilder.Append(btnLetterString);
+            return _stringBuilder.ToString();
+        }
+
+        public static string ConstructShortcutText(int command)
+        {
+            if (command < 0)
+                return GHApp.IsiOS ? " " : "";
+            int btnAsciiCode = UnMetaCtrl(command);
+            if (!(btnAsciiCode >= 32 && btnAsciiCode <= 123))
+                return GHApp.IsiOS ? " " : "";
+            return ConstructShortcutText((char)btnAsciiCode, IsCtrl(command), IsMeta(command));
+        }
+        public static string ConstructShortcutText(LabeledImageButton btn)
+        {
+            if (btn == null)
+                return GHApp.IsiOS ? " " : "";
+            int command = btn.MappedBtnCommand;
+            if (command < 0)
+                return GHApp.IsiOS ? " " : "";
+            if (command == 0)
+                return ConstructShortcutText(btn.MappedBtnLetter, btn.MappedBtnCtrl, btn.MappedBtnMeta);
+            int btnAsciiCode = UnMetaCtrl(command);
+            if (!(btnAsciiCode >= 32 && btnAsciiCode <= 123))
+                return GHApp.IsiOS ? " " : "";
+            return ConstructShortcutText((char)btnAsciiCode, IsCtrl(command), IsMeta(command));
+        }
+
         public static bool isok(int x, int y)
         {
             if (x < 1 || x >= GHConstants.MapCols)

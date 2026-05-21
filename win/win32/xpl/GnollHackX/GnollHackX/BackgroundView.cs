@@ -75,7 +75,7 @@ namespace GnollHackX
             SKCanvas canvas = surface.Canvas;
             float canvaswidth = e.Info.Width;
             float canvasheight = e.Info.Height;
-            float scale = canvaswidth / (float)this.Width;
+            float scale = canvaswidth == 0f || this.Width == 0.0 ? 1.0f : canvaswidth / (float)this.Width;
 
             canvas.Clear();
 
@@ -108,6 +108,8 @@ namespace GnollHackX
                 SKImage bordertl = null;
                 SKImage borderhorizontal = null;
                 SKImage bordervertical = null;
+                SKImage bordertlspecial = null;
+                int borderspecialloc = -1;
                 if (GHApp.DarkMode)
                 {
                     switch (BorderStyle)
@@ -115,24 +117,52 @@ namespace GnollHackX
                         case BorderStyles.None:
                             break;
                         case BorderStyles.Simple:
-                            bordertl = GHApp.DarkModeSimpleFrameTopLeftCornerBitmap; ;
+                            bordertl = GHApp.DarkModeSimpleFrameTopLeftCornerBitmap;
                             borderhorizontal = GHApp.DarkModeSimpleFrameTopHorizontalBitmap;
-                            bordervertical = GHApp.DarkModeSimpleFrameLeftVerticalBitmap; ;
+                            bordervertical = GHApp.DarkModeSimpleFrameLeftVerticalBitmap;
                             break;
                         case BorderStyles.Small:
-                            bordertl = GHApp.DarkModeSimpleFrameSmallTopLeftCornerBitmap; ;
+                            bordertl = GHApp.DarkModeSimpleFrameSmallTopLeftCornerBitmap;
                             borderhorizontal = GHApp.DarkModeSimpleFrameTopHorizontalBitmap;
-                            bordervertical = GHApp.DarkModeSimpleFrameLeftVerticalBitmap; ;
+                            bordervertical = GHApp.DarkModeSimpleFrameLeftVerticalBitmap;
                             break;
                         case BorderStyles.SimpleAlternative:
-                            bordertl = GHApp.DarkModeSimpleFrame2TopLeftCornerBitmap; ;
+                            bordertl = GHApp.DarkModeSimpleFrame2TopLeftCornerBitmap;
                             borderhorizontal = GHApp.DarkModeSimpleFrame2TopHorizontalBitmap;
-                            bordervertical = GHApp.DarkModeSimpleFrame2LeftVerticalBitmap; ;
+                            bordervertical = GHApp.DarkModeSimpleFrame2LeftVerticalBitmap;
                             break;
                         case BorderStyles.SmallAlternative:
-                            bordertl = GHApp.DarkModeSimpleFrame2SmallTopLeftCornerBitmap; ;
+                            bordertl = GHApp.DarkModeSimpleFrame2SmallTopLeftCornerBitmap;
                             borderhorizontal = GHApp.DarkModeSimpleFrame2TopHorizontalBitmap;
-                            bordervertical = GHApp.DarkModeSimpleFrame2LeftVerticalBitmap; ;
+                            bordervertical = GHApp.DarkModeSimpleFrame2LeftVerticalBitmap;
+                            break;
+                        case BorderStyles.SimpleTransformTopLeft:
+                            bordertl = GHApp.DarkModeSimpleFrameTopLeftCornerBitmap;
+                            borderhorizontal = GHApp.DarkModeSimpleFrameTopHorizontalBitmap;
+                            bordervertical = GHApp.DarkModeSimpleFrameLeftVerticalBitmap;
+                            bordertlspecial = GHApp.DarkModeSimpleFrameTransformBitmap;
+                            borderspecialloc = 0;
+                            break;
+                        case BorderStyles.SimpleAlternativeTransformTopLeft:
+                            bordertl = GHApp.DarkModeSimpleFrame2TopLeftCornerBitmap;
+                            borderhorizontal = GHApp.DarkModeSimpleFrame2TopHorizontalBitmap;
+                            bordervertical = GHApp.DarkModeSimpleFrame2LeftVerticalBitmap;
+                            bordertlspecial = GHApp.DarkModeSimpleFrame2TransformBitmap;
+                            borderspecialloc = 0;
+                            break;
+                        case BorderStyles.SimpleTransformTopRight:
+                            bordertl = GHApp.DarkModeSimpleFrameTopLeftCornerBitmap;
+                            borderhorizontal = GHApp.DarkModeSimpleFrameTopHorizontalBitmap;
+                            bordervertical = GHApp.DarkModeSimpleFrameLeftVerticalBitmap;
+                            bordertlspecial = GHApp.DarkModeSimpleFrameTransformBitmap;
+                            borderspecialloc = 1;
+                            break;
+                        case BorderStyles.SimpleAlternativeTransformTopRight:
+                            bordertl = GHApp.DarkModeSimpleFrame2TopLeftCornerBitmap;
+                            borderhorizontal = GHApp.DarkModeSimpleFrame2TopHorizontalBitmap;
+                            bordervertical = GHApp.DarkModeSimpleFrame2LeftVerticalBitmap;
+                            bordertlspecial = GHApp.DarkModeSimpleFrame2TransformBitmap;
+                            borderspecialloc = 1;
                             break;
                         case BorderStyles.Custom:
                             bordertl = CustomBorderTopLeftCorner;
@@ -148,24 +178,52 @@ namespace GnollHackX
                         case BorderStyles.None:
                             break;
                         case BorderStyles.Simple:
-                            bordertl = GHApp.SimpleFrameTopLeftCornerBitmap; ;
+                            bordertl = GHApp.SimpleFrameTopLeftCornerBitmap;
                             borderhorizontal = GHApp.SimpleFrameTopHorizontalBitmap;
-                            bordervertical = GHApp.SimpleFrameLeftVerticalBitmap; ;
+                            bordervertical = GHApp.SimpleFrameLeftVerticalBitmap;
                             break;
                         case BorderStyles.Small:
-                            bordertl = GHApp.SimpleFrameSmallTopLeftCornerBitmap; ;
+                            bordertl = GHApp.SimpleFrameSmallTopLeftCornerBitmap;
                             borderhorizontal = GHApp.SimpleFrameTopHorizontalBitmap;
-                            bordervertical = GHApp.SimpleFrameLeftVerticalBitmap; ;
+                            bordervertical = GHApp.SimpleFrameLeftVerticalBitmap;
                             break;
                         case BorderStyles.SimpleAlternative:
-                            bordertl = GHApp.SimpleFrame2TopLeftCornerBitmap; ;
+                            bordertl = GHApp.SimpleFrame2TopLeftCornerBitmap;
                             borderhorizontal = GHApp.SimpleFrame2TopHorizontalBitmap;
-                            bordervertical = GHApp.SimpleFrame2LeftVerticalBitmap; ;
+                            bordervertical = GHApp.SimpleFrame2LeftVerticalBitmap;
                             break;
                         case BorderStyles.SmallAlternative:
-                            bordertl = GHApp.SimpleFrame2SmallTopLeftCornerBitmap; ;
+                            bordertl = GHApp.SimpleFrame2SmallTopLeftCornerBitmap;
                             borderhorizontal = GHApp.SimpleFrame2TopHorizontalBitmap;
-                            bordervertical = GHApp.SimpleFrame2LeftVerticalBitmap; ;
+                            bordervertical = GHApp.SimpleFrame2LeftVerticalBitmap;
+                            break;
+                        case BorderStyles.SimpleTransformTopLeft:
+                            bordertl = GHApp.SimpleFrameTopLeftCornerBitmap;
+                            borderhorizontal = GHApp.SimpleFrameTopHorizontalBitmap;
+                            bordervertical = GHApp.SimpleFrameLeftVerticalBitmap;
+                            bordertlspecial = GHApp.SimpleFrameTransformBitmap;
+                            borderspecialloc = 0;
+                            break;
+                        case BorderStyles.SimpleAlternativeTransformTopLeft:
+                            bordertl = GHApp.SimpleFrame2TopLeftCornerBitmap;
+                            borderhorizontal = GHApp.SimpleFrame2TopHorizontalBitmap;
+                            bordervertical = GHApp.SimpleFrame2LeftVerticalBitmap;
+                            bordertlspecial = GHApp.SimpleFrame2TransformBitmap;
+                            borderspecialloc = 0;
+                            break;
+                        case BorderStyles.SimpleTransformTopRight:
+                            bordertl = GHApp.SimpleFrameTopLeftCornerBitmap;
+                            borderhorizontal = GHApp.SimpleFrameTopHorizontalBitmap;
+                            bordervertical = GHApp.SimpleFrameLeftVerticalBitmap;
+                            bordertlspecial = GHApp.SimpleFrameTransformBitmap;
+                            borderspecialloc = 1;
+                            break;
+                        case BorderStyles.SimpleAlternativeTransformTopRight:
+                            bordertl = GHApp.SimpleFrame2TopLeftCornerBitmap;
+                            borderhorizontal = GHApp.SimpleFrame2TopHorizontalBitmap;
+                            bordervertical = GHApp.SimpleFrame2LeftVerticalBitmap;
+                            bordertlspecial = GHApp.SimpleFrame2TransformBitmap;
+                            borderspecialloc = 1;
                             break;
                         case BorderStyles.Custom:
                             bordertl = CustomBorderTopLeftCorner;
@@ -270,13 +328,14 @@ namespace GnollHackX
 
                 if (BorderStyle > BorderStyles.None && bordertl != null && borderhorizontal != null && bordervertical != null)
                 {
-                    float borderscalex = (canvaswidth / GHConstants.BackgroundBorderDivisor / 6) / bordervertical.Width;
-                    float borderscaley = (canvasheight / GHConstants.BackgroundBorderDivisor / 6) / borderhorizontal.Height;
+                    float borderscalex = (canvaswidth / GHConstants.BackgroundBorderDivisor / 6) / Math.Max(1, bordervertical.Width);
+                    float borderscaley = (canvasheight / GHConstants.BackgroundBorderDivisor / 6) / Math.Max(1, borderhorizontal.Height);
                     float borderscale = Math.Max(0.10f, Math.Min(10.0f, (float)Math.Sqrt(borderscalex * borderscaley)));
                     for (int i = 0; i < 4; i++)
                     {
                         float tx = 0, ty = 0;
                         bool hflip = false, vflip = false;
+                        bool specialMatch = i == borderspecialloc && bordertlspecial != null;
                         using (SKAutoCanvasRestore res = new SKAutoCanvasRestore(canvas, true))
                         {
                             switch (i)
@@ -311,7 +370,7 @@ namespace GnollHackX
                             target_rect.Bottom = bordertl.Height * borderscale;
                             canvas.Translate(tx + (hflip ? target_rect.Width : 0), ty + (vflip ? target_rect.Height : 0));
                             canvas.Scale(hflip ? -1 : 1, vflip ? -1 : 1, 0, 0);
-                            canvas.DrawImage(bordertl, target_rect,
+                            canvas.DrawImage(specialMatch ? bordertlspecial : bordertl, target_rect,
 #if GNH_MAUI
                                 new SKSamplingOptions(SKFilterMode.Linear),
 #endif

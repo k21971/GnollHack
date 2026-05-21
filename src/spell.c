@@ -59,10 +59,10 @@ STATIC_DCL void FDECL(add_spell_prepare_menu_item, (winid, int, int, int, int, B
 STATIC_DCL void FDECL(add_spell_prepare_menu_heading, (winid, int, int, BOOLEAN_P));
 STATIC_DCL void FDECL(add_alt_spell_cast_menu_item, (winid, int, int));
 STATIC_DCL void FDECL(add_alt_spell_prepare_menu_item, (winid, int, int));
-STATIC_DCL boolean FDECL(is_acceptable_component_object_type, (struct materialcomponent*, int));
-STATIC_DCL boolean FDECL(is_acceptable_component_monster_type, (struct materialcomponent*, int));
-STATIC_DCL uchar FDECL(is_obj_acceptable_component, (struct materialcomponent*, struct obj* otmp, BOOLEAN_P));
-STATIC_DCL int FDECL(count_matcomp_alternatives, (struct materialcomponent*));
+STATIC_DCL boolean FDECL(is_acceptable_component_object_type, (const struct materialcomponent*, int));
+STATIC_DCL boolean FDECL(is_acceptable_component_monster_type, (const struct materialcomponent*, int));
+STATIC_DCL uchar FDECL(is_obj_acceptable_component, (const struct materialcomponent*, struct obj* otmp, BOOLEAN_P));
+STATIC_DCL int FDECL(count_matcomp_alternatives, (const struct materialcomponent*));
 STATIC_DCL struct extended_create_window_info FDECL(extended_create_window_info_for_spell, (BOOLEAN_P));
 STATIC_DCL const char* FDECL(get_spell_attribute_description, (int));
 STATIC_DCL const char* FDECL(get_targeting_description, (int));
@@ -204,7 +204,7 @@ struct obj *spellbook;
         if (!objects[spellbook->otyp].oc_name_known
             && !objects[spellbook->otyp].oc_uname)
             docall(spellbook, dcbuf);
-        Sprintf(priority_debug_buf_2, "confused_book: %d", spellbook->otyp);
+        debugprint("confused_book: %d", spellbook->otyp);
         useup(spellbook);
         gone = TRUE;
     } else {
@@ -277,6 +277,7 @@ struct obj *book2;
             {
                 achievement_gained("Performed the Invocation Ritual");
                 livelog_printf(LL_ACHIEVE, "%s", "performed the invocation");
+                issue_achievement(GUI_ACHIEVEMENT_PERFORMED_THE_RITUAL);
                 u.uevent.invoked = 1;
             }
             /* in case you haven't killed the Wizard yet, behave as if
@@ -411,8 +412,10 @@ learn(VOID_ARGS)
 
     if (book->unpaid && costly_spot(u.ux, u.uy))
     {
+        debugprint_pos();
         char* o_shop = in_rooms(u.ux, u.uy, SHOPBASE);
         shkp = shop_keeper(*o_shop);
+        debugprint_pos();
         if (shkp && inhishop(shkp) && is_obj_on_shk_bill(book, shkp))
         {
             billable_book = TRUE;
@@ -491,7 +494,7 @@ learn(VOID_ARGS)
             if (!objects[book->otyp].oc_name_known
                 && !objects[book->otyp].oc_uname)
                 docall(book, (char*)0);
-            Sprintf(priority_debug_buf_2, "learn: %d", book->otyp);
+            debugprint("learn: %d", book->otyp);
             useup(book);
         }
         else
@@ -624,7 +627,7 @@ learn(VOID_ARGS)
     { /* maybe a demon cursed it */
         if (cursed_book(book)) 
         {
-            Sprintf(priority_debug_buf_2, "learn2: %d", book->otyp);
+            debugprint("learn2: %d", book->otyp);
             useup(book);
             gone = TRUE;
             context.spbook.book = 0;
@@ -639,7 +642,7 @@ learn(VOID_ARGS)
     {
         play_sfx_sound(SFX_ITEM_CRUMBLES_TO_DUST);
         pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "spellbook crumbles to dust.");
-        Sprintf(priority_debug_buf_2, "learn3: %d", book->otyp);
+        debugprint("learn3: %d", book->otyp);
         useup(book);
         gone = TRUE;
     }
@@ -1546,13 +1549,13 @@ docast(VOID_ARGS)
 {
     if (in_doagain && docast_spell_no > -1)
     {
-        return spelleffects(docast_spell_no, FALSE, &youmonst);
+        return spelleffects(docast_spell_no, FALSE, &youmonst, (boolean*)0);
     }
     else
     {
         docast_spell_no = -1;
         if (getspell(&docast_spell_no, 0))
-            return spelleffects(docast_spell_no, FALSE, &youmonst);
+            return spelleffects(docast_spell_no, FALSE, &youmonst, (boolean*)0);
     }
     docast_spell_no = -1;
     return 0;
@@ -1562,14 +1565,23 @@ docast(VOID_ARGS)
 int
 docastquick(VOID_ARGS)
 {
+    return docastquick_core((boolean*)0);
+}
+
+int
+docastquick_core(stop_readchar_ptr)
+boolean* stop_readchar_ptr;
+{
     if (context.quick_cast_spell_set && context.quick_cast_spell_no > -1)
     {
-        return spelleffects(context.quick_cast_spell_no, FALSE, &youmonst);
+        return spelleffects(context.quick_cast_spell_no, FALSE, &youmonst, stop_readchar_ptr);
     }
     else
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
         pline_ex(ATR_NONE, CLR_MSG_FAIL, "Quick spell has not been set.");
+        if (stop_readchar_ptr)
+            *stop_readchar_ptr = TRUE;
         return 0;
     }
 }
@@ -2058,9 +2070,9 @@ int spell, booktype;
 
     /* Casting time*/
     if(objects[booktype].oc_spell_flags & S1_DOES_NOT_TAKE_A_TURN)
-        Strcpy(buf2, "0 rounds");
+        Strcpy(buf2, "0 turns");
     else
-        Strcpy(buf2, "1 round");
+        Strcpy(buf2, "1 turn");
 
     Sprintf(buf, "Casting time:     %s", buf2);    
     putstr(datawin, ATR_INDENT_AT_COLON, buf);
@@ -2068,7 +2080,7 @@ int spell, booktype;
     /* Cooldown */
     if (objects[booktype].oc_spell_cooldown > 0)
     {
-        Sprintf(buf2, "%lld round%s", (long long)objects[booktype].oc_spell_cooldown, objects[booktype].oc_spell_cooldown == 1 ? "" : "s");
+        Sprintf(buf2, "%lld turn%s", (long long)objects[booktype].oc_spell_cooldown, objects[booktype].oc_spell_cooldown == 1 ? "" : "s");
     }
     else
     {
@@ -2322,7 +2334,7 @@ int spell, booktype;
         //    Sprintf(plusbuf, "%d", objects[booktype].oc_spell_dur_plus);
         //    Strcat(buf, plusbuf);
         //}
-        Sprintf(plusbuf, " round%s", (objects[booktype].oc_spell_dur_dice == 0 && objects[booktype].oc_spell_dur_diesize == 0 && objects[booktype].oc_spell_dur_plus == 1) ? "" : "s");
+        Sprintf(plusbuf, " turn%s", (objects[booktype].oc_spell_dur_dice == 0 && objects[booktype].oc_spell_dur_diesize == 0 && objects[booktype].oc_spell_dur_plus == 1) ? "" : "s");
         Strcat(buf, plusbuf);        
         putstr(datawin, ATR_INDENT_AT_COLON, buf);
     }
@@ -2506,10 +2518,11 @@ int spell, booktype;
 }
 
 int
-spelleffects(spell, atme, targetmonst)
+spelleffects(spell, atme, targetmonst, stop_readchar_ptr)
 int spell;
 boolean atme;
 struct monst* targetmonst;
+boolean* stop_readchar_ptr;
 {
     double damage = 0;
     int chance, n; // , intell;
@@ -2531,11 +2544,15 @@ struct monst* targetmonst;
      */
     if (rejectcasting()) 
     {
+        if (stop_readchar_ptr)
+            *stop_readchar_ptr = TRUE;
         return 0; /* no time elapses */
     }
 
     if (reject_specific_spell_casting(spell)) 
     {
+        if (stop_readchar_ptr)
+            *stop_readchar_ptr = TRUE;
         return 0; /* no time elapses */
     }
 
@@ -2550,10 +2567,14 @@ struct monst* targetmonst;
             in_doagain = 0;
             res = domaterialcomponentsmenu(spell);
             skip_savech = 0;
+            if (stop_readchar_ptr)
+                *stop_readchar_ptr = TRUE;
             return res;
         }
 
         skip_savech = 0;
+        if (stop_readchar_ptr)
+            *stop_readchar_ptr = TRUE;
         return 0; /* no time elapses */
 
     }
@@ -2562,6 +2583,8 @@ struct monst* targetmonst;
     {
         play_sfx_sound(SFX_NOT_READY_YET);
         You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot cast the spell before the cooldown has expired.");
+        if (stop_readchar_ptr)
+            *stop_readchar_ptr = TRUE;
         return 0; /* no time elapses */
     }
 
@@ -2570,6 +2593,8 @@ struct monst* targetmonst;
     {
         play_sfx_sound(SFX_GENERAL_CANNOT);
         You_ex(ATR_NONE, CLR_MSG_FAIL, "cannot recall this spell anymore.");
+        if (stop_readchar_ptr)
+            *stop_readchar_ptr = TRUE;
         return 0;
     }
 
@@ -2610,11 +2635,15 @@ struct monst* targetmonst;
     {
         play_sfx_sound(SFX_GENERAL_NOT_ENOUGH_STAMINA);
         You_ex(ATR_NONE, CLR_MSG_FAIL, "lack the strength to cast spells.");
+        if (stop_readchar_ptr)
+            *stop_readchar_ptr = TRUE;
         return 0;
     } 
     else if (check_capacity("Your concentration falters while carrying so much stuff.")) 
     {
         play_sfx_sound(SFX_FAIL_TO_CAST_CORRECTLY);
+        if (stop_readchar_ptr)
+            *stop_readchar_ptr = TRUE;
         return 1;
     }
 
@@ -2645,6 +2674,8 @@ struct monst* targetmonst;
     {
         play_sfx_sound(SFX_NOT_ENOUGH_MANA);
         You_ex(ATR_NONE, CLR_MSG_FAIL, "don't have enough mana to cast that spell.");
+        if (stop_readchar_ptr)
+            *stop_readchar_ptr = TRUE;
         return res;
     } 
     //else {
@@ -2733,6 +2764,8 @@ struct monst* targetmonst;
         deduct_mana_cost(denergy / 2);
         context.botl = 1;
         update_u_action_revert(ACTION_TILE_NO_ACTION);
+        if (stop_readchar_ptr)
+            *stop_readchar_ptr = TRUE;
         return 1;
     }
 
@@ -3381,6 +3414,7 @@ struct monst* targetmonst;
         strcpy_capitalized_for_title(abuf, ra_desc);
         achievement_gained(abuf);
         livelog_printf(LL_ACHIEVE, "%s", ra_desc);
+        issue_achievement(GUI_ACHIEVEMENT_COMPLETED_OPTIONAL_QUEST);
     }
 
     return result;
@@ -3468,7 +3502,7 @@ int otyp;
             You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "more courageous.");
             break;
         case MIND_SHIELDING:
-            You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "shielded from mental detection.");
+            You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "shielded from mental attacks, control, and detection.");
             break;
         case LYCANTHROPY_RESISTANCE:
             You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "more protected from lycanthropy.");
@@ -5476,7 +5510,7 @@ int spell;
         matcnt++;
         struct obj* otmp = (struct obj*)0;
         char buf[BUFSZ], buf3[BUFSZ], buf5[BUFSZ];
-        struct materialcomponent* mc = &matlists[spellmatcomp(spell)].matcomp[j];
+        const struct materialcomponent* mc = &matlists[spellmatcomp(spell)].matcomp[j];
         Strcpy(buf3, domatcompname(mc));
 
         Sprintf(buf, "You need %s%s. ",
@@ -5636,7 +5670,7 @@ int spell;
     for (j = 0; j < matcnt; j++)
     {
         struct obj* otmp = selcomps[j];
-        struct materialcomponent* mc = &matlists[spellmatcomp(spell)].matcomp[j];
+        const struct materialcomponent* mc = &matlists[spellmatcomp(spell)].matcomp[j];
 
         if (!otmp || !mc)
             continue;
@@ -5681,9 +5715,7 @@ int spell;
             int used_amount = (failure ? 1 : selected_multiplier) * mc->amount;
             if(otmp->quan >= used_amount)
             {
-                Sprintf(priority_debug_buf_2, "domaterialcomponentsmenu: %d", otmp->otyp);
-                Strcpy(priority_debug_buf_3, "domaterialcomponentsmenu");
-                Strcpy(priority_debug_buf_4, "domaterialcomponentsmenu");
+                debugprint("domaterialcomponentsmenu1: %d", otmp->otyp);
                 for (i = 0; i < used_amount; i++)
                     useup(otmp);
 
@@ -5692,7 +5724,7 @@ int spell;
             else
             {
                 impossible("There should always be enough material components at this stage");
-                Sprintf(priority_debug_buf_3, "domaterialcomponentsmenu: %d", otmp->otyp);
+                debugprint("domaterialcomponentsmenu2: %d", otmp->otyp);
                 useupall(otmp);
                 failure = TRUE;
             }
@@ -5769,7 +5801,7 @@ int spell;
 STATIC_OVL
 int
 count_matcomp_alternatives(mc)
-struct materialcomponent* mc;
+const struct materialcomponent* mc;
 {
     int cnt = 0;
     int i;
@@ -5788,7 +5820,7 @@ struct materialcomponent* mc;
 STATIC_OVL
 boolean
 is_acceptable_component_object_type(mc, otyp)
-struct materialcomponent *mc;
+const struct materialcomponent *mc;
 int otyp;
 {
     int i;
@@ -5806,7 +5838,7 @@ int otyp;
 STATIC_OVL
 boolean
 is_acceptable_component_monster_type(mc, mnum)
-struct materialcomponent* mc;
+const struct materialcomponent* mc;
 int mnum;
 {
     int i;
@@ -5824,7 +5856,7 @@ int mnum;
 STATIC_OVL
 uchar
 is_obj_acceptable_component(mc, otmp, also_possible)
-struct materialcomponent* mc;
+const struct materialcomponent* mc;
 struct obj* otmp;
 boolean also_possible;
 {
@@ -5862,7 +5894,7 @@ struct obj* otmp;
     uchar res;
     for (j = 0; matlists[spellmatcomp(spell)].matcomp[j].amount != 0; j++)
     {
-        struct materialcomponent* mc = &matlists[spellmatcomp(spell)].matcomp[j];
+        const struct materialcomponent* mc = &matlists[spellmatcomp(spell)].matcomp[j];
         res = is_obj_acceptable_component(mc, otmp, TRUE);
         if (res)
             return res;
@@ -5881,7 +5913,7 @@ int* corpsenm_ptr;
     uchar res;
     for (j = 0; matlists[objects[booktype].oc_material_components].matcomp[j].amount != 0; j++)
     {
-        struct materialcomponent* mc = &matlists[objects[booktype].oc_material_components].matcomp[j];
+        const struct materialcomponent* mc = &matlists[objects[booktype].oc_material_components].matcomp[j];
         res = is_acceptable_component_object_type(mc, otyp);
         if (res)
         {
@@ -5897,7 +5929,7 @@ int* corpsenm_ptr;
 
 const char*
 domatcompname(mc)
-struct materialcomponent* mc;
+const struct materialcomponent* mc;
 {
     /* in general, use the description for complicated (e.g., multialternative) cases */
     if(mc->description && strcmp(mc->description, ""))

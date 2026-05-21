@@ -36,7 +36,7 @@ STATIC_PTR int FDECL(ckvalidcat, (struct obj *));
 STATIC_PTR int FDECL(ckunpaid, (struct obj *));
 STATIC_PTR char *FDECL(safeq_xprname, (struct obj *));
 STATIC_PTR char *FDECL(safeq_shortxprname, (struct obj *));
-STATIC_DCL char FDECL(display_pickinv, (const char *, char *, char *, BOOLEAN_P, int64_t *, int, const char*, BOOLEAN_P, BOOLEAN_P));
+STATIC_DCL char FDECL(display_pickinv, (const char *, char *, char *, BOOLEAN_P, int64_t *, int, BOOLEAN_P, const char*, UCHAR_P, BOOLEAN_P));
 STATIC_DCL char FDECL(display_used_invlets, (CHAR_P));
 STATIC_DCL boolean FDECL(this_type_only, (struct obj *));
 STATIC_DCL void NDECL(dounpaid);
@@ -46,7 +46,8 @@ STATIC_DCL struct obj *FDECL(find_unpaid, (struct obj *, struct obj **));
 STATIC_DCL int FDECL(menu_identify, (int));
 STATIC_DCL boolean FDECL(tool_in_use, (struct obj *));
 STATIC_DCL char FDECL(obj_to_let, (struct obj *));
-STATIC_DCL void FDECL(add_inventory_menu_item, (winid, struct obj*, CHAR_P, BOOLEAN_P, BOOLEAN_P, int, BOOLEAN_P, BOOLEAN_P, int*));
+STATIC_DCL void FDECL(add_inventory_menu_item, (winid, struct obj*, CHAR_P, BOOLEAN_P, BOOLEAN_P, int, BOOLEAN_P, BOOLEAN_P, BOOLEAN_P, int*));
+STATIC_DCL boolean FDECL(is_special_show_condition_satisfied, (int));
 
 static int lastinvnr = 51; /* 0 ... 51 (never saved&restored) */
 
@@ -709,6 +710,7 @@ struct obj *objlist, *obj;
        have when carried are different from what they are now; prevent
        that from eliciting an incorrect result from mergable() */
     save_nocharge = obj->no_charge;
+    debugprint_pos();
     if (objlist == invent && obj->where == OBJ_FLOOR
         && (shkp = shop_keeper(inside_shop(obj->ox, obj->oy))) != 0) {
         if (obj->no_charge)
@@ -732,8 +734,8 @@ struct obj *objlist, *obj;
     return objlist;
 }
 
-/* merge obj with otmp and delete obj if types agree */
-int
+/* merge obj with otmp and delete obj if types agree; if so, return TRUE, otherwise FALSE */
+boolean
 merged(potmp, pobj)
 struct obj **potmp, **pobj;
 {
@@ -766,7 +768,7 @@ struct obj **potmp, **pobj;
             otmp = *potmp = uoname(otmp, UONAME(obj));
         if (!has_oname(otmp) && has_oname(obj))
             otmp = *potmp = oname(otmp, ONAME(obj));
-        Strcpy(debug_buf_2, "merged");
+        debugprint("merged");
         obj_extract_self(obj);
 
         /* really should merge the timeouts */
@@ -777,8 +779,10 @@ struct obj **potmp, **pobj;
         if (obj->timed)
             obj_stop_timers(obj); /* follows lights */
 
+        boolean objgone = FALSE; /* Should not become true since it has been extracted above */
         /* fixup for `#adjust' merging wielded darts, daggers, &c */
-        if (obj->owornmask && carried(otmp)) {
+        if (obj->owornmask && carried(otmp)) 
+        {
             int64_t wmask = otmp->owornmask | obj->owornmask;
 
             /* Both the items might be worn in competing slots;
@@ -799,10 +803,16 @@ struct obj **potmp, **pobj;
                 impossible("merging strangely worn items (%lx)", wmask);
                 wmask = otmp->owornmask;
             }
+            int trackidx = add_to_obj_tracking(otmp);
+            int trackidx2 = add_to_obj_tracking(obj);
             if ((otmp->owornmask & ~wmask) != 0L)
                 setnotworn(otmp);
-            setworn(otmp, wmask);
-            setnotworn(obj);
+            boolean otmpgone = finish_obj_tracking(trackidx);
+            if (!otmpgone)
+                setworn(otmp, wmask);
+            objgone = finish_obj_tracking(trackidx2);
+            if (!objgone)
+                setnotworn(obj);
 #if 0
         /* (this should not be necessary, since items
             already in a monster's inventory don't ever get
@@ -815,19 +825,22 @@ struct obj **potmp, **pobj;
 #endif /*0*/
         }
 
-        /* handle puddings a bit differently; absorption will free the
-           other object automatically so we can just return out from here */
-        if (obj->globby) {
-            pudding_merge_message(otmp, obj);
-            obj_absorb(potmp, pobj);
-            return 1;
-        }
+        if (!objgone)
+        {
+            /* handle puddings a bit differently; absorption will free the
+               other object automatically so we can just return out from here */
+            if (obj->globby) {
+                pudding_merge_message(otmp, obj);
+                obj_absorb(potmp, pobj);
+                return TRUE;
+            }
 
-        Sprintf(priority_debug_buf_4, "merged: %d", obj->otyp);
-        obfree(obj, otmp); /* free(obj), bill->otmp */
-        return 1;
+            debugprint("merged: %d", obj->otyp);
+            obfree(obj, otmp); /* free(obj), bill->otmp */
+        }
+        return TRUE;
     }
-    return 0;
+    return FALSE;
 }
 
 /*
@@ -860,6 +873,7 @@ struct obj *obj;
         {
             achievement_gained("Amulet of Yendor");
             livelog_printf(LL_ACHIEVE, "%s", "acquired the Amulet of Yendor");
+            issue_achievement(GUI_ACHIEVEMENT_FOUND_AMULET_OF_YENDOR);
             if (iflags.using_gui_sounds)
             {
                 delay_output_milliseconds(500);
@@ -886,6 +900,7 @@ struct obj *obj;
         {
             achievement_gained("Candelabrum of Invocation");
             livelog_printf(LL_ACHIEVE, "%s", "acquired the Candelabrum of Invocation");
+            issue_achievement(GUI_ACHIEVEMENT_FOUND_CANDELABRUM_OF_INVOCATION);
             u.uachieve.menorah = 1;
             invocation_ritual_quest_update(TRUE);
         }
@@ -901,6 +916,7 @@ struct obj *obj;
         {
             achievement_gained("Bell of Opening");
             livelog_printf(LL_ACHIEVE, "%s", "acquired the Bell of Opening");
+            issue_achievement(GUI_ACHIEVEMENT_FOUND_BELL_OF_OPENING);
             u.uachieve.bell = 1;
             invocation_ritual_quest_update(TRUE);
         }
@@ -916,6 +932,7 @@ struct obj *obj;
         {
             achievement_gained("Book of the Dead");
             livelog_printf(LL_ACHIEVE, "%s", "acquired the Book of the Dead");
+            issue_achievement(GUI_ACHIEVEMENT_FOUND_BOOK_OF_THE_DEAD);
             u.uachieve.book = 1;
             invocation_ritual_quest_update(TRUE);
         }
@@ -940,6 +957,7 @@ struct obj *obj;
             {
                 achievement_gained("Prime Codex");
                 livelog_printf(LL_ACHIEVE, "%s", "acquired the Prime Codex");
+                issue_achievement(GUI_ACHIEVEMENT_FOUND_PRIME_CODEX);
             }
             u.uachieve.prime_codex = 1;
         }
@@ -980,6 +998,7 @@ struct obj *obj;
             strcpy_capitalized_for_title(abuf, ra_desc);
             achievement_gained(abuf);
             livelog_printf(LL_ACHIEVE, "%s", ra_desc);
+            issue_achievement(GUI_ACHIEVEMENT_COMPLETED_OPTIONAL_QUEST);
         }
     }
 
@@ -996,6 +1015,7 @@ struct obj *obj;
         {
             achievement_gained("Gladstone");
             livelog_printf(LL_ACHIEVE, "%s", "acquired the Gladstone from Mines' End");
+            issue_achievement(GUI_ACHIEVEMENT_FOUND_GLADSTONE);
         }
         u.uachieve.mines_luckstone = 1;
         obj->speflags &= ~(SPEFLAGS_MINES_PRIZE);
@@ -1009,6 +1029,7 @@ struct obj *obj;
         {
             achievement_gained("Sokoban Solved");
             livelog_printf(LL_ACHIEVE, "completed Sokoban, acquiring %s", an(xname(obj)));
+            issue_achievement(GUI_ACHIEVEMENT_SOLVED_SOKOBAN);
         }
         u.uachieve.finish_sokoban = 1;
         obj->speflags &= ~(SPEFLAGS_SOKO_PRIZE1 | SPEFLAGS_SOKO_PRIZE2);
@@ -1107,7 +1128,7 @@ boolean verbose;
     boolean was_telepathic = Telepat;
     boolean was_blind_telepathic = Blind_telepat;
     boolean had_xray_vision = XRay_vision;
-    boolean had_exray_vision = Extended_XRay_vision;
+    boolean had_astral_vision = Astral_vision;
     boolean had_magical_breathing = Magical_breathing;
     boolean had_warning = Warning;
     boolean had_warning_of_mon = Warning;
@@ -1406,7 +1427,7 @@ boolean verbose;
     }
 
     /* X-ray vision */
-    if (!Extended_XRay_vision && ((XRay_vision && !had_xray_vision)
+    if (!Astral_vision && ((XRay_vision && !had_xray_vision)
         || (!XRay_vision && had_xray_vision))
         )
     {
@@ -1416,13 +1437,13 @@ boolean verbose;
             check_bosses = TRUE;
     }
 
-    if ((Extended_XRay_vision && !had_exray_vision)
-        || (!Extended_XRay_vision && had_exray_vision)
+    if ((Astral_vision && !had_astral_vision)
+        || (!Astral_vision && had_astral_vision)
         )
     {
         vision_full_recalc = 1;
         see_monsters();
-        if (Extended_XRay_vision)
+        if (Astral_vision)
             check_bosses = TRUE;
     }
 
@@ -1743,7 +1764,7 @@ struct obj *obj;
     /* merge with quiver in preference to any other inventory slot
        in case quiver and wielded weapon are both eligible; adding
        extra to quivered stack is more useful than to wielded one */
-    Sprintf(priority_debug_buf_3, "addinv: %d", obj->otyp);
+    debugprint("addinv: %d", obj->otyp);
     if (uquiver && merged(&uquiver, &obj)) {
         obj = uquiver;
         if (!obj)
@@ -1892,20 +1913,24 @@ boolean doprinv;
         newsym(u.ux, u.uy);
 
         if (!touch_artifact(obj, &youmonst)) {
-            Strcpy(debug_buf_2, "hold_another_object1");
+            debugprint("hold_another_object1");
             obj_extract_self(obj); /* remove it from the floor */
-            dropy(obj);            /* now put it back again :-) */
-            return obj;
+            if (!dropy(obj))            /* now put it back again :-) */
+                return obj;
+            else
+                return (struct obj*)0;
         } else if (wasUpolyd && !Upolyd) {
             /* loose your grip if you revert your form */
             if (drop_fmt)
                 pline(drop_fmt, drop_arg);
-            Strcpy(debug_buf_2, "hold_another_object2");
+            debugprint("hold_another_object2");
             obj_extract_self(obj);
-            dropy(obj);
-            return obj;
+            if (!dropy(obj))
+                return obj;
+            else
+                return (struct obj*)0;
         }
-        Strcpy(debug_buf_2, "hold_another_object3");
+        debugprint("hold_another_object3");
         obj_extract_self(obj);
 #if 0
         if (crysknife) {
@@ -1956,10 +1981,10 @@ boolean doprinv;
         pline(drop_fmt, drop_arg);
     obj->nomerge = 0;
     if (can_reach_floor(TRUE)) {
-        dropxf(obj);
+        (void)dropxf(obj);
     } else {
         freeinv(obj);
-        hitfloor(obj, FALSE);
+        (void)hitfloor(obj, FALSE);
     }
     newsym(u.ux, u.uy);
     return (struct obj *) 0; /* might be gone */
@@ -1970,10 +1995,12 @@ void
 useupall(obj)
 struct obj *obj;
 {
-    setnotworn(obj);
-    freeinv(obj);
-    Sprintf(priority_debug_buf_4, "useupall: %d", obj->otyp);
-    obfree(obj, (struct obj *) 0); /* deletes contents also */
+    if (!setnotworn(obj))
+    {
+        freeinv(obj);
+        debugprint("useupall: %d", obj->otyp);
+        obfree(obj, (struct obj*)0); /* deletes contents also */
+    }
 }
 
 void
@@ -1988,7 +2015,7 @@ register struct obj *obj;
         obj->owt = weight(obj);
         update_inventory();
     } else {
-        Sprintf(priority_debug_buf_3, "useup: %d", obj->otyp);
+        debugprint("useup: %d", obj->otyp);
         useupall(obj);
     }
 }
@@ -2089,7 +2116,7 @@ register struct obj *obj;
         context.last_picked_obj_oid = 0;
         context.last_picked_obj_show_duration_left = 0;
     }
-    Sprintf(debug_buf_4, "freeinv: otyp=%d", obj->otyp);
+    debugprint("freeinv: otyp=%d", obj->otyp);
     extract_nobj(obj, &invent);
     freeinv_core(obj);
     update_inventory();
@@ -2100,8 +2127,7 @@ delallobj(x, y)
 int x, y;
 {
     struct obj *otmp, *otmp2;
-    Strcpy(priority_debug_buf_2, "delallobj");
-    Strcpy(priority_debug_buf_3, "delallobj");
+    debugprint("delallobj");
 
     for (otmp = level.objects[x][y]; otmp; otmp = otmp2) {
         if (otmp == uball)
@@ -2142,11 +2168,10 @@ uint64_t newsym_flags;
         return;
     }
     update_map = (obj->where == OBJ_FLOOR);
-    Sprintf(debug_buf_2, "delobj_with_flags: %d, %u", obj->otyp, obj->o_id);
+    debugprint("delobj_with_flags: %d, %u", obj->otyp, obj->o_id);
     obj_extract_self(obj);
     if (update_map)
         newsym_with_flags(obj->ox, obj->oy, newsym_flags);
-    Sprintf(priority_debug_buf_4, "delobj_with_flags: %d, %u", obj->otyp, obj->o_id);
     obfree(obj, (struct obj *) 0); /* frees contents also */
 }
 
@@ -2283,9 +2308,22 @@ register int type;
 
     for (otmp = invent; otmp; otmp = otmp->nobj)
         if (otmp->otyp == type)
-            return  otmp;
+            return otmp;
     return (struct obj *) 0;
 }
+
+struct obj *
+carrying_class(oclass)
+char oclass;
+{
+    register struct obj *otmp;
+
+    for (otmp = invent; otmp; otmp = otmp->nobj)
+        if (otmp->oclass == oclass)
+            return otmp;
+    return (struct obj *) 0;
+}
+
 
 struct obj*
 carrying_leashed_leash()
@@ -2436,6 +2474,19 @@ register struct obj *objchn;
     return (struct obj *) 0;
 }
 
+struct obj*
+o_on_open_inventory(id)
+unsigned int id;
+{
+    struct obj* objchn = invent;
+    while (objchn) {
+        if (objchn->o_id == id)
+            return objchn;
+        /* Does not check contents, since the item needs to be in open inventory */
+        objchn = objchn->nobj;
+    }
+    return (struct obj*)0;
+}
 
 struct obj*
 o_on_memory(id, objchn)
@@ -2624,13 +2675,14 @@ register const char* let, * word;
 int show_weights;
 const char* headertext;
 {
-    return getobj_ex(let, word, show_weights, headertext, (boolean (*)(struct obj*))0, (int64_t)0, 0U);
+    return getobj_ex(let, word, show_weights, TRUE, headertext, (boolean (*)(struct obj*))0, (int64_t)0, 0U);
 }
 
 struct obj *
-getobj_ex(let, word, show_weights, headertext, validitemfunc, cost, getobjflags)
+getobj_ex(let, word, show_weights, show_quick, headertext, validitemfunc, cost, getobjflags)
 register const char *let, *word;
 int show_weights;
+boolean show_quick;
 const char* headertext;
 boolean (*validitemfunc)(struct obj*);
 int64_t cost;
@@ -3058,8 +3110,8 @@ unsigned int getobjflags; /* 1 = cost is specified; 2 = header text is about cos
                 allowed_choices = altlets;
             ilet = display_pickinv(allowed_choices, *qbuf ? qbuf : (char *) 0,
                                    menuquery,
-                                   TRUE, allowcnt ? &ctmp : (int64_t *) 0, show_weights, headertext, FALSE, FALSE);
-            if (!ilet)
+                                   TRUE, allowcnt ? &ctmp : (int64_t *) 0, show_weights, show_quick, headertext, FALSE, FALSE);
+            if (!ilet || ilet == SWAP_LET)
                 continue;
             if (ilet == HANDS_SYM)
                 return (struct obj *) &zeroobj; /* cast away 'const' */
@@ -3296,6 +3348,18 @@ struct obj* otmp_only;
                     && (otmp->speflags & SPEFLAGS_FAVORITE))
                 || (!strcmp(word, "unmark as favorite") /* exclude if not a favorite */
                     && !(otmp->speflags & SPEFLAGS_FAVORITE))
+                || (!strcmp(word, "set as quick engrave item") /* exclude if already a quick engrave item */
+                    && (otmp->o_id == context.quick_engrave_obj_oid || (otmp->oclass == TOOL_CLASS && !(otmp->otyp == MAGIC_MARKER || otmp->otyp == TOWEL /* || is_weptool(otmp) */))))
+                || (!strcmp(word, "unset as quick engrave item") /* exclude if not a quick engrave item */
+                    && otmp->o_id != context.quick_engrave_obj_oid)
+                || (!strcmp(word, "set as quick pick-axe") /* exclude if already a quick pick-axe */
+                    && (otmp->o_id == context.quick_pickaxe_obj_oid || (!(is_pick(otmp) || is_saw(otmp) || is_axe(otmp)))))
+                || (!strcmp(word, "unset as quick pick-axe") /* exclude if not a quick pick-axe */
+                    && otmp->o_id != context.quick_pickaxe_obj_oid)
+                || (!strcmp(word, "set as quick bag") /* exclude if already a quick bag */
+                    && (otmp->o_id == context.quick_bag_obj_oid || !Is_container(otmp) || (Is_box(otmp) && (!otmp->lknown || otmp->olocked)) || (!objects[otmp->otyp].oc_name_known && !otmp->cknown) || (objects[otmp->otyp].oc_name_known && !Is_proper_container(otmp)) || Is_specialized_container(otmp) || Is_container_with_closed_lid(otmp)))
+                || (!strcmp(word, "unset as quick bag") /* exclude if not a quick bag */
+                    && otmp->o_id != context.quick_bag_obj_oid)
                 || (!strcmp(word, "set as quick wand") /* exclude if already a quick wand */
                     && otmp->o_id == context.quick_zap_wand_oid)
                 || (!strcmp(word, "unset as quick wand") /* exclude if not the quick wand */
@@ -3329,7 +3393,7 @@ struct obj* otmp_only;
                             && otyp != TOWEL)))
                 || (!strcmp(word, "wield")
                     && (otmp->oclass == TOOL_CLASS && !is_weptool(otmp)))
-                || (!strcmp(word, "eat") && !is_edible(otmp))
+                || (!strcmp(word, "eat") && !is_obj_normally_edible(otmp))
                 || (!strcmp(word, "drink") && otmp->oclass == TOOL_CLASS && !is_obj_quaffable(otmp))
                 || (!strcmp(word, "sacrifice")
                     && (otyp != CORPSE && otyp != AMULET_OF_YENDOR
@@ -3342,6 +3406,7 @@ struct obj* otmp_only;
                 || (!strcmp(word, "rub")
                     && ((otmp->oclass == TOOL_CLASS && !is_otyp_lamp(otyp))
                         || (otmp->oclass == GEM_CLASS && !is_graystone(otmp))))
+                || (!strcmp(word, "cut rock or wood with") && !(is_pick(otmp) || is_saw(otmp) || is_axe(otmp)))
                 || (!strcmp(word, "use or apply")
                     /* Picks, axes, pole-weapons, bullwhips */
                     && ((otmp->oclass == WEAPON_CLASS && !is_appliable_weapon(otmp))
@@ -3645,10 +3710,10 @@ STATIC_VAR NEARDATA const char removeables[] = { ARMOR_CLASS, WEAPON_CLASS,
    Return the number of times fn was called successfully.
    If combo is TRUE, we just use this to get a category list. */
 int
-ggetobj(word, fn, mx, combo, resultflags, show_weights)
+ggetobj(word, fn, mx, combo, resultflags, show_weights, show_quick)
 const char *word;
 int FDECL((*fn), (OBJ_P)), mx;
-boolean combo; /* combination menu flag */
+boolean combo, show_quick; /* combination menu flag */
 unsigned *resultflags;
 int show_weights;
 {
@@ -3720,7 +3785,7 @@ int show_weights;
                     /* index() check: limit overflow items to one '#' */
                     if ((*ofilter)(otmp) && !index(ailets, otmp->invlet))
                         (void) strkitten(ailets, otmp->invlet);
-            if (display_inventory(ailets, TRUE, show_weights) == '\033')
+            if (display_inventory(ailets, TRUE, show_weights, show_quick) == '\033')
                 return 0;
         } else
             break;
@@ -3944,23 +4009,29 @@ int FDECL((*fn), (OBJ_P)), FDECL((*ckfn), (OBJ_P));
             allflag = 1;
             /*FALLTHRU*/
         case 'y':
+        {
+            int trackid = add_to_obj_tracking(otmp);
             tmp = (*fn)(otmp);
+            if (finish_obj_tracking(trackid))
+                otmp = 0; /* The object was destroyed */
             if (tmp < 0) {
                 if (container_gone(fn)) {
                     /* otmp caused magic bag to explode;
                        both are now gone */
                     otmp = 0; /* and return */
-                } else if (otmp && otmp != otmpo) {
+                }
+                else if (otmp && otmp != otmpo) {
                     /* split occurred, merge again */
-                    Sprintf(priority_debug_buf_3, "askchain: %d", otmp->otyp);
-                    (void) merged(&otmpo, &otmp);
+                    debugprint("askchain: %d", otmp->otyp);
+                    (void)merged(&otmpo, &otmp);
                 }
                 goto ret;
             }
             cnt += tmp;
             if (--mx == 0)
                 goto ret;
-            /*FALLTHRU*/
+        }
+        /*FALLTHRU*/
         case 'n':
             if (nodot)
                 dud++;
@@ -4050,7 +4121,7 @@ int id_limit;
             original_id_limit <= 1 ? "" : first ? " first" : " next");
 
         n = query_objlist(buf, &invent, (SIGNAL_NOMENU | SIGNAL_ESCAPE
-                                         | USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON),
+                                         | USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON | SHOW_QUICK),
                           &pick_list, id_limit == 1 ? PICK_ONE : PICK_ANY, not_fully_identified, SHOWWEIGHTS_NONE);
 
         if (n > 0)
@@ -4193,8 +4264,7 @@ boolean learning_id; /* true if we just read unknown identify scroll */
         {
             do
             {
-                n = ggetobj("identify", identify, id_limit, FALSE,
-                    (unsigned*)0, 0);
+                n = ggetobj("identify", identify, id_limit, FALSE, (unsigned*)0, 0, TRUE);
                 if (n < 0)
                     break; /* quit or no eligible items */
                 else
@@ -4214,6 +4284,8 @@ boolean learning_id; /* true if we just read unknown identify scroll */
             res += idres;
         }
     }
+    if (res > 0)
+        issue_achievement(GUI_ACHIEVEMENT_IDENTIFIED_AN_ITEM);
     return res;
 }
 
@@ -4413,14 +4485,19 @@ ddoinv()
     {
         pickcnt = 0;
         return_to_inv = FALSE;
-        invlet = display_inventory_with_header((const char*)0, TRUE, &pickcnt, SHOWWEIGHTS_INVENTORY, FALSE);
-        if (invlet == '\033' || invlet == '\0')
+        invlet = display_inventory_with_header((const char*)0, TRUE, &pickcnt, SHOWWEIGHTS_INVENTORY, TRUE, FALSE, FALSE);
+        if (invlet == CANCEL_LET || invlet == '\0')
         {
             issue_gui_command(GUI_CMD_TOGGLE_MENU_POSITION_SAVING, GHMENU_STYLE_INVENTORY, 0, (char*)0);
             return 0;
         }
 
-        if (flags.inventory_obj_cmd)
+        if (invlet == SWAP_LET)
+        {
+            doswapweapon();
+            return_to_inv = TRUE;
+        }
+        else if (flags.inventory_obj_cmd)
         {
             int res = display_item_command_menu_by_invlet(invlet, pickcnt, &return_to_inv);
             if (res || !return_to_inv)
@@ -4458,11 +4535,16 @@ doseeworn()
     {
         pickcnt = 0;
         return_to_inv = FALSE;
-        invlet = display_inventory_with_header((const char*)0, TRUE, &pickcnt, SHOWWEIGHTS_INVENTORY, TRUE);
-        if (!invlet || invlet == '\033' || invlet == '\0')
+        invlet = display_inventory_with_header((const char*)0, TRUE, &pickcnt, SHOWWEIGHTS_INVENTORY, TRUE, iflags.worn_shows_equipment, TRUE);
+        if (!invlet || invlet == CANCEL_LET || invlet == '\0')
             return 0;
 
-        if (flags.inventory_obj_cmd)
+        if (invlet == SWAP_LET)
+        {
+            doswapweapon();
+            return_to_inv = TRUE;
+        }
+        else if (flags.inventory_obj_cmd)
         {
             int res = display_item_command_menu_by_invlet(invlet, pickcnt, &return_to_inv);
             if (res || !return_to_inv)
@@ -4501,6 +4583,18 @@ boolean* return_to_inv_ptr;
         return 0;
     else
         return display_item_command_menu(otmp, pickcnt, return_to_inv_ptr);
+}
+
+STATIC_OVL boolean
+is_special_show_condition_satisfied(i)
+int i; /* extcmdlist index */
+{
+    if (extcmdlist[i].ef_funct == dosetquickengraveitem)
+        return context.quick_engrave_obj_oid != 0;
+    if (extcmdlist[i].ef_funct == dosetquickpickaxeitem)
+        return context.quick_pickaxe_obj_oid != 0;
+
+    return FALSE;
 }
 
 #define NUM_CMD_SECTIONS 3
@@ -4553,11 +4647,13 @@ boolean* return_to_inv_ptr;
             slen = (int)strlen(headings[j]);
             if (slen > longest_len_header)
                 longest_len_header = slen;
-
         }
         for (i = 0; extcmdlist[i].ef_txt; i++)
         {
             if (!(extcmdlist[i].flags & allflags) || !extcmdlist[i].getobj_word)
+                continue;
+
+            if ((extcmdlist[i].flags & SPECIAL_SHOW_CONDITIONS) && !is_special_show_condition_satisfied(i))
                 continue;
 
             slen = (int)strlen(extcmdlist[i].ef_txt_word ? extcmdlist[i].ef_txt_word : extcmdlist[i].ef_txt);
@@ -4573,11 +4669,16 @@ boolean* return_to_inv_ptr;
                 if (!(extcmdlist[i].flags & section_flags[j]) || !extcmdlist[i].getobj_word)
                     continue;
 
+                if ((extcmdlist[i].flags & SPECIAL_SHOW_CONDITIONS) && !is_special_show_condition_satisfied(i))
+                    continue;
+
                 Strcpy(class_list, "");
                 if (extcmdlist[i].getobj_classes)
                     Strcpy(class_list, extcmdlist[i].getobj_classes);
                 else if (!strcmp(extcmdlist[i].getobj_word, "break"))
                     setbreakclasses(class_list);
+                else if (!strcmp(extcmdlist[i].getobj_word, "cut rock or wood with"))
+                    setapplyclasses(class_list);
                 else if (!strcmp(extcmdlist[i].getobj_word, "use or apply"))
                     setapplyclasses(class_list);
                 else if (!strcmp(extcmdlist[i].getobj_word, "take items out of"))
@@ -4630,18 +4731,23 @@ boolean* return_to_inv_ptr;
                 if (!(extcmdlist[i].flags & section_flags[j]) || !extcmdlist[i].getobj_word)
                     continue;
 
+                if ((extcmdlist[i].flags & SPECIAL_SHOW_CONDITIONS) && !is_special_show_condition_satisfied(i))
+                    continue;
+
                 Strcpy(class_list, "");
                 if (extcmdlist[i].getobj_classes)
                     Strcpy(class_list, extcmdlist[i].getobj_classes);
                 else if (!strcmp(extcmdlist[i].getobj_word, "break"))
                     setbreakclasses(class_list);
+                else if (!strcmp(extcmdlist[i].getobj_word, "cut rock or wood with"))
+                    setapplyclasses(class_list);
                 else if (!strcmp(extcmdlist[i].getobj_word, "use or apply"))
                     setapplyclasses(class_list);
                 else if (!strcmp(extcmdlist[i].getobj_word, "take items out of"))
                     setapplyclasses(class_list);
                 else if (!strcmp(extcmdlist[i].getobj_word, "put items in"))
                     setapplyclasses(class_list);
-                else  if (!strcmp(extcmdlist[i].getobj_word, "ready"))
+                else if (!strcmp(extcmdlist[i].getobj_word, "ready"))
                 {
                     Strcpy(class_list, (uslinging()
                         || (uswapwep
@@ -4752,7 +4858,7 @@ boolean* return_to_inv_ptr;
                 otmpsplit = splitobj(otmp, pickcnt);
                 if (otmpsplit)
                 {
-                    Strcpy(debug_buf_2, "display_item_command_menu");
+                    debugprint("display_item_command_menu");
                     obj_extract_self(otmpsplit); /* free from inv */
                     otmpsplit->nomerge = 1;
                     otmpsplit = hold_another_object(otmpsplit, "Oops!  %s out of your grasp!", The(aobjnam(otmpsplit, "slip")), (const char*)0, FALSE);
@@ -4773,6 +4879,7 @@ boolean* return_to_inv_ptr;
                 savech(invlet);
             }
 
+            int tracked_otmp_id = getobj_autoselect_obj != otmp ? add_to_obj_tracking(otmp) : -1;
             trackedobj = getobj_autoselect_obj;
             res = (extcmdlist[selected_action].ef_funct)();
             getobj_autoselect_obj = (struct obj*)0;
@@ -4781,12 +4888,13 @@ boolean* return_to_inv_ptr;
             trackedobj_gone = FALSE;
             repeatmenu = (boolean)((extcmdlist[selected_action].flags & ALLOW_RETURN_TO_CMD_MENU) != 0) && !res;
             returntoinv = (boolean)((extcmdlist[selected_action].flags & ALLOW_RETURN_TO_INVENTORY) != 0) && !res;
+            boolean otmp_gone = finish_obj_tracking(tracked_otmp_id);
 
-            if (!autoobjgone) /* otmp or otmpsplit may have been deallocated, e.g., scrolls */
+            if (!autoobjgone && !otmp_gone) /* otmp or otmpsplit may have been deallocated, e.g., scrolls */
             {
-                if ((repeatmenu || returntoinv) && otmpsplit && otmpsplit != otmp && otmpsplit->where == OBJ_INVENT && otmp->where == OBJ_INVENT)
+                if ((repeatmenu || returntoinv || !res) && otmpsplit && otmpsplit != otmp && otmpsplit->where == OBJ_INVENT && otmp->where == OBJ_INVENT)
                 {
-                    Sprintf(priority_debug_buf_3, "display_item_command_menu: %d, %d", otmp->otyp, otmpsplit->otyp);
+                    debugprint("display_item_command_menu: %d, %d", otmp->otyp, otmpsplit->otyp);
                     (void)merged(&otmp, &otmpsplit); /* Merge the split object back to the original */
                 }
             }
@@ -4878,11 +4986,11 @@ free_pickinv_cache()
 }
 
 STATIC_OVL void
-add_inventory_menu_item(win, otmp, ilet, wizid, loadstonecorrectly, show_weights, want_reply, comparison_stats, wtcount_ptr)
+add_inventory_menu_item(win, otmp, ilet, wizid, loadstonecorrectly, show_weights, show_quick, want_reply, comparison_stats, wtcount_ptr)
 winid win;
 struct obj* otmp;
 char ilet;
-boolean wizid, loadstonecorrectly, want_reply, comparison_stats;
+boolean wizid, loadstonecorrectly, want_reply, comparison_stats, show_quick;
 int show_weights;
 int* wtcount_ptr;
 {
@@ -4909,9 +5017,9 @@ int* wtcount_ptr;
     memset(attrs, ATR_NONE, sizeof(attrs));
     memset(colors, NO_COLOR, sizeof(colors));
     Strcpy(objbuf,
-        show_weights > SHOWWEIGHTS_NONE ? (flags.inventory_weights_last ? doname_with_weight_last(otmp, loadstonecorrectly, iflags.perm_invent && !want_reply)
-            : doname_with_weight_first(otmp, loadstonecorrectly, iflags.perm_invent && !want_reply))
-        : doname_with_flags(otmp, iflags.perm_invent && !want_reply ? DONAME_HIDE_REMAINING_LIT_TURNS : 0, (char**)0, (char**)0));
+        show_weights > SHOWWEIGHTS_NONE ? (flags.inventory_weights_last ? doname_with_weight_last(otmp, loadstonecorrectly, iflags.perm_invent && !want_reply, show_quick ? DONAME_SHOW_QUICK_ITEMS : 0)
+            : doname_with_weight_first(otmp, loadstonecorrectly, iflags.perm_invent && !want_reply, show_quick ? DONAME_SHOW_QUICK_ITEMS : 0))
+        : doname_with_flags(otmp, (show_quick ? DONAME_SHOW_QUICK_ITEMS : 0) | (iflags.perm_invent && !want_reply ? DONAME_HIDE_REMAINING_LIT_TURNS : 0), (char**)0, (char**)0));
     struct extended_menu_info eminfo = obj_to_extended_menu_info(otmp);
     if (comparison_stats)
     {
@@ -4933,15 +5041,16 @@ int* wtcount_ptr;
  * any count returned from the menu selection is placed here.
  */
 STATIC_OVL char
-display_pickinv(lets, xtra_choice, query, want_reply, out_cnt, show_weights, headertext, addinventoryheader, wornonly)
+display_pickinv(lets, xtra_choice, query, want_reply, out_cnt, show_weights, show_quick, headertext, addinventoryheader, wornonly)
 const char *lets;
 char *xtra_choice; /* "fingers", pick hands rather than an object */
 char *query;
-boolean want_reply;
+boolean want_reply, show_quick;
 int64_t *out_cnt;
 int show_weights;
 const char* headertext;
-boolean addinventoryheader, wornonly;
+uchar addinventoryheader;
+boolean wornonly;
 {
     static const char not_carrying_anything[] = "Not carrying anything";
     struct obj *otmp, wizid_fakeobj;
@@ -5044,7 +5153,7 @@ boolean addinventoryheader, wornonly;
     sortedinvent = sortloot(&invent, sortflags, FALSE,
                             (boolean FDECL((*), (OBJ_P))) 0);
 
-    start_menu_ex(win, addinventoryheader ? GHMENU_STYLE_INVENTORY : GHMENU_STYLE_PICK_ITEM_LIST);
+    start_menu_ex(win, addinventoryheader == 2 ? GHMENU_STYLE_INVENTORY_EQUIPMENT : addinventoryheader ? GHMENU_STYLE_INVENTORY : GHMENU_STYLE_PICK_ITEM_LIST);
     any = zeroany;
     if (wizard && iflags.override_ID) 
     {
@@ -5122,14 +5231,14 @@ boolean addinventoryheader, wornonly;
        if (!classcount)
        {
            add_extended_menu(win, NO_GLYPH, &any,
-               0, 0, iflags.menu_headings, NO_COLOR,
+               0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
                "Favorites",
                MENU_UNSELECTED,
                menu_group_heading_info('\0'));
            classcount++;
            favorites_printed = TRUE;
        }
-       add_inventory_menu_item(win, otmp, ilet, wizid, loadstonecorrectly, show_weights, want_reply, comparison_stats && !otmp->owornmask, &wtcount);
+       add_inventory_menu_item(win, otmp, ilet, wizid, loadstonecorrectly, show_weights, show_quick, want_reply, comparison_stats && !otmp->owornmask, &wtcount);
    }
 
    /* Others by class */
@@ -5153,7 +5262,7 @@ nextclass:
             if (flags.sortpack && !classcount)
             {
                 add_extended_menu(win, NO_GLYPH, &any,
-                    0, 0, iflags.menu_headings, NO_COLOR,
+                    0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
                          let_to_name(*classlet, FALSE,
                                      (want_reply && iflags.menu_head_objsym)),
                          MENU_UNSELECTED,
@@ -5163,13 +5272,13 @@ nextclass:
             else if (!flags.sortpack && !classcount && favorites_printed)
             {
                 add_extended_menu(win, NO_GLYPH, &any,
-                    0, 0, iflags.menu_headings, NO_COLOR,
+                    0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
                     "Items",
                     MENU_UNSELECTED,
                     menu_group_heading_info('\0'));
                 classcount++;
             }
-            add_inventory_menu_item(win, otmp, ilet, wizid, loadstonecorrectly, show_weights, want_reply, comparison_stats && !otmp->owornmask, &wtcount);
+            add_inventory_menu_item(win, otmp, ilet, wizid, loadstonecorrectly, show_weights, show_quick, want_reply, comparison_stats && !otmp->owornmask, &wtcount);
         }
     }
     if (flags.sortpack) 
@@ -5225,6 +5334,8 @@ nextclass:
 
         if(wornonly)
             Strcpy(qbuf, "Worn Items");
+        else if (addinventoryheader == 2)
+            Strcpy(qbuf, "Equipment");
         else
             Strcpy(qbuf, "Inventory");
 
@@ -5243,7 +5354,7 @@ nextclass:
     n = select_menu(win,
                     wizid ? PICK_ANY : want_reply ? PICK_ONE : PICK_NONE,
                     &selected);
-    if (n > 0) 
+    if (n > 0)
     {
         if (wizid) 
         {
@@ -5276,7 +5387,7 @@ nextclass:
         free((genericptr_t) selected);
     } 
     else
-        ret = !n ? '\0' : '\033'; /* cancelled */
+        ret = !n ? '\0' : n == INVENTORY_SWAP_RESULT ? SWAP_LET : CANCEL_LET; /* cancelled */
 
     return ret;
 }
@@ -5516,24 +5627,24 @@ int show_weights;
  * was selected.
  */
 char
-display_inventory(lets, want_reply, show_weights)
+display_inventory(lets, want_reply, show_weights, show_quick)
 const char *lets;
-boolean want_reply;
+boolean want_reply, show_quick;
 int show_weights;
 {
     return display_pickinv(lets, (char *) 0, (char *) 0,
-                           want_reply, (int64_t *) 0, show_weights, "", FALSE, FALSE);
+                           want_reply, (int64_t *) 0, show_weights, show_quick, "", FALSE, FALSE);
 }
 
 char
-display_inventory_with_header(lets, want_reply, out_cnt, show_weights, wornonly)
+display_inventory_with_header(lets, want_reply, out_cnt, show_weights, show_quick, isequipment, wornonly)
 const char* lets;
-boolean want_reply, wornonly;
+boolean want_reply, show_quick, isequipment, wornonly;
 int64_t* out_cnt;
 int show_weights;
 {
     return display_pickinv(lets, (char*)0, (char*)0,
-        want_reply, out_cnt, show_weights, "", TRUE, wornonly);
+        want_reply, out_cnt, show_weights, show_quick, "", isequipment ? 2 : TRUE, isequipment ? 0 : wornonly);
 }
 
 /*
@@ -5576,8 +5687,8 @@ char avoidlet;
                     int gui_glyph = maybe_get_replaced_glyph(glyph, u.ux, u.uy, data_to_replacement_info(glyph, LAYER_OBJECT, otmp, (struct monst*)0, 0UL, 0UL, 0UL, MAT_NONE, 0));
                     add_extended_menu(win, gui_glyph,
                              &any, ilet, 0, ATR_NONE, NO_COLOR,
-                             (flags.inventory_weights_last ? doname_with_weight_last(otmp, TRUE, FALSE) : 
-                                 doname_with_weight_first(otmp, TRUE, FALSE)), MENU_UNSELECTED, obj_to_extended_menu_info(otmp));
+                             (flags.inventory_weights_last ? doname_with_weight_last(otmp, TRUE, FALSE, 0) : 
+                                 doname_with_weight_first(otmp, TRUE, FALSE, 0)), MENU_UNSELECTED, obj_to_extended_menu_info(otmp));
                 }
             }
             if (flags.sortpack && *++classlet)
@@ -6206,7 +6317,7 @@ dotypeinv()
     }
     if (query_objlist((char *) 0, &invent,
                       ((flags.invlet_constant ? USE_INVLET : 0)
-                       | INVORDER_SORT | OBJECT_COMPARISON),
+                       | INVORDER_SORT | OBJECT_COMPARISON | SHOW_QUICK),
                       &pick_list, PICK_NONE, this_type_only, SHOWWEIGHTS_INVENTORY) > 0)
         free((genericptr_t) pick_list);
     return 0;
@@ -6653,7 +6764,7 @@ boolean picked_some, explicit_cmd;
                 else
                     totalweight += otmp->owt;
 
-                Sprintf(buf, "%s", (flags.inventory_weights_last ? doname_with_price_and_weight_last(otmp, objects[LOADSTONE].oc_name_known) : doname_with_price_and_weight_first(otmp, objects[LOADSTONE].oc_name_known))); //Looking at what is on the ground
+                Sprintf(buf, "%s", (flags.inventory_weights_last ? doname_with_price_and_weight_last(otmp, objects[LOADSTONE].oc_name_known, FALSE) : doname_with_price_and_weight_first(otmp, objects[LOADSTONE].oc_name_known, FALSE))); //Looking at what is on the ground
                 Sprintf(buf2, "%2d - %s", count, ""); //Looking at what is on the ground
                 int attr = ATR_NONE;
                 int color = NO_COLOR;
@@ -6868,7 +6979,6 @@ print_things_here_to_window(VOID_ARGS)
             }
             else
             {
-                //Sprintf(buf2, "%s", item_name_buf); // (flags.inventory_weights_last ? doname_with_price_and_weight_last(otmp, objects[LOADSTONE].oc_name_known) : doname_with_price_and_weight_first(otmp, objects[LOADSTONE].oc_name_known)));
                 if (iflags.use_menu_color && get_menu_coloring(item_name_buf, &mcolor, &mattr))
                     putstr_ex(tmpwin, item_name_buf, mattr, mcolor, 0);
                 else
@@ -6950,7 +7060,7 @@ struct obj *obj;
     if (!obj || !isok(obj->ox, obj->oy))
         return;
 
-    Sprintf(priority_debug_buf_3, "stackobj: %d", obj->otyp);
+    debugprint("stackobj: %d", obj->otyp);
     for (otmp = level.objects[obj->ox][obj->oy]; otmp; otmp = otmp->nexthere)
         if (otmp != obj && merged(&obj, &otmp))
             break;
@@ -7158,7 +7268,7 @@ doprarm()
         if (uarmf)
             lets[ct++] = obj_to_let(uarmf);
         lets[ct] = 0;
-        (void) display_inventory(lets, FALSE, SHOWWEIGHTS_NONE);
+        (void) display_inventory(lets, FALSE, SHOWWEIGHTS_NONE, FALSE);
     }
     return 0;
 }
@@ -7178,7 +7288,7 @@ doprring()
         if (uright)
             lets[ct++] = obj_to_let(uright);
         lets[ct] = 0;
-        (void) display_inventory(lets, FALSE, SHOWWEIGHTS_NONE);
+        (void) display_inventory(lets, FALSE, SHOWWEIGHTS_NONE, FALSE);
     }
     return 0;
 }
@@ -7221,7 +7331,7 @@ doprtool()
     if (!ct)
         You1("are not using any tools.");
     else
-        (void) display_inventory(lets, FALSE, SHOWWEIGHTS_NONE);
+        (void) display_inventory(lets, FALSE, SHOWWEIGHTS_NONE, FALSE);
     return 0;
 }
 
@@ -7250,11 +7360,16 @@ doprinuse()
         {
             pickcnt = 0;
             return_to_inv = FALSE;
-            invlet = display_inventory_with_header(lets, TRUE, &pickcnt, SHOWWEIGHTS_INVENTORY, FALSE);
-            if (!invlet || invlet == '\033' || invlet == '\0')
+            invlet = display_inventory_with_header(lets, TRUE, &pickcnt, SHOWWEIGHTS_INVENTORY, TRUE, FALSE, FALSE);
+            if (!invlet || invlet == CANCEL_LET || invlet == '\0')
                 return 0;
 
-            if (flags.inventory_obj_cmd)
+            if (invlet == SWAP_LET)
+            {
+                doswapweapon();
+                return_to_inv = TRUE;
+            }
+            else if (flags.inventory_obj_cmd)
             {
                 int res = display_item_command_menu_by_invlet(invlet, pickcnt, & return_to_inv);
                 if (res || !return_to_inv)
@@ -7306,6 +7421,7 @@ uint64_t newsym_flags;
     {
         if (index(u.urooms, *in_rooms(otmp->ox, otmp->oy, 0)))
         {
+            debugprint_pos();
             char* o_shop = in_rooms(otmp->ox, otmp->oy, SHOPBASE);
             struct monst* shkp = shop_keeper(*o_shop);
             if (shkp && inhishop(shkp) && !Deaf && !muteshk(shkp) && !(otmp->speflags & SPEFLAGS_ADDED_TO_YOUR_BILL))
@@ -7318,7 +7434,7 @@ uint64_t newsym_flags;
         else
             (void) stolen_value(otmp, otmp->ox, otmp->oy, FALSE, FALSE);
     }
-    Sprintf(priority_debug_buf_3, "useupf_with_flags: %d", otmp->otyp);
+    debugprint("useupf_with_flags: %d", otmp->otyp);
     delobj_with_flags(otmp, newsym_flags);
     if (at_u && u.uundetected && hides_under(youmonst.data))
         (void) hideunder(&youmonst);
@@ -7500,9 +7616,7 @@ doorganize() /* inventory organizer by Del Lamb */
     char *objname, *uobjname, *otmpname, *uotmpname;
     const char *adj_type;
     boolean ever_mind = FALSE, collect;
-    Strcpy(debug_buf_2, "doorganize");
-    *debug_buf_3 = 0;
-    *debug_buf_4 = 0;
+    debugprint("doorganize");
 
     if (!invent) {
         You1("aren't carrying anything to adjust.");
@@ -7586,7 +7700,7 @@ doorganize() /* inventory organizer by Del Lamb */
         Sprintf(qbuf, "Adjust letter to what [%s]%s?", lets,
             invent ? " (? see used letters)" : "");
         //let = yn_function(qbuf, (char *)0, '\0', (char *)0);
-        let = yn_function_ex(YN_STYLE_GENERAL, ATR_NONE, NO_COLOR, NO_GLYPH, (const char*)0, qbuf, (const char*)0, '\0', (const char*)0, (const char*)0, 1UL);
+        let = yn_function_core(YN_STYLE_GENERAL, ATR_NONE, NO_COLOR, NO_GLYPH, (const char*)0, qbuf, (const char*)0, '\0', (const char*)0, (const char*)0, 1UL);
 #endif
         if (let == '?' || let == '*') {
             let = display_used_invlets(splitting ? obj->invlet : 0);
@@ -7601,7 +7715,7 @@ doorganize() /* inventory organizer by Del Lamb */
                but splitting to same slot is not */
             || (splitting && let == obj->invlet)) {
  noadjust:
-            Sprintf(priority_debug_buf_3, "doorganize: %d", obj->otyp);
+            debugprint("doorganize: %d", obj->otyp);
             if (splitting)
                 (void) merged(&splitting, &obj);
             if (!ever_mind)
@@ -7646,7 +7760,7 @@ doorganize() /* inventory organizer by Del Lamb */
                with compatible named ones; we only want that if it is
                the 'from' stack (obj) with a name and candidate (otmp)
                without one, not unnamed 'from' with named candidate. */
-            Sprintf(priority_debug_buf_3, "doorganize2: %d", otmp->otyp);
+            debugprint("doorganize2: %d", otmp->otyp);
             otmpname = has_oname(otmp) ? ONAME(otmp) : (char *) 0;
             uotmpname = has_uoname(otmp) ? UONAME(otmp) : (char*)0;
             if ((!otmpname || (objname && !strcmp(objname, otmpname)))
@@ -7679,13 +7793,13 @@ doorganize() /* inventory organizer by Del Lamb */
                         free((genericptr_t) objname), objname = 0;
                 }
 
-                Sprintf(priority_debug_buf_3, "doorganize3: %d", obj->otyp);
+                debugprint("doorganize3: %d", obj->otyp);
                 if (merged(&otmp, &obj)) {
                     adj_type = "Splitting and merging:";
                     obj = otmp;
                     extract_nobj(obj, &invent);
                 } else if (inv_cnt(FALSE) >= 52) {
-                    Sprintf(priority_debug_buf_3, "doorganize4: %d", obj->otyp);
+                    debugprint("doorganize4: %d", obj->otyp);
                     (void) merged(&splitting, &obj); /* undo split */
                     /* "inventory cannot accommodate any more items" */
                     Your("pack is too full.");
@@ -7846,7 +7960,7 @@ register struct obj *obj;
                      "that");
 
     if (contained_object_chain(obj)) {
-        n = query_objlist(qbuf, contained_object_chain_ptr(obj), INVORDER_SORT | OBJECT_COMPARISON,
+        n = query_objlist(qbuf, contained_object_chain_ptr(obj), INVORDER_SORT | OBJECT_COMPARISON | SHOW_QUICK,
                           &selected, PICK_NONE, allow_all, SHOWWEIGHTS_OTHER_PICKUP); //Looking at things in container's inventory far away
     } else {
         invdisp_nothing(qbuf, "(empty)");
@@ -7898,7 +8012,7 @@ boolean as_if_seen;
         only.x = x;
         only.y = y;
         if (query_objlist("Things that are buried here:",
-                          &level.buriedobjlist, INVORDER_SORT | OBJECT_COMPARISON,
+                          &level.buriedobjlist, INVORDER_SORT | OBJECT_COMPARISON | SHOW_QUICK,
                           &selected, PICK_NONE, only_here, SHOWWEIGHTS_PICKUP) > 0)
             free((genericptr_t) selected);
         only.x = only.y = 0;

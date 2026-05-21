@@ -202,7 +202,7 @@ docharacterstatistics(VOID_ARGS)
     putstr(datawin, ATR_HEADING, buf);
 
     int trait_count = 0;
-    int i;
+    int i, j;
 
     for (i = 0; i < MAX_TRAIT_DESCRIPTIONS; i++)
     {
@@ -226,6 +226,18 @@ docharacterstatistics(VOID_ARGS)
     {
         if (urole.trait_descriptions[i] && strcmp(urole.trait_descriptions[i], ""))
         {
+            boolean docontinue = FALSE;
+            for (j = 0; j < MAX_TRAIT_DESCRIPTIONS && urace.trait_descriptions[j] && *urace.trait_descriptions[j]; j++)
+            {
+                if (!strcmp(urace.trait_descriptions[j], urole.trait_descriptions[i]))
+                {
+                    docontinue = TRUE;
+                    break;
+                }
+            }
+            if (docontinue)
+                continue;
+
             trait_count++;
 
             char dbuf[BUFSZ * 2];
@@ -260,7 +272,8 @@ docharacterstatistics(VOID_ARGS)
     }
 
 
-
+    boolean known_props[MAX_PROPS] = { 0 };
+    
     /* Current intrinsics */
     Sprintf(buf, "Intrinsic and known extrinsic abilities:");
     putstr(datawin, ATR_HEADING, buf);
@@ -280,6 +293,7 @@ docharacterstatistics(VOID_ARGS)
         if (innate_intrinsic || obj || (temporary_intrinsic && !is_recurring))
         {
             intrinsic_count++;
+            known_props[i] = TRUE;
 
             char dbuf2[BUFSZ];
             char dbuf3[BUFSZ];
@@ -343,6 +357,27 @@ docharacterstatistics(VOID_ARGS)
         Sprintf(buf, " (None)");
         putstr(datawin, 0, buf);
     }
+
+    ///* Empty line, half size since the next line is a heading with its own margin */
+    //Strcpy(buf, " ");
+    //putstr(datawin, ATR_HALF_SIZE, buf);
+
+    /* Current rates */
+    Sprintf(buf, "Current known rates:");
+    putstr(datawin, ATR_HEADING, buf);
+
+    /* Nutrition consumption */
+    Sprintf(buf, " Nutrition usage:   %6.2f / turn", calchungry(known_props));
+    putstr(datawin, ATR_INDENT_AT_COLON, buf);
+
+    /* Regeneration */
+    Sprintf(buf, " HP regeneration:   %6.2f / turn", calculate_hp_regeneration(known_props));
+    putstr(datawin, ATR_INDENT_AT_COLON, buf);
+
+    /* Mana regeneration */
+    Sprintf(buf, " Mana regeneration: %6.2f / turn", calculate_mana_regeneration(known_props));
+    putstr(datawin, ATR_INDENT_AT_COLON, buf);
+
 
     /* Level-up intrinsics */
     for(i = 1; i <= 2; i++)
@@ -465,12 +500,21 @@ char* buf;
 
     int len = (int)strlen(buf);
     char* p;
-    boolean found = FALSE;
-    for (p = buf; (int)(p - buf) < len - 3; p++)
+    boolean found = FALSE, useplus = FALSE, usenone = FALSE;
+    for (p = buf - 1; (int)(p - buf) < len - 3; p++)
     {
-        if (*p == ' ' && *(p + 1) >= '0' && *(p + 1) <= '9' && *(p + 2) <= 'd' && *(p + 3) >= '0' && *(p + 3) <= '9')
+        if ((p == buf - 1 || *p == ' ' || *p == '+')
+            && (
+                (*(p + 1) >= '0' && *(p + 1) <= '9' && *(p + 2) == 'd' && *(p + 3) >= '0' && *(p + 3) <= '9') ||
+                ((int)(p - buf) < len - 4 && *(p + 1) >= '0' && *(p + 1) <= '9' && *(p + 2) >= '0' && *(p + 2) <= '9' && *(p + 3) == 'd' && *(p + 4) >= '0' && *(p + 4) <= '9')
+                )
+           )
         {
             found = TRUE;
+            if (p == buf - 1)
+                usenone = TRUE;
+            else
+                useplus = *p == '+';
             break;
         }
     }
@@ -482,16 +526,26 @@ char* buf;
         {
             char* qp = strstr(p + 1, "+");
             char* qs = strstr(p + 1, " ");
-            if (qs)
+            //if (qs)
             {
                 int dice = 0;
                 int diesize = 0;
                 int plus = 0;
                 int res = 0;
-                if (qp && qp < qs && *(qp + 1) >= '0' && *(qp + 1) <= '9')
-                    res = sscanf(p, " %dd%d+%d", &dice, &diesize, &plus);
+                if (qp && (!qs || qp < qs) && (int)(qp - buf) <= len - 1 && *(qp + 1) >= '0' && *(qp + 1) <= '9')
+                {
+                    if (usenone)
+                        res = sscanf(p + 1, "%dd%d+%d", &dice, &diesize, &plus);
+                    else
+                        res = sscanf(p, useplus ? "+%dd%d+%d" : " %dd%d+%d", &dice, &diesize, &plus);
+                }
                 else
-                    res = sscanf(p, " %dd%d", &dice, &diesize);
+                {
+                    if (usenone)
+                        res = sscanf(p + 1, "%dd%d", &dice, &diesize);
+                    else
+                        res = sscanf(p, useplus ? "+%dd%d" : " %dd%d", &dice, &diesize);
+                }
 
                 if (res >= 2)
                 {
@@ -501,10 +555,11 @@ char* buf;
                     int minvalue = dice + plus;
                     int maxvalue = dice * diesize + plus;
                     if (minvalue == maxvalue)
-                        Sprintf(tptr, " %d", minvalue);
+                        Sprintf(tptr, usenone ? "%d": useplus ? "+%d" : " %d", minvalue);
                     else
-                        Sprintf(tptr, " %d-%d", minvalue, maxvalue);
-                    Strcat(tptr, qs);
+                        Sprintf(tptr, usenone ? "%d-%d" : useplus ? "+%d-%d" : " %d-%d", minvalue, maxvalue);
+                    if (qs)
+                        Strcat(tptr, qs);
                     Strcpy(buf, tmpstr);
                     free(tmpstr);
                 }
@@ -1111,11 +1166,19 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
         putstr(datawin, ATR_INDENT_AT_COLON, buf);
 
         /* Nutritinal value */
-        if (obj ? is_edible(obj) : is_otyp_normally_edible(otyp))
+        if (obj ? is_obj_normally_edible(obj) : is_otyp_normally_edible(otyp))
         {
-            Sprintf(buf2, "%u rounds", !obj ? objects[otyp].oc_nutrition : obj->oeaten ? obj->oeaten : obj_nutrition(obj, &youmonst));
+            unsigned nutvalue = !obj ? objects[otyp].oc_nutrition : obj->oeaten ? mon_obj_oeaten_value(obj, &youmonst) : mon_obj_nutrition_value(obj, &youmonst);
+            Sprintf(buf2, "%u turn%s", nutvalue, plur(nutvalue));
             Sprintf(buf, "Nutritional value:      %s", buf2);            
             putstr(datawin, ATR_INDENT_AT_COLON, buf);
+            unsigned basenutvalue = !obj ? objects[otyp].oc_nutrition : obj->oeaten ? obj->oeaten : obj_nutrition(obj);
+            if (basenutvalue != nutvalue)
+            {
+                Sprintf(buf2, "%u turn%s", basenutvalue, plur(basenutvalue));
+                Sprintf(buf, "Base nutritional value: %s", buf2);
+                putstr(datawin, ATR_INDENT_AT_COLON, buf);
+            }
         }
         if (obj && otyp == EGG && obj->corpsenm >= LOW_PM && obj->known && (mvitals[obj->corpsenm].mvflags & MV_KNOWS_EGG))
         {
@@ -1218,6 +1281,9 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
                         break;
                     case EDIBLEFX_CURE_TELEPORTITIS:
                         Strcpy(buf2, "Cures teleportitis");
+                        break;
+                    case EDIBLEFX_CURE_HALLUCINATION:
+                        Strcpy(buf2, "Cures hallucination");
                         break;
                     default:
                         break;
@@ -1381,7 +1447,7 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
                     {
                         int polemin = 1, polemax = 2;
                         get_pole_type_weapon_min_max_distances(obj, &youmonst, &polemin, &polemax);
-                        Sprintf(buf2, "Yes, for a ranged attack (min: %.0f\', max: %.0f\')", floor(sqrt((double)polemin) * 5), ceil(sqrt((double)polemax) * 5));
+                        Sprintf(buf2, "Yes, for a ranged attack (min: %.0f sq. max: %.0f sq.)", floor(sqrt((double)polemin)), ceil(sqrt((double)polemax)));
                     }
                     else
                     {
@@ -1452,8 +1518,8 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
         if (objects[otyp].oc_multishot_style > 0 || is_otyp_launcher(otyp) || is_otyp_nonmelee_throwing_weapon(otyp)) {
 
             Sprintf(buf, "%s  %s", 
-                is_otyp_launcher(otyp) ? "Shots per round:      " : 
-                is_otyp_nonmelee_throwing_weapon(otyp) ? "Throws per round:     " : "Attacks per round:    ", 
+                is_otyp_launcher(otyp) ? "Shots per turn:       " : 
+                is_otyp_nonmelee_throwing_weapon(otyp) ? "Throws per turn:      " : "Attacks per turn:     ", 
                 multishot_style_names[objects[otyp].oc_multishot_style]);
 
             putstr(datawin, ATR_INDENT_AT_COLON, buf);
@@ -1466,7 +1532,7 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
             if(!obj && objects[otyp].oc_range < 0)
                 Strcpy(buf, "Ammunition range:       Based on strength");
             else 
-                Sprintf(buf, "Ammunition range:       %d'", max(1, baserange) * 5);
+                Sprintf(buf, "Ammunition range:       %d squares", max(1, baserange));
             putstr(datawin, ATR_INDENT_AT_COLON, buf);
         }
 
@@ -1501,11 +1567,11 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
             else
                 range = weapon_range(obj, (struct obj*)0);
 
-            Sprintf(buf2, "%d", max(1, range) * 5);
+            Sprintf(buf2, "%d squares", max(1, range));
             if(thrown)
-                Sprintf(buf, "Throw distance:         %s'", buf2);
+                Sprintf(buf, "Throw distance:         %s", buf2);
             else
-                Sprintf(buf, "Range when fired:       %s'", buf2);
+                Sprintf(buf, "Range when fired:       %s", buf2);
             
             putstr(datawin, ATR_INDENT_AT_COLON, buf);
         }
@@ -1700,12 +1766,45 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
         }
 
         /* Damage type - Main */
-        if (printmaindmgtype && objects[otyp].oc_damagetype != AD_PHYS)
+        if (printmaindmgtype)
         {
             char dmgttext[BUFSZ] = "";
-            Strcpy(dmgttext, get_damage_type_text(objects[otyp].oc_damagetype));
-            *dmgttext = highc(*dmgttext);
-            if (strcmp(dmgttext, "") != 0)
+            if (is_otyp_launcher(otyp))
+            {
+                Strcpy(dmgttext, "By ammunition");
+            }
+            else if (!objects[otyp].oc_dir)
+            {
+                Strcpy(dmgttext, "Bludgeoning");
+            }
+            else
+            {
+                if (objects[otyp].oc_dir & PIERCE)
+                {
+                    Strcpy(dmgttext, "Piercing");
+                }
+                if (objects[otyp].oc_dir & SLASH)
+                {
+                    boolean has_prev = *dmgttext != 0;
+                    if (has_prev)
+                        Strcat(dmgttext, ", ");
+                    Strcat(dmgttext, "slashing");
+                    if (!has_prev)
+                        *dmgttext = highc(*dmgttext);
+                }
+            }
+            if (objects[otyp].oc_damagetype != AD_PHYS)
+            {
+                boolean has_prev = *dmgttext != 0;
+                if (has_prev)
+                    Strcat(dmgttext, ", ");
+                char dmgtypebuf[BUFSZ] = "";
+                Strcpy(dmgtypebuf, get_damage_type_text(objects[otyp].oc_damagetype));
+                if (!has_prev)
+                    *dmgtypebuf = highc(*dmgtypebuf);
+                Strcat(dmgttext, dmgtypebuf);
+            }
+            if (*dmgttext)
             {
                 Sprintf(buf, "Damage type:            %s", dmgttext);
                 putstr(datawin, ATR_INDENT_AT_COLON, buf);
@@ -1866,17 +1965,18 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
             wep_avg_dmg += dmg_bonus;
             wep_multipliable_avg_dmg += dmg_bonus;
         }
-        else if (obj)
-        {
-            /* Otherwise get full melee strength damage bonus */
-            double str_bonus = strength_damage_bonus_core(ACURR(A_STR), TRUE);
-            Sprintf(buf, "Strength damage bonus:  %s%.1f on average",
-                str_bonus >= 0 ? "+" : "", str_bonus);
-            putstr(datawin, ATR_INDENT_AT_COLON, buf);
+        /* Ammos should not get any strength bonus */
+        //else if (obj)
+        //{
+        //    /* Otherwise get full melee strength damage bonus */
+        //    double str_bonus = strength_damage_bonus_core(ACURR(A_STR), TRUE);
+        //    Sprintf(buf, "Strength damage bonus:  %s%.1f on average",
+        //        str_bonus >= 0 ? "+" : "", str_bonus);
+        //    putstr(datawin, ATR_INDENT_AT_COLON, buf);
 
-            wep_avg_dmg += str_bonus;
-            wep_multipliable_avg_dmg += str_bonus;
-        }
+        //    wep_avg_dmg += str_bonus;
+        //    wep_multipliable_avg_dmg += str_bonus;
+        //}
 
         if (objects[otyp].oc_hitbonus != 0)
         {
@@ -2113,7 +2213,7 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
                 //    Strcat(buf, plusbuf);
                 //}
 
-                Sprintf(plusbuf, " round%s", (objects[otyp].oc_spell_dur_dice == 0 && objects[otyp].oc_spell_dur_diesize == 0 && applied_plus == 1) ? "" : "s");
+                Sprintf(plusbuf, " turn%s", (objects[otyp].oc_spell_dur_dice == 0 && objects[otyp].oc_spell_dur_diesize == 0 && applied_plus == 1) ? "" : "s");
                 Strcat(buf, plusbuf);
 
                 if (objects[otyp].oc_spell_dur_buc_plus != 0 && obj && !obj->bknown)
@@ -2228,7 +2328,7 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
                 else if (objects[otyp].oc_flags5 & O5_EFFECT_IS_MANA)
                     Strcpy(plusbuf, " mana");
                 else
-                    Sprintf(plusbuf, " round%s", (dice == 0 && objects[otyp].oc_potion_normal_diesize == 0 && plus == 1) ? "" : "s");
+                    Sprintf(plusbuf, " turn%s", (dice == 0 && objects[otyp].oc_potion_normal_diesize == 0 && plus == 1) ? "" : "s");
                 Strcat(buf, plusbuf);
 
                 if(objects[otyp].oc_flags5 & O5_EFFECT_FOR_BLESSED_ONLY)
@@ -2288,7 +2388,7 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
                 else if (objects[otyp].oc_flags5 & O5_EFFECT_IS_MANA)
                     Strcpy(plusbuf, " mana");
                 else
-                    Sprintf(plusbuf, " round%s", (dice == 0 && objects[otyp].oc_potion_breathe_diesize == 0 && plus == 1) ? "" : "s");
+                    Sprintf(plusbuf, " turn%s", (dice == 0 && objects[otyp].oc_potion_breathe_diesize == 0 && plus == 1) ? "" : "s");
                 Strcat(buf, plusbuf);
 
                 if (objects[otyp].oc_flags5 & O5_EFFECT_FOR_BLESSED_ONLY)
@@ -2465,7 +2565,7 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
                 //    Strcat(buf, plusbuf);
                 //}
 
-                Sprintf(plusbuf, " round%s", (dice == 0 && objects[otyp].oc_potion_nutrition_diesize == 0 && plus == 1) ? "" : "s");
+                Sprintf(plusbuf, " turn%s", (dice == 0 && objects[otyp].oc_potion_nutrition_diesize == 0 && plus == 1) ? "" : "s");
                 Strcat(buf, plusbuf);
                 putstr(datawin, ATR_INDENT_AT_COLON, buf);
             }
@@ -2751,6 +2851,7 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
         if (obj->opoisoned)
         {
             Sprintf(buf, "Poisoned status:        Poisoned (+2d6 poison damage)");
+            convert_dice_to_ranges(buf);
             wep_avg_dmg += 7.0;
             putstr(datawin, ATR_INDENT_AT_COLON, buf);
         }
@@ -2768,6 +2869,7 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
                 obj->elemental_enchantment == LIGHTNING_ENCHANTMENT ? 21.0 :
                 obj->elemental_enchantment == DEATH_ENCHANTMENT ? 0.0 : 0.0;
 
+            convert_dice_to_ranges(buf);
             putstr(datawin, ATR_INDENT_AT_COLON, buf);
         }
     }
@@ -2807,19 +2909,19 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
 
     if (stats_known && objects[otyp].oc_item_cooldown > 0)
     {
-        Sprintf(buf, "Cooldown time:          %d rounds", (int)objects[otyp].oc_item_cooldown);
+        Sprintf(buf, "Cooldown time:          %d turn%s", (int)objects[otyp].oc_item_cooldown, plur((int)objects[otyp].oc_item_cooldown));
         putstr(datawin, ATR_INDENT_AT_COLON, buf);
 
         if (obj && obj->cooldownleft > 0)
         {
-            Sprintf(buf, "Cooldown left:          %d rounds", (int)obj->cooldownleft);
+            Sprintf(buf, "Cooldown left:          %d turn%s", (int)obj->cooldownleft, plur((int)obj->cooldownleft));
             putstr(datawin, ATR_INDENT_AT_COLON, buf);
         }
     }
 
     if (obj && stats_known && obj->repowerleft > 0)
     {
-        Sprintf(buf, "Repowering time left:   %d rounds", (int)obj->repowerleft);
+        Sprintf(buf, "Repowering time left:   %d turn%s", (int)obj->repowerleft, plur((int)obj->repowerleft));
         putstr(datawin, ATR_INDENT_AT_COLON, buf);
     }
 
@@ -2831,7 +2933,7 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
 
     if (obj && stats_known && obj->invokeleft > 0)
     {
-        Sprintf(buf, "Invoke time left:       %d rounds", (int)obj->invokeleft);
+        Sprintf(buf, "Invoke time left:       %d turn%s", (int)obj->invokeleft, plur((int)obj->invokeleft));
         putstr(datawin, ATR_INDENT_AT_COLON, buf);
     }
 
@@ -3683,7 +3785,7 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
             || (ocflags6 & (O6_THROWING_REQUIRES_STR_18_00))
             || otyp_shines_magical_light(otyp)
             || (obj && has_obj_mythic_fire_resistance(obj)) || (obj && has_obj_mythic_cold_resistance(obj)) || (obj && has_obj_mythic_shock_resistance(obj))
-            || is_otyp_special_praying_item(otyp) || otyp_consumes_nutrition_every_20_rounds(otyp)
+            || is_otyp_special_praying_item(otyp) || otyp_consumes_nutrition_every_20_turns(otyp)
             || (obj ? is_death_enchantable(obj) : is_otyp_death_enchantable(otyp)) //|| is_otyp_elemental_enchantable(otyp) 
             )
         {
@@ -3835,10 +3937,10 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
                 Sprintf(buf, " %2d - If blessed, shimmers when it is safe to pray", powercnt);
                 putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
             }
-            if (otyp_consumes_nutrition_every_20_rounds(otyp))
+            if (otyp_consumes_nutrition_every_20_turns(otyp))
             {
                 powercnt++;
-                Sprintf(buf, " %2d - Consumes nutrition every 20 rounds when worn", powercnt);
+                Sprintf(buf, " %2d - Consumes nutrition every 20 turns when worn", powercnt);
                 putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
             }
             if (ocflags5 & O5_MBAG_DESTROYING_ITEM)
@@ -3879,8 +3981,10 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
         /* Corpse properties */
         if (obj && is_obj_rotting_corpse(obj) && obj->corpsenm > NON_PM && obj->corpsenm < NUM_MONSTERS)
         {
-            if (mvitals[obj->corpsenm].mvflags & MV_KNOWS_CORPSE)
+            if ((mvitals[obj->corpsenm].mvflags & MV_KNOWS_CORPSE) || Corpse_property_appraisal 
+                || maybe_polyd(is_gnoll(youmonst.data), Race_if(PM_GNOLL)) || Role_if(PM_HEALER))
             {
+                mvitals[obj->corpsenm].mvflags |= MV_KNOWS_CORPSE;
                 Sprintf(buf, "Corpse properties:");
                 putstr(datawin, ATR_HEADING, buf);
 
@@ -4083,7 +4187,7 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
 
                     //if (artilist[obj->oartifact].inv_duration_dice > 0 && artilist[obj->oartifact].inv_duration_diesize > 0)
                     //{
-                    //    Sprintf(buf, "      * Effect duration is %dd%d%s rounds", artilist[obj->oartifact].inv_duration_dice, artilist[obj->oartifact].inv_duration_diesize, plusbuf);
+                    //    Sprintf(buf, "      * Effect duration is %dd%d%s turns", artilist[obj->oartifact].inv_duration_dice, artilist[obj->oartifact].inv_duration_diesize, plusbuf);
                     //}
                     //else
                     //    Sprintf(buf, "      * Effect duration is %s", plusbuf);
@@ -4112,7 +4216,7 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
 
             if (artilist[obj->oartifact].repower_time > 0)
             {
-                Sprintf(buf, "      * Repowers over %d round%s", artilist[obj->oartifact].repower_time, plur(artilist[obj->oartifact].repower_time));
+                Sprintf(buf, "      * Repowers over %d turn%s", artilist[obj->oartifact].repower_time, plur(artilist[obj->oartifact].repower_time));
                 putstr(datawin, ATR_INDENT_AT_ASTR, buf);
             }
 
@@ -4742,13 +4846,13 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
                 powercnt++;
                 const char* applicable_verb = is_thrown_weapon_only(obj) ? "throw" : is_launcher(obj) || ammo_and_launcher(obj, applicable_launcher) ? "fire" : "strike";
                 if (average_multi_shot_times == 1.0)
-                    Sprintf(buf, " %2d - You %s once per round", powercnt, applicable_verb);
+                    Sprintf(buf, " %2d - You %s once per turn", powercnt, applicable_verb);
                 else if (average_multi_shot_times == 2.0)
-                    Sprintf(buf, " %2d - You %s twice per round", powercnt, applicable_verb);
+                    Sprintf(buf, " %2d - You %s twice per turn", powercnt, applicable_verb);
                 else if (average_multi_shot_times == 3.0)
-                    Sprintf(buf, " %2d - You %s three times per round", powercnt, applicable_verb);
+                    Sprintf(buf, " %2d - You %s three times per turn", powercnt, applicable_verb);
                 else
-                    Sprintf(buf, " %2d - You %s an average of %.1f time%s per round", powercnt, applicable_verb, average_multi_shot_times, plur(average_multi_shot_times));
+                    Sprintf(buf, " %2d - You %s an average of %.1f time%s per turn", powercnt, applicable_verb, average_multi_shot_times, plur(average_multi_shot_times));
 
                 putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
 
@@ -4763,12 +4867,12 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
                 }
 
                 powercnt++;
-                Sprintf(buf, " %2d - Your basic average damage is %.1f per round", powercnt, wep_avg_dmg);
+                Sprintf(buf, " %2d - Your basic average damage is %.1f per turn", powercnt, wep_avg_dmg);
                 putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
                 if (wep_all_extra_avg_dmg != 0)
                 {
                     powercnt++;
-                    Sprintf(buf, " %2d - Your average damage with extras is %.1f per round", powercnt, wep_avg_dmg + wep_all_extra_avg_dmg);
+                    Sprintf(buf, " %2d - Your average damage with extras is %.1f per turn", powercnt, wep_avg_dmg + wep_all_extra_avg_dmg);
                     putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
                 }
 
@@ -4782,17 +4886,17 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
                     else
                         Strcpy(dmgbuf, "further");
                     powercnt++;
-                    Sprintf(buf, " %2d - %s will cause %s damage per round", powercnt, uquiver ? Yname2(uquiver) : "Your ammo", dmgbuf);
+                    Sprintf(buf, " %2d - %s will cause %s damage per turn", powercnt, uquiver ? Yname2(uquiver) : "Your ammo", dmgbuf);
                     putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
                     if (ammo_stats.stats_set && ammo_stats.weapon_stats_printed)
                     {
                         powercnt++;
-                        Sprintf(buf, " %2d - Your average damage with ammo is %.1f per round", powercnt, wep_avg_dmg + ammo_stats.avg_damage);
+                        Sprintf(buf, " %2d - Your average damage with ammo is %.1f per turn", powercnt, wep_avg_dmg + ammo_stats.avg_damage);
                         putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
                         if (wep_all_extra_avg_dmg != 0)
                         {
                             powercnt++;
-                            Sprintf(buf, " %2d - Your average damage with ammo and extras is %.1f per round", powercnt, wep_avg_dmg + wep_all_extra_avg_dmg + ammo_stats.avg_damage);
+                            Sprintf(buf, " %2d - Your average damage with ammo and extras is %.1f per turn", powercnt, wep_avg_dmg + wep_all_extra_avg_dmg + ammo_stats.avg_damage);
                             putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
                         }
                     }
@@ -4807,17 +4911,17 @@ struct item_description_stats* stats_ptr; /* If non-null, only returns item stat
                     else
                         Strcpy(dmgbuf, "further");
                     powercnt++;
-                    Sprintf(buf, " %2d - %s will cause %s damage per round", powercnt, applicable_launcher ? Yname2(applicable_launcher) : "Your launcher", dmgbuf);
+                    Sprintf(buf, " %2d - %s will cause %s damage per turn", powercnt, applicable_launcher ? Yname2(applicable_launcher) : "Your launcher", dmgbuf);
                     putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
                     if (launcher_stats.stats_set && launcher_stats.weapon_stats_printed)
                     {
                         powercnt++;
-                        Sprintf(buf, " %2d - Your average damage with launcher is %.1f per round", powercnt, wep_avg_dmg + launcher_stats.avg_damage);
+                        Sprintf(buf, " %2d - Your average damage with launcher is %.1f per turn", powercnt, wep_avg_dmg + launcher_stats.avg_damage);
                         putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
                         if (wep_all_extra_avg_dmg != 0)
                         {
                             powercnt++;
-                            Sprintf(buf, " %2d - Your average damage with launcher and extras is %.1f per round", powercnt, wep_avg_dmg + wep_all_extra_avg_dmg + launcher_stats.avg_damage);
+                            Sprintf(buf, " %2d - Your average damage with launcher and extras is %.1f per turn", powercnt, wep_avg_dmg + wep_all_extra_avg_dmg + launcher_stats.avg_damage);
                             putstr(datawin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
                         }
                     }
@@ -5091,6 +5195,8 @@ struct permonst* ptr;
 {
     if (!ptr)
         return 0;
+
+    issue_breadcrumb3("monsterdescription_core", mon ? (int)mon->mnum : (int)(ptr - &mons[0]), mon ? ((mon == &youmonst ? 1 : 0) | (mon != &youmonst && is_tame(mon) ? 2 : 0) | (mon->data ? 4 : 0)) : -1);
 
     winid datawin = WIN_ERR;
     int glyph = mon ? any_mon_to_glyph(mon, rn2_on_display_rng) : (int)(ptr - &mons[0]) + GLYPH_MON_OFF;
@@ -5475,6 +5581,7 @@ boolean pushing;
             if (fills_up && u.uinwater && distu(rx, ry) == 0) 
             {
                 u.uinwater = 0;
+                debugprint_pos();
                 docrt();
                 vision_full_recalc = 1;
                 play_environment_ambient_sounds();
@@ -5496,9 +5603,7 @@ boolean pushing;
         }
 
         /* boulder is now gone */
-        Sprintf(priority_debug_buf_2, "boulder_hits_pool: %d", otmp->otyp);
-        Sprintf(priority_debug_buf_3, "boulder_hits_pool: %d", otmp->otyp);
-        Sprintf(priority_debug_buf_4, "boulder_hits_pool: %d", otmp->otyp);
+        debugprint("boulder_hits_pool: %d", otmp->otyp);
         if (pushing)
             delobj(otmp);
         else
@@ -5648,7 +5753,7 @@ const char *verb;
             deltrap(t);
         if (obj)
         {
-            Sprintf(priority_debug_buf_2, "flooreffects: %d", obj->otyp);
+            debugprint("flooreffects: %d", obj->otyp);
             useupf(obj, 1L);
         }
         bury_objs(x, y);
@@ -5719,18 +5824,22 @@ register struct obj *obj;
     if (Blind)
         return;
 
-    if (obj->oclass != COIN_CLASS) {
+    if (obj->oclass != COIN_CLASS) 
+    {
         /* KMH, conduct */
         if (!u.uconduct.gnostic++)
             livelog_printf(LL_CONDUCT,
                 "eschewed atheism, by dropping %s on an altar",
                 doname(obj));
-    } else {
+    } 
+    else 
+    {
         /* coins don't have bless/curse status */
         obj->blessed = obj->cursed = 0;
     }
 
-    if (obj->blessed || obj->cursed) {
+    if (obj->blessed || obj->cursed) 
+    {
         const char* hclr = hcolor_multi_buf1(obj->blessed ? NH_AMBER : NH_BLACK);
         //multicolor_buffer[2] = multicolor_buffer[1];
         There_ex(ATR_NONE, Hallucination ? CLR_MSG_HALLUCINATED : obj->blessed ? CLR_MSG_POSITIVE : CLR_MSG_NEGATIVE, // no_multiattrs, multicolor_buffer, 
@@ -5738,11 +5847,19 @@ register struct obj *obj;
             an_prefix(hclr), hclr, " flash", doname(obj),
               otense(obj, "hit"));
         if (!Hallucination)
+        {
             obj->bknown = 1;
-    } else {
+            issue_achievement(GUI_ACHIEVEMENT_IDENTIFIED_BLESSEDNESS_ON_ALTAR);
+        }
+    } 
+    else 
+    {
         pline("%s %s on the altar.", Doname2(obj), otense(obj, "land"));
         if (obj->oclass != COIN_CLASS)
+        {
             obj->bknown = 1;
+            issue_achievement(GUI_ACHIEVEMENT_IDENTIFIED_BLESSEDNESS_ON_ALTAR);
+        }
     }
 }
 
@@ -5860,8 +5977,8 @@ register struct obj *obj;
         pline_The_ex1(ATR_NONE, CLR_MSG_ATTENTION, "ring is regurgitated!");
  giveback:
         obj->in_use = FALSE;
-        dropxf(obj);
-        trycall(obj);
+        if (!dropxf(obj))
+            trycall(obj);
         return;
     case RIN_LEVITATION:
         pline_The_ex1(ATR_NONE, CLR_MSG_ATTENTION, "sink quivers upward for a moment.");
@@ -5935,7 +6052,7 @@ register struct obj *obj;
                           otense(otmp, "vanish"));
                     ideed = TRUE;
                 }
-                Sprintf(priority_debug_buf_3, "dosinkring: %d", otmp->otyp);
+                debugprint("dosinkring2: %d", otmp->otyp);
                 delobj(otmp);
             }
         }
@@ -6027,7 +6144,7 @@ register struct obj *obj;
     if (!rn2(20) && !nosink) {
         pline_The("sink backs up, leaving %s.", doname(obj));
         obj->in_use = FALSE;
-        dropxf(obj);
+        (void)dropxf(obj);
     } else if (!rn2(5)) {
         freeinv(obj);
         obj->in_use = FALSE;
@@ -6037,9 +6154,7 @@ register struct obj *obj;
     }
     else
     {
-        Sprintf(priority_debug_buf_2, "dosinkring: %d", obj->otyp);
-        Strcpy(priority_debug_buf_3, "dosinkring");
-        Strcpy(priority_debug_buf_4, "dosinkring");
+        debugprint("dosinkring1: %d", obj->otyp);
         useup(obj);
     }
 }
@@ -6160,7 +6275,7 @@ register struct obj *obj;
             if (obj->oclass == COIN_CLASS)
                 context.botl = 1;
             freeinv(obj);
-            hitfloor(obj, TRUE);
+            (void)hitfloor(obj, TRUE);
             //if (levhack)
             //    float_down(I_SPECIAL | TIMEOUT, W_ARTIFACT_INVOKED | W_ARTIFACT_CARRIED);
             return 1;
@@ -6168,7 +6283,7 @@ register struct obj *obj;
         if (!IS_ALTAR(levl[u.ux][u.uy].typ) && flags.verbose)
             You("drop %s.", doname(obj));
     }
-    dropx(obj);
+    (void)dropx(obj);
     return 1;
 }
 
@@ -6182,7 +6297,8 @@ register struct obj* obj;
 /* dropx - take dropped item out of inventory;
    called in several places - may produce output
    (eg ship_object() and dropy() -> sellobj() both produce output) */
-void
+/* returns TRUE if obj is gone */
+boolean
 dropx(obj)
 register struct obj *obj;
 {
@@ -6192,17 +6308,18 @@ register struct obj *obj;
     freeinv(obj);
     if (!u.uswallow) {
         if (ship_object(obj, u.ux, u.uy, FALSE))
-            return;
+            return TRUE;
         if (IS_ALTAR(levl[u.ux][u.uy].typ))
             doaltarobj(obj); /* set bknown */
     }
-    dropy(obj);
+    return dropy(obj);
 }
 
 /* dropxf - take dropped item out of inventory;
    called in several places - may produce output
    (eg ship_object() and dropy() -> sellobj() both produce output) */
-void
+/* returns TRUE if obj is gone */
+boolean
 dropxf(obj)
 register struct obj* obj;
 {
@@ -6213,32 +6330,35 @@ register struct obj* obj;
     obj_set_found(obj);
     if (!u.uswallow) {
         if (ship_object(obj, u.ux, u.uy, FALSE))
-            return;
+            return TRUE;
         if (IS_ALTAR(levl[u.ux][u.uy].typ))
             doaltarobj(obj); /* set bknown */
     }
-    dropy(obj);
+    return dropy(obj);
 }
 
 /* dropy - put dropped object at destination; called from lots of places */
-void
+/* returns TRUE if obj is gone */
+boolean
 dropy(obj)
 struct obj *obj;
 {
-    dropz(obj, FALSE);
+    return dropz(obj, FALSE);
 }
 
 /* dropyf - put dropped object at destination; called from lots of places */
-void
+/* returns TRUE if obj is gone */
+boolean
 dropyf(obj)
 struct obj* obj;
 {
     obj_set_found(obj);
-    dropz(obj, FALSE);
+    return dropz(obj, FALSE);
 }
 
 /* dropz - really put dropped object at its destination... */
-void
+/* returns TRUE if obj is gone */
+boolean
 dropz(obj, with_impact)
 struct obj *obj;
 boolean with_impact;
@@ -6255,16 +6375,11 @@ boolean with_impact;
         setuswapwep((struct obj*) 0, W_SWAPWEP2);
 
     if (!u.uswallow && flooreffects(obj, u.ux, u.uy, "drop"))
-    {
-        if (iflags.using_gui_sounds && !ui_has_input())
-        {
-            play_object_floor_sound_at_location(obj, OBJECT_SOUND_TYPE_DROP, u.ux, u.uy, Underwater);
-            delay_output_milliseconds(ITEM_PICKUP_DROP_DELAY);
-        }
-        return;
-    }
+        return TRUE;
+
+    boolean res = FALSE;
     /* uswallow check done by GAN 01/29/87 */
-    if (u.uswallow) 
+    if (u.uswallow)
     {
         boolean could_petrify = FALSE;
         boolean could_poly = FALSE;
@@ -6286,7 +6401,8 @@ boolean with_impact;
             if (is_unpaid(obj))
                 (void) stolen_value(obj, u.ux, u.uy, TRUE, FALSE);
 
-            int was_obj_freed = mpickobj(u.ustuck, obj);
+            boolean was_obj_freed = mpickobj(u.ustuck, obj);
+            res = was_obj_freed;
 
             if (is_animal(u.ustuck->data)) 
             {
@@ -6296,8 +6412,9 @@ boolean with_impact;
                                    FALSE, could_slime);
                     if (!was_obj_freed)
                     {
-                        Sprintf(priority_debug_buf_3, "dropz1: %d", obj->otyp);
+                        debugprint("dropz1: %d", obj->otyp);
                         delobj(obj); /* corpse is digested */
+                        res = TRUE;
                     }
                 }
                 else if (could_petrify) 
@@ -6308,8 +6425,9 @@ boolean with_impact;
                     /* Don't leave a cockatrice corpse in a statue */
                     if (!u.uswallow && !was_obj_freed)
                     {
-                        Sprintf(priority_debug_buf_3, "dropz2: %d", obj->otyp);
+                        debugprint("dropz2: %d", obj->otyp);
                         delobj(obj);
+                        res = TRUE;
                     }
                 } 
                 else if (could_grow)
@@ -6317,8 +6435,9 @@ boolean with_impact;
                     (void) grow_up(u.ustuck, (struct monst *) 0);
                     if (!was_obj_freed)
                     {
-                        Sprintf(priority_debug_buf_3, "dropz3: %d", obj->otyp);
+                        debugprint("dropz3: %d", obj->otyp);
                         delobj(obj); /* corpse is digested */
+                        res = TRUE;
                     }
                 } 
                 else if (could_heal)
@@ -6326,8 +6445,9 @@ boolean with_impact;
                     u.ustuck->mhp = u.ustuck->mhpmax;
                     if (!was_obj_freed)
                     {
-                        Sprintf(priority_debug_buf_3, "dropz4: %d", obj->otyp);
+                        debugprint("dropz4: %d", obj->otyp);
                         delobj(obj); /* corpse is digested */
+                        res = TRUE;
                     }
                 }
             }
@@ -6354,6 +6474,7 @@ boolean with_impact;
         }
         newsym(u.ux, u.uy); /* remap location under self */
     }
+    return res;
 }
 
 /* things that must change when not held; recurse into containers.
@@ -6413,7 +6534,7 @@ dodropmany()
 
     /* should coordinate with perm invent, maybe not show worn items */
     n = query_objlist("What would you like to drop?", &invent,
-        (USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON), &pick_list, PICK_ANY, allow_all, SHOWWEIGHTS_DROP);
+        (USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON | SHOW_QUICK), &pick_list, PICK_ANY, allow_all, SHOWWEIGHTS_DROP);
 
     if (n > 0 && pick_list)
     {
@@ -6485,7 +6606,7 @@ doddrop()
     if (*u.ushops)
         sellobj_state(SELL_DELIBERATE);
     if (flags.menu_style != MENU_TRADITIONAL
-        || (result = ggetobj("drop", drop, 0, FALSE, (unsigned *) 0, 3)) < -1)
+        || (result = ggetobj("drop", drop, 0, FALSE, (unsigned *) 0, 3, TRUE)) < -1)
         result = menu_drop(result);
     if (*u.ushops)
         sellobj_state(SELL_NORMAL);
@@ -6548,7 +6669,7 @@ int retry;
 
         all_categories = FALSE;
         /* Gather valid classes via traditional GnollHack method */
-        i = ggetobj("drop", drop, 0, TRUE, &ggoresults, 3);
+        i = ggetobj("drop", drop, 0, TRUE, &ggoresults, 3, TRUE);
         if (i == -2)
             all_categories = TRUE;
         if (ggoresults & ALL_FINISHED) 
@@ -6585,7 +6706,7 @@ int retry;
     {
         /* should coordinate with perm invent, maybe not show worn items */
         n = query_objlist("What would you like to drop?", &invent,
-                          (USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON), &pick_list, PICK_ANY,
+                          (USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON | SHOW_QUICK), &pick_list, PICK_ANY,
                           all_categories ? allow_all : allow_category, SHOWWEIGHTS_DROP);
         if (n > 0 && pick_list)
         {
@@ -6658,7 +6779,7 @@ doautostash()
     }
     add_valid_menu_class(0); /* clear any classes already there */
     if (flags.menu_style != MENU_TRADITIONAL
-        || (result = ggetobj("put in bag", autobag, 0, FALSE, (unsigned*)0, 3)) < -1)
+        || (result = ggetobj("put in bag", autobag, 0, FALSE, (unsigned*)0, 3, TRUE)) < -1)
         result = menu_autostash(result);
     if (result)
         reset_occupations();
@@ -6719,7 +6840,7 @@ int retry;
 
         all_categories = FALSE;
         /* Gather valid classes via traditional GnollHack method */
-        i = ggetobj("put in bag", autobag, 0, TRUE, &ggoresults, 3);
+        i = ggetobj("put in bag", autobag, 0, TRUE, &ggoresults, 3, TRUE);
         if (i == -2)
             all_categories = TRUE;
         if (ggoresults & ALL_FINISHED)
@@ -6747,7 +6868,12 @@ int retry;
          */
         bypass_objlist(invent, FALSE); /* clear bypass bit for invent */
         while ((otmp = nxt_unbypassed_obj(invent)) != 0)
-            n_autobagged += auto_bag_in(invent, otmp, FALSE);
+        {
+            int bagres = auto_bag_in(invent, otmp, FALSE);
+            n_autobagged += (bagres != 0);
+            if (bagres == -1)
+                break;
+        }
         /* we might not have autobagged everything (worn armor, welded weapon,
            cursed loadstones), so reset any remaining inventory to normal */
         bypass_objlist(invent, FALSE);
@@ -6756,7 +6882,7 @@ int retry;
     {
         /* should coordinate with perm invent, maybe not show worn items */
         n = query_objlist("What would you like to put in bag?", &invent,
-            (USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON), &pick_list, PICK_ANY,
+            (USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON | SHOW_QUICK), &pick_list, PICK_ANY,
             all_categories ? allow_all : allow_category, SHOWWEIGHTS_DROP);
         if (n > 0 && pick_list)
         {
@@ -6799,7 +6925,10 @@ int retry;
                         otmp = splitobj(otmp, cnt);
                     }
                 }
-                n_autobagged += auto_bag_in(invent, otmp, FALSE);
+                int bagres = auto_bag_in(invent, otmp, FALSE);
+                n_autobagged += (bagres != 0);
+                if (bagres == -1)
+                    break;
             }
             bypass_objlist(invent, FALSE); /* reset invent to normal */
             free((genericptr_t)pick_list);
@@ -7095,7 +7224,7 @@ save_currentstate()
         fd = currentlevel_rewrite();
         if (fd < 0)
             return;
-        Sprintf(priority_debug_buf_4, "save_currentstate (fd=%d)", fd);
+        debugprint("save_currentstate (fd=%d)", fd);
         bufon(fd);
         savelev(fd, ledger_no(&u.uz), WRITE_SAVE);
         bclose(fd);
@@ -7163,7 +7292,7 @@ goto_level(newlevel, at_location, falling, inside_tower, portal)
 d_level *newlevel;
 uchar at_location; /* 1 = at stairs, 2 = at altar */
 boolean falling, inside_tower;
-xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = Modron portal up (find portal down), 4 = Modron portal (random destination) */
+xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = Modron portal up (find portal down), 4 = Modron portal (random destination), 5 = Magic portal to special stairs down, 6 = Magic portal to special stairs up */
 {
     int fd, l_idx;
     xchar new_ledger;
@@ -7178,6 +7307,12 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
     char *annotation;
     boolean play_arrival_teleport_effect = !!(u.utotype & UTOFLAGS_TELEPORT_EFFECT);
     d_level fromlevel = u.uz;
+
+    char dbgbuf[BUFSZ * 2];
+    s_level* newslev = Is_special(newlevel);
+    Sprintf(dbgbuf, "goto_level: dnum=%d, dlevel=%d, slev=%s, at_location=%d, falling=%d, inside_tower=%d, portal=%d", (int)newlevel->dnum, (int)newlevel->dlevel, newslev ? newslev->name : "normal", (int)at_location, (int)falling, (int)inside_tower, (int)portal);
+    issue_breadcrumb(dbgbuf);
+    debugprint("%s", dbgbuf);
 
     if(at_location & 2)
         context.reviving = TRUE;
@@ -7299,12 +7434,14 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
     removealtarsummons();
     if (u.uswallow) /* idem */
         u.uswldtim = u.uswallow = 0;
+    debugprint_pos();
     recalc_mapseen(); /* recalculate map overview before we leave the level */
     /*
      *  We no longer see anything on the level.  Make sure that this
      *  follows u.uswallow set to null since uswallow overrides all
      *  normal vision.
      */
+    debugprint_pos();
     vision_recalc(2);
 
     /*
@@ -7318,7 +7455,7 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
     if (!cant_go_back) 
     {
         update_mlstmv(); /* current monsters are becoming inactive */
-        Sprintf(priority_debug_buf_4, "goto_level (fd=%d)", fd);
+        debugprint("goto_level1 (fd=%d)", fd);
         bufon(fd);       /* use buffered output */
     }
 
@@ -7391,15 +7528,14 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
             impossible("goto_level: returning to discarded level?");
             level_info[new_ledger].flags &= ~(FORGOTTEN | VISITED);
         }
+        issue_breadcrumb2("Making a new level", (int)new_ledger);
         mklev();
         isnew = TRUE; /* made the level */
     }
     else 
     {
-        Strcpy(debug_buf_1, "goto_level");
-        Strcpy(debug_buf_2, "goto_level");
-        Strcpy(debug_buf_3, "goto_level");
-        Strcpy(debug_buf_4, "goto_level");
+        debugprint("goto_level2");
+        issue_breadcrumb2("Opening an existing level", (int)new_ledger);
         /* returning to previously visited level; reload it */
         fd = open_levelfile(new_ledger, whynot);
         if (tricked_fileremoved(fd, whynot))
@@ -7433,7 +7569,7 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
 
         if (!ttrap)
         {
-            impossible("goto_level: no corresponding portal!");
+            impossible("goto_level: no corresponding portal, portal type is 1. from: %d/%d, to: %d/%d.", fromlevel.dnum, fromlevel.dlevel, u.uz.dnum, u.uz.dlevel);
             u_on_rndspot((up ? 1 : 0) | (was_in_W_tower ? 2 : 0));
         }
         else
@@ -7442,6 +7578,29 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
             u_on_newpos(ttrap->tx, ttrap->ty);
         }
     } 
+    else if ((portal == MAGIC_PORTAL_TARGET_SSTAIRS_DOWN || portal == MAGIC_PORTAL_TARGET_SSTAIRS_UP) && !In_endgame(&u.uz))
+    {
+        /* find the special stairs on the level */
+        u_on_sstairs(portal == MAGIC_PORTAL_TARGET_SSTAIRS_DOWN);
+    }
+    else if ((portal == MAGIC_PORTAL_TARGET_STAIRS_DOWN) && !In_endgame(&u.uz))
+    {
+        /* find the stairs on the level */
+        u_on_dnstairs();
+    }
+    else if ((portal == MAGIC_PORTAL_TARGET_STAIRS_UP) && !In_endgame(&u.uz))
+    {
+        /* find the stairs on the level */
+        u_on_upstairs();
+    }
+    else if ((portal == MAGIC_PORTAL_TARGET_LADDER_DOWN) && !In_endgame(&u.uz))
+    {
+        u_on_newpos(xdnladder, ydnladder);
+    }
+    else if ((portal == MAGIC_PORTAL_TARGET_LADDER_UP) && !In_endgame(&u.uz))
+    {
+        u_on_newpos(xupladder, yupladder);
+    }
     else if ((portal == 2 || portal == 3) && !In_endgame(&u.uz))
     {
         /* find the portal on the new level */
@@ -7455,7 +7614,8 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
 
         if (!ttrap)
         {
-            panic("goto_level: no corresponding portal!");
+            impossible("goto_level: no corresponding portal, portal type=%d. from: %d/%d, to: %d/%d.", (int)portal, fromlevel.dnum, fromlevel.dlevel, u.uz.dnum, u.uz.dlevel);
+            u_on_rndspot((up ? 1 : 0) | (was_in_W_tower ? 2 : 0));
             return;
         }
         /* Activate the other end */
@@ -7581,6 +7741,7 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
 
     /* Reset the screen. */
     vision_reset(); /* reset the blockages */
+    debugprint_pos();
     docrt();        /* does a full vision recalc */
     flush_screen(-1);
 
@@ -7623,47 +7784,69 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
     obj_delivery(TRUE);
 
     /* Check whether we just entered Gehennom. */
-    if (!In_hell(&u.uz0) && Inhell) 
+    if (Inhell) 
     {
-        if (Is_valley(&u.uz))
+        issue_achievement(GUI_ACHIEVEMENT_ENTERED_GEHENNOM);
+        if (!In_hell(&u.uz0))
         {
-            You_ex(ATR_NONE, CLR_MSG_WARNING, "arrive at the Valley of the Dead...");
-            pline_The_ex1(ATR_NONE, CLR_MSG_WARNING, "odor of burnt flesh and decay pervades the air.");
+            if (Is_valley(&u.uz))
+            {
+                You_ex(ATR_NONE, CLR_MSG_WARNING, "arrive at the Valley of the Dead...");
+                pline_The_ex1(ATR_NONE, CLR_MSG_WARNING, "odor of burnt flesh and decay pervades the air.");
 #ifdef MICRO
-            display_nhwindow(WIN_MESSAGE, FALSE);
+                display_nhwindow(WIN_MESSAGE, FALSE);
 #endif
-            You_hear_ex(ATR_NONE, CLR_MSG_WARNING, "groans and moans everywhere.");
-        } 
-        else
-            pline_ex(ATR_NONE, CLR_MSG_WARNING, "It is hot here.  You smell smoke...");
+                You_hear_ex(ATR_NONE, CLR_MSG_WARNING, "groans and moans everywhere.");
+            }
+            else
+                pline_ex(ATR_NONE, CLR_MSG_WARNING, "It is hot here.  You smell smoke...");
 
-        if (flags.showscore && !u.uachieve.enter_gehennom)
-            context.botl = 1;
+            if (flags.showscore && !u.uachieve.enter_gehennom)
+                context.botl = 1;
 
-        if (!u.uachieve.enter_gehennom)
-        {
-            achievement_gained("Entered Gehennom");
-            livelog_printf(LL_ACHIEVE, "%s", "entered Gehennom");
+            if (!u.uachieve.enter_gehennom)
+            {
+                achievement_gained("Entered Gehennom");
+                livelog_printf(LL_ACHIEVE, "%s", "entered Gehennom");
+            }
+            u.uachieve.enter_gehennom = 1;
         }
-        u.uachieve.enter_gehennom = 1;
     }
 
-    if (In_mines(&u.uz) && !u.uachieve.entered_gnomish_mines)
+    if (In_mines(&u.uz))
     {
-        //if (!u.uachieve.entered_gnomish_mines)
-        //    achievement_gained("Entered Gnomish Mines");
-        livelog_printf(LL_ACHIEVE, "%s", "entered the Gnomish Mines");
-        u.uachieve.entered_gnomish_mines = 1;
+        issue_achievement(GUI_ACHIEVEMENT_ENTERED_GNOMISH_MINES);
+        if (!u.uachieve.entered_gnomish_mines)
+        {
+            //if (!u.uachieve.entered_gnomish_mines)
+            //    achievement_gained("Entered Gnomish Mines");
+            livelog_printf(LL_ACHIEVE, "%s", "entered the Gnomish Mines");
+            u.uachieve.entered_gnomish_mines = 1;
+        }
+        if (Is_minetown_level(&u.uz))
+        {
+            if (!u.uachieve.entered_mine_town)
+            {
+                //    achievement_gained("Entered Mine Town");
+                livelog_printf(LL_MINORAC, "%s", "reached Mine Town");
+                u.uachieve.entered_mine_town = 1;
+            }
+            issue_achievement(GUI_ACHIEVEMENT_REACHED_MINE_TOWN);
+        }
+        else if (Is_mineend_level(&u.uz))
+            issue_achievement(GUI_ACHIEVEMENT_REACHED_MINES_END);
     }
 
     if (In_endgame(&u.uz))
     {
+        issue_achievement(GUI_ACHIEVEMENT_ENTERED_ELEMENTAL_PLANES);
         if (Is_astralevel(&u.uz))
         {
             if (!u.uachieve.entered_astral_plane)
                 livelog_printf(LL_ACHIEVE, "%s", "entered the Astral Plane");
 
             u.uachieve.entered_astral_plane = 1;
+            issue_achievement(GUI_ACHIEVEMENT_ENTERED_ASTRAL_PLANE);
         }
         else
         {
@@ -7673,18 +7856,17 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
         }
     }
 
-    if (Is_minetown_level(&u.uz) && !u.uachieve.entered_mine_town)
+    if (In_sokoban(&u.uz))
     {
-        //    achievement_gained("Entered Mine Town");
-        livelog_printf(LL_MINORAC, "%s", "reached Mine Town");
-        u.uachieve.entered_mine_town = 1;
-    }
-
-    if (In_sokoban(&u.uz) && !u.uachieve.entered_sokoban)
-    {
-        //    achievement_gained("Entered Sokoban");
-        livelog_printf(LL_ACHIEVE, "%s", "entered Sokoban");
-        u.uachieve.entered_sokoban = 1;
+        issue_achievement(GUI_ACHIEVEMENT_ENTERED_SOKOBAN);
+        if (!u.uachieve.entered_sokoban)
+        {
+            //    achievement_gained("Entered Sokoban");
+            livelog_printf(LL_ACHIEVE, "%s", "entered Sokoban");
+            u.uachieve.entered_sokoban = 1;
+        }
+        if (Is_sokoend_level(&u.uz))
+            issue_achievement(GUI_ACHIEVEMENT_REACHED_TOP_OF_SOKOBAN);
     }
 
     if (Is_bigroom(&u.uz) && !u.uachieve.entered_bigroom)
@@ -7704,22 +7886,79 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
             livelog_printf(LL_ACHIEVE, "%s", "entered the Plane of the Modron");
         u.uevent.modron_plane_entered = 1;
         u.uachieve.entered_plane_of_modron = 1;
+        issue_achievement(GUI_ACHIEVEMENT_ENTERED_PLANE_OF_THE_MODRON);
+        if (Is_primus_modron_level(&u.uz))
+            issue_achievement(GUI_ACHIEVEMENT_REACHED_PROTONUS);
     }
-    
-    if (In_bovine_level(&u.uz))
+    else if (In_bovine_level(&u.uz))
     {
         if (!u.uachieve.entered_hellish_pastures)
             livelog_printf(LL_ACHIEVE, "%s", "entered the Hellish Pastures");
         u.uevent.hellish_pastures_entered = 1;
         u.uachieve.entered_hellish_pastures = 1;
+        issue_achievement(GUI_ACHIEVEMENT_ENTERED_HELLISH_PASTURES);
     }
-
-    if (In_large_circular_dgn_level(&u.uz))
+    else if (In_large_circular_dgn_level(&u.uz))
     {
         if (!u.uachieve.entered_large_circular_dungeon)
             livelog_printf(LL_ACHIEVE, "%s", "entered the Large Circular Dungeon");
         u.uevent.large_circular_dgn_entered = 1;
         u.uachieve.entered_large_circular_dungeon = 1;
+        issue_achievement(GUI_ACHIEVEMENT_ENTERED_LARGE_CIRCULAR_DUNGEON);
+        if (Is_quantum_core_level(&u.uz))
+            issue_achievement(GUI_ACHIEVEMENT_REACHED_QUANTUM_CORE);
+    }
+    else if (In_quest(&u.uz))
+    {
+        issue_achievement(GUI_ACHIEVEMENT_ENTERED_THE_QUEST);
+        if (Is_nemesis(&u.uz))
+            issue_achievement(GUI_ACHIEVEMENT_REACHED_FINAL_QUEST_LEVEL);
+    }
+    else if (In_W_tower(u.ux, u.uy, &u.uz))
+    {
+        issue_achievement(GUI_ACHIEVEMENT_REACHED_WIZARD_TOWER);
+    }
+    else if (In_V_tower(&u.uz))
+    {
+        issue_achievement(GUI_ACHIEVEMENT_ENTERED_VLAD_TOWER);
+    }
+    else if (Is_medusa_level(&u.uz))
+    {
+        issue_achievement(GUI_ACHIEVEMENT_REACHED_MEDUSA_ISLAND);
+    }
+    else if (Is_stronghold(&u.uz))
+    {
+        issue_achievement(GUI_ACHIEVEMENT_REACHED_CASTLE);
+    }
+    else if(Is_valley(&u.uz))
+    {
+        issue_achievement(GUI_ACHIEVEMENT_REACHED_VALLEY_OF_THE_DEAD);
+    }
+    else if (Is_sanctum(&u.uz))
+    {
+        issue_achievement(GUI_ACHIEVEMENT_REACHED_SANCTUM);
+    }
+    else if (Invocation_lev(&u.uz))
+    {
+        issue_achievement(GUI_ACHIEVEMENT_REACHED_BOTTOM_OF_GEHENNOM);
+    }
+
+    schar new_level_depth = depth(&u.uz);
+    if (new_level_depth >= 5)
+    {
+        issue_achievement(GUI_ACHIEVEMENT_REACHED_DUNGEON_LEVEL_5);
+    }
+    if (new_level_depth >= 10)
+    {
+        issue_achievement(GUI_ACHIEVEMENT_REACHED_DUNGEON_LEVEL_10);
+    }
+    if (new_level_depth >= 15)
+    {
+        issue_achievement(GUI_ACHIEVEMENT_REACHED_DUNGEON_LEVEL_15);
+    }
+    if (new_level_depth >= 20)
+    {
+        issue_achievement(GUI_ACHIEVEMENT_REACHED_DUNGEON_LEVEL_20);
     }
 
     if (isnew)
@@ -7730,7 +7969,7 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
         boolean major = In_endgame(&u.uz) && !Is_astralevel(&u.uz);
         if (major)
         {
-            (void)endgamelevelname(dloc, depth(&u.uz));
+            (void)endgamelevelname(dloc, new_level_depth);
             livelog_printf(LL_ACHIEVE, "entered the %s", dloc);
         }
         else
@@ -7803,6 +8042,7 @@ xchar portal; /* 1 = Magic portal, 2 = Modron portal down (find portal up), 3 = 
     } 
     else if (Is_knox(&u.uz))
     {
+        issue_achievement(GUI_ACHIEVEMENT_ENTERED_FORT_LUDIOUS);
         /* alarm stops working once Croesus has died */
         if (isnew || !mvitals[PM_CROESUS].died) 
         {
@@ -8027,6 +8267,7 @@ int64_t portal_flag;
 const char *pre_msg, *post_msg;
 {
     short typmask = UTOFLAGS_DEFERRED_GOTO; /* non-zero triggers `deferred_goto' */
+    debugprint("schedule_goto: dnum=%d, dlevel=%d, portal_flag=%lld", tolev ? tolev->dnum : -1, tolev ? tolev->dlevel : -1, (long long)portal_flag);
 
     /* destination flags (`goto_level' args) */
     if (at_location == 1)
@@ -8036,16 +8277,19 @@ const char *pre_msg, *post_msg;
 
     if (falling)
         typmask |= UTOFLAGS_FALLING;
-    if (portal_flag == 1)
-        typmask |= UTOFLAGS_PORTAL_1;
-    else if (portal_flag == 2)
-        typmask |= UTOFLAGS_PORTAL_2;
-    else if (portal_flag == 3)
-        typmask |= UTOFLAGS_PORTAL_3;
-    else if (portal_flag == 4)
-        typmask |= UTOFLAGS_PORTAL_4;
 
-    if (portal_flag < 0)
+    //if (portal_flag == 1)
+    //    typmask |= UTOFLAGS_PORTAL_1;
+    //else if (portal_flag == 2)
+    //    typmask |= UTOFLAGS_PORTAL_2;
+    //else if (portal_flag == 3)
+    //    typmask |= UTOFLAGS_PORTAL_3;
+    //else if (portal_flag == 4)
+    //    typmask |= UTOFLAGS_PORTAL_4;
+
+    if (portal_flag > 0 && portal_flag < 16)
+        typmask |= (short)(portal_flag << UTO_PORTAL_BIT_OFFSET);
+    else if (portal_flag < 0)
     {
         typmask |= UTOFLAGS_PORTAL_1; /* The same otherwise as 1 */
         typmask |= UTOFLAGS_REMOVE_PORTAL; /* flag for portal removal */
@@ -8075,11 +8319,12 @@ deferred_goto()
     {
         d_level dest;
         short typmask = u.utotype; /* save it; goto_level zeroes u.utotype */
+        debugprint("deferred_goto: dnum=%d, dlevel=%d, typmask=%d", (int)u.utolev.dnum, (int)u.utolev.dlevel, typmask);
 
         assign_level(&dest, &u.utolev);
         if (dfr_pre_msg)
             pline1(dfr_pre_msg);
-        xchar portal_flag = (typmask & UTOFLAGS_PORTAL_1) ? 1 : (typmask & UTOFLAGS_PORTAL_2) ? 2 : (typmask & UTOFLAGS_PORTAL_3) ? 3 : (typmask & UTOFLAGS_PORTAL_4) ? 4 : 0;
+        xchar portal_flag = (xchar)((typmask & UTOFLAGS_PORTAL_MASK) >> UTO_PORTAL_BIT_OFFSET); //  (typmask & UTOFLAGS_PORTAL_1) ? 1 : (typmask & UTOFLAGS_PORTAL_2) ? 2 : (typmask & UTOFLAGS_PORTAL_3) ? 3 : (typmask & UTOFLAGS_PORTAL_4) ? 4 : 0;
         uchar at_location = (!!(typmask & UTOFLAGS_AT_STAIRS)) | (2 * (!!(typmask & UTOFLAGS_AT_ALTAR)));
         boolean falling = !!(typmask & UTOFLAGS_FALLING);
         boolean inside_tower = !!(typmask & UTOFLAGS_INSIDE_TOWER);
@@ -8093,6 +8338,11 @@ deferred_goto()
             {
                 deltrap(t);
                 newsym(u.ux, u.uy);
+                issue_breadcrumb("Quest far portal deleted.");
+            }
+            else
+            {
+                issue_breadcrumb("Quest far portal marked for deletion but not found.");
             }
         }
 
@@ -8384,7 +8634,7 @@ int animateintomon; // monstid to be animated into
 
 /* Revive the corpse via a timeout. */
 /*ARGSUSED*/
-void
+int
 revive_mon(arg, timeout)
 anything *arg;
 int64_t timeout UNUSED;
@@ -8395,7 +8645,7 @@ int64_t timeout UNUSED;
     xchar x, y;
 
     if (!mptr)
-        return;
+        return 0;
 
     int body_where = body->where;
 
@@ -8417,7 +8667,7 @@ int64_t timeout UNUSED;
     }
 
     /* if we succeed, the corpse is gone */
-    if (!revive_corpse(body)) 
+    if (!revive_corpse(body))
     {
         int64_t when;
         int action;
@@ -8433,8 +8683,8 @@ int64_t timeout UNUSED;
                     if (!rn2(3))
                         break;
             }
-        } 
-        else 
+        }
+        else
         { /* rot this corpse away */
             You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "%sless hassled.", is_rider_or_tarrasque(mptr) ? "much " : "");
             action = ROT_CORPSE;
@@ -8442,8 +8692,11 @@ int64_t timeout UNUSED;
             if (when < 1L)
                 when = 1L;
         }
-        (void) start_timer(when, TIMER_OBJECT, action, arg);
+        (void)start_timer(when, TIMER_OBJECT, action, arg);
+        return FALSE;
     }
+    else
+        return TRUE;
 }
 
 int
@@ -8661,7 +8914,7 @@ void
 delete_location(x, y)
 xchar x, y;
 {
-    Strcpy(debug_buf_4, "delete_location");
+    debugprint("delete_location");
 
     if (levl[x][y].typ == FOUNTAIN)
         level.flags.nfountains--;
@@ -8705,10 +8958,9 @@ void
 delete_decoration(x, y)
 xchar x, y;
 {
-    Strcpy(debug_buf_4, "delete_decoration");
-
     if (levl[x][y].decoration_typ)
     {
+        debugprint("delete_decoration");
         if (levl[x][y].lamplit)
         {
             if (!in_mklev)
@@ -8904,7 +9156,7 @@ transform_location_type(x, y, type, subtype)
 xchar x, y;
 int type, subtype;
 {
-    Strcpy(debug_buf_4, "transform_location_type");
+    debugprint("transform_location_type");
 
     /* First, only limited delete */
     if (levl[x][y].typ == FOUNTAIN)

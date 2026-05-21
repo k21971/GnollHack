@@ -25,7 +25,7 @@ namespace GnollHackX.Pages.MainScreen
 #endif
 {
     [XamlCompilation(XamlCompilationOptions.Compile)]
-    public partial class VaultPage : ContentPage, ICloseablePage
+    public partial class VaultPage : ContentPage, ICloseablePage, IKeyPressHandlingPage
     {
         private MainPage _mainPage;
         List<LabeledImageButton> _buttons = new List<LabeledImageButton>();
@@ -65,6 +65,26 @@ namespace GnollHackX.Pages.MainScreen
             rib.HorizontalOptions = LayoutOptions.Center;
             rib.VerticalOptions = LayoutOptions.Center;
             rib.BtnClicked += btnTopScores_Clicked;
+            _buttons.Add(rib);
+
+            rib = new LabeledImageButton();
+            rib.ImgSourcePath = "resource://" + GHApp.AppResourceName + ".Assets.UI.achievement-page.png";
+            rib.ImgHighFilterQuality = true;
+            rib.LblText = "Achievements";
+            rib.LblFontSize = 20;
+            rib.LblFontColor = GHApp.DarkMode ? GHColors.White : GHColors.Black;
+            rib.LblFontFamily = "Immortal";
+            rib.ImgWidth = 110;
+            rib.ImgHeight = 110;
+            rib.GridWidth = 200;
+            rib.GridHeight = 140;
+            rib.GridMargin = gridMargin;
+            rib.WidthRequest = 200 + rib.ImgWidth / 5;
+            rib.HeightRequest = 140;
+            rib.Margin = margin;
+            rib.HorizontalOptions = LayoutOptions.Center;
+            rib.VerticalOptions = LayoutOptions.Center;
+            rib.BtnClicked += btnAchievements_Clicked;
             _buttons.Add(rib);
 
             rib = new LabeledImageButton();
@@ -204,8 +224,7 @@ namespace GnollHackX.Pages.MainScreen
             if (playClickSound)
                 GHApp.PlayButtonClickedSound();
             GHApp.CurrentMainPage?.InvalidateCarousel();
-            var page = await GHApp.Navigation.PopModalAsync();
-            GHApp.DisconnectIViewHandlers(page);
+            await GHApp.PopModalPageAsync();
         }
 
         private bool _backPressed = false;
@@ -250,7 +269,7 @@ namespace GnollHackX.Pages.MainScreen
             {
                 //bool shouldUseFlex = width >= 460 && height >= 600; // && !GHApp.IsWindows;
                 //bool widerWidth = height < 280 + 6 + 24 + 60 + lblHeader.Margin.Top + lblHeader.Margin.Bottom + CloseButton.Margin.Top + CloseButton.Margin.Bottom;
-                double usedWidth = 720; // widerWidth ? 2048 : 720;
+                double usedWidth = 800; // widerWidth ? 2048 : 720;
 #if GNH_MAUI
                 ViewGrid.MaximumWidthRequest = usedWidth;
 #else
@@ -272,12 +291,12 @@ namespace GnollHackX.Pages.MainScreen
                     }
 
                     double widthAvailableFull = Math.Max(0, usedWidth - 2 * 10);
-                    int noOfColumnsFull = Math.Max(1, (int)(widthAvailableFull / 230));
+                    int noOfColumnsFull = Math.Max(1, (int)(widthAvailableFull / 180));
                     int noOfRowsFull = 1 + (_buttons.Count - 1) / noOfColumnsFull;
 
                     double widthAvailable = Math.Max(0, Math.Min(width, usedWidth) - 2 * 10);
                     double heightAvailable = height - 60 - 80;
-                    int noOfColumnsScreen = Math.Max(1, (int)(widthAvailable / 230));
+                    int noOfColumnsScreen = Math.Max(1, (int)(widthAvailable / 180));
                     int noOfRowsScreen = 1 + (_buttons.Count - 1) / noOfColumnsScreen;
                     double heightTaken = 160 * noOfRowsScreen;
 
@@ -336,7 +355,7 @@ namespace GnollHackX.Pages.MainScreen
                         Grid.SetRow(button, row);
                         j++;
                     }
-                    VaultGrid.WidthRequest = noOfColumns * 230;
+                    VaultGrid.WidthRequest = noOfColumns * 200;
 
                     //if (widthAvailable < noOfColumns * 230)
                     //    VaultScrollView.HorizontalScrollBarVisibility = ScrollBarVisibility.Default;
@@ -404,14 +423,14 @@ namespace GnollHackX.Pages.MainScreen
                 }
                 else
                 {
-                    await GHApp.Navigation.PushModalAsync(topScorePage);
+                    await GHApp.PushModalPageAsync(topScorePage);
                 }
             }
             else
             {
                 /* No top scores */
                 var topScorePage = new TopScorePage();
-                await GHApp.Navigation.PushModalAsync(topScorePage);
+                await GHApp.PushModalPageAsync(topScorePage);
             }
             VaultGrid.IsEnabled = true;
         }
@@ -427,9 +446,25 @@ namespace GnollHackX.Pages.MainScreen
             GHApp.PlayButtonClickedSound();
             var libPage = new LibraryPage();
             libPage.ReadLibrary();
-            await GHApp.Navigation.PushModalAsync(libPage);
+            await GHApp.PushModalPageAsync(libPage);
             VaultGrid.IsEnabled = true;
         }
+
+        private async void btnAchievements_Clicked(object sender, EventArgs e)
+        {
+            await OpenAchievementsPage();
+        }
+
+        private async Task OpenAchievementsPage()
+        {
+            VaultGrid.IsEnabled = false;
+            GHApp.PlayButtonClickedSound();
+            var achievementsPage = new AchievementsPage();
+            achievementsPage.ReadAchievements();
+            await GHApp.PushModalPageAsync(achievementsPage);
+            VaultGrid.IsEnabled = true;
+        }
+
 
         private async void btnOracle_Clicked(object sender, EventArgs e)
         {
@@ -442,7 +477,7 @@ namespace GnollHackX.Pages.MainScreen
             GHApp.PlayButtonClickedSound();
             var oraclePage = new OraclePage();
             oraclePage.ReadConsultations();
-            await GHApp.Navigation.PushModalAsync(oraclePage);
+            await GHApp.PushModalPageAsync(oraclePage);
             VaultGrid.IsEnabled = true;
         }
 
@@ -456,7 +491,7 @@ namespace GnollHackX.Pages.MainScreen
             VaultGrid.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
             var musicPage = new MusicPage();
-            await GHApp.Navigation.PushModalAsync(musicPage);
+            await GHApp.PushModalPageAsync(musicPage);
             VaultGrid.IsEnabled = true;
         }
 
@@ -471,7 +506,7 @@ namespace GnollHackX.Pages.MainScreen
             GHApp.PlayButtonClickedSound();
             var snapPage = new SnapshotPage();
             snapPage.LoadSnapshots();
-            await GHApp.Navigation.PushModalAsync(snapPage);
+            await GHApp.PushModalPageAsync(snapPage);
             VaultGrid.IsEnabled = true;
         }
 
@@ -485,12 +520,15 @@ namespace GnollHackX.Pages.MainScreen
             VaultGrid.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
             ReplayPage selectFilePage = new ReplayPage(_mainPage);
-            await GHApp.Navigation.PushModalAsync(selectFilePage);
+            await GHApp.PushModalPageAsync(selectFilePage);
             VaultGrid.IsEnabled = true;
         }
 
         public bool HandleKeyPress(int key, bool isCtrl, bool isMeta)
         {
+            if (GHApp.PushingModalPage) /* Ignore key presses when opening a page */
+                return true;
+
             bool handled = false;
             try
             {
@@ -504,6 +542,12 @@ namespace GnollHackX.Pages.MainScreen
                             case (int)'T':
                                 if (VaultGrid.IsEnabled)
                                     await OpenTopScorePage();
+                                handled = true;
+                                break;
+                            case (int)'a':
+                            case (int)'A':
+                                if (VaultGrid.IsEnabled)
+                                    await OpenAchievementsPage();
                                 handled = true;
                                 break;
                             case (int)'l':

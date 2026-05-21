@@ -204,12 +204,17 @@
 #define has_monster_type_nontinnable_corpse(ptr) (((ptr)->mflags6 & M6_NON_TINNABLE) != 0)
 #define has_monster_type_nonedible_corpse(ptr) (((ptr)->mflags6 & M6_NON_EDIBLE) != 0)
 #define revives_upon_meddling(ptr) (((ptr)->mflags6 & M6_REVIVES_UPON_MEDDLING) != 0)
-#define lithovore(ptr) (((ptr)->mflags6 & M6_LITHOVORE) != 0L)
+#define lithovorous(ptr) (((ptr)->mflags6 & M6_LITHOVORE) != 0L)
 #define has_blobby_animation(ptr) (((ptr)->mflags6 & M6_BLOB_ANIMATION) != 0L)
 #define has_shark_animation(ptr) (((ptr)->mflags6 & M6_SHARK_ANIMATION) != 0L)
 #define has_human_breathe_animation(ptr) (((ptr)->mflags6 & M6_HUMAN_BREATHE_ANIMATION) != 0L)
 #define has_animal_breathe_animation(ptr) (((ptr)->mflags6 & M6_ANIMAL_BREATHE_ANIMATION) != 0L)
 #define able_to_wear_objects(ptr) (((ptr)->mflags6 & M6_ABLE_TO_WEAR_OBJECTS) != 0L)
+#define bonevorous(ptr) (((ptr)->mflags6 & M6_BONEVORE) != 0L)
+#define toothvorous(ptr) (((ptr)->mflags6 & M6_TOOTHVORE) != 0L)
+#define chitinvorous(ptr) (((ptr)->mflags6 & M6_CHITINVORE) != 0L)
+#define woodvorous(ptr) (((ptr)->mflags6 & M6_WOODVORE) != 0L)
+#define magicvorous(ptr) (((ptr)->mflags6 & M6_MAGICVORE) != 0L)
 
 #define is_archaeologist(ptr) (((ptr)->mflags7 & M7_ARCHAEOLOGIST) != 0L)
 #define is_barbarian(ptr) (((ptr)->mflags7 & M7_BARBARIAN) != 0L)
@@ -233,7 +238,7 @@
     ((ptr) == &mons[PM_GREEN_SLIME] || flaming(ptr) || is_incorporeal(ptr))
 
 #define is_non_eater(ptr) \
-    ((is_not_living(ptr) || is_angel(ptr) || is_demon(ptr) || has_mflag_is_non_eater(ptr) || (!carnivorous(ptr) && !herbivorous(ptr) && !metallivorous(ptr) && !lithovore(ptr))) && !is_corpse_eater(ptr))
+    ((is_not_living(ptr) || is_angel(ptr) || is_demon(ptr) || has_mflag_is_non_eater(ptr) || (!carnivorous(ptr) && !herbivorous(ptr) && !metallivorous(ptr) && !lithovorous(ptr) && !woodvorous(ptr) && !magicvorous(ptr) && !bonevorous(ptr) && !toothvorous(ptr) && !chitinvorous(ptr))) && !is_corpse_eater(ptr))
 
 #define mon_is_literate(m) (is_speaking((m)->data) && !mindless((m)->data) && haseyes((m)->data))
 #define is_cloned_wizard(m) (((m)->mon_flags & MON_FLAGS_CLONED_WIZ) != 0L)
@@ -427,7 +432,6 @@
 #define is_confused(mon) \
     (has_confused(mon))
 
-
 /* blindness and can see (meaning can detect the player at the first place) */
 #define has_blinded(mon) \
     has_property(mon, BLINDED)
@@ -491,19 +495,20 @@
 #define has_charm_resistance(mon) \
     (has_innate_charm_resistance((mon)->data) || has_property(mon, CHARM_RESISTANCE))
 
+#define is_charmed(mon) (has_charmed(mon) && !has_charm_resistance(mon) && !is_undead((mon)->data) && !is_vampshifter(mon) && !mon_has_no_apparent_mind(mon))
+
 #define has_undead_control(mon) \
     has_property(mon, UNDEAD_CONTROL)
 
-#define is_charmed(mon) \
-    ((has_charmed(mon) && !has_charm_resistance(mon) && !is_undead((mon)->data) && !is_vampshifter(mon) && !mon_has_no_apparent_mind(mon)) \
-     || (has_undead_control(mon) && (is_undead((mon)->data) || is_vampshifter(mon))) \
-    )
+#define is_controlled(mon) (has_undead_control(mon) && (is_undead((mon)->data) || is_vampshifter(mon)))
+
+#define is_charmed_or_controlled(mon) (is_charmed(mon) || is_controlled(mon))
 
 #define is_tame(mon) \
-    ((is_charmed(mon) || (mon)->mtame) && (mon)->mextra && (mon)->mextra->edog) /* Note: currently a monster cannot be tame without an edog */
+    ((is_charmed_or_controlled(mon) || (mon)->mtame) && (mon)->mextra && (mon)->mextra->edog) /* Note: currently a monster cannot be tame without an edog */
 
 #define is_peaceful(mon) \
-    (is_charmed(mon) || (mon)->mpeaceful)
+    (is_charmed_or_controlled(mon) || (mon)->mpeaceful)
 
 #define is_mon_protecting(mtmp) (is_protector(mtmp) && is_peaceful(mtmp))
 
@@ -827,10 +832,16 @@
     (pm_resists_wounding((mon)->data) || has_wounding_resistance(mon))
 #define resists_bisection(mon) \
     (pm_resists_bisection((mon)->data) || has_bisection_resistance(mon))
-#define resists_slime(mon) \
+#define resists_slime_only(mon) \
     (slimeproof((mon)->data) || has_slime_resistance(mon))
-#define resists_polymorph(mon) \
+#define resists_slime(mon) \
+    (resists_slime_only(mon) || has_property(mon, UNCHANGING))
+#define resists_polymorph_only(mon) \
     (pm_resists_polymorph((mon)->data) || has_property(mon, POLYMORPH_RESISTANCE))
+#define resists_polymorph(mon) \
+    (resists_polymorph_only(mon) || has_property(mon, UNCHANGING))
+#define resists_mimicking(mon) \
+    (resists_polymorph(mon) || has_property(mon, PROT_FROM_SHAPE_CHANGERS))
 
 /* other similar definitions */
 #define is_reflecting(mon) \

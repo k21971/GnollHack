@@ -20,8 +20,6 @@ STATIC_VAR NEARDATA const char *gate_str;
 extern boolean notonhead; /* for long worms */
 
 STATIC_DCL void FDECL(kickdmg, (struct monst *, BOOLEAN_P));
-STATIC_DCL boolean FDECL(maybe_kick_monster, (struct monst *,
-                                              XCHAR_P, XCHAR_P));
 STATIC_DCL void FDECL(kick_monster, (struct monst *, XCHAR_P, XCHAR_P));
 STATIC_DCL int FDECL(really_kick_object, (XCHAR_P, XCHAR_P, BOOLEAN_P));
 STATIC_DCL char *FDECL(kickstr, (char *, const char *));
@@ -216,7 +214,8 @@ boolean clumsy;
     if (silverhit)
         pline_ex(ATR_NONE, CLR_MSG_MYSTICAL, "Your silver boots sear %s flesh!", s_suffix(mon_nam(mon)));
 
-    if (!DEADMONSTER(mon))
+    boolean was_alive = !DEADMONSTER(mon);
+    if (was_alive)
     {
         /* squeeze some guilt feelings... */
         if (mon->mtame)
@@ -281,15 +280,14 @@ boolean clumsy;
             }
         }
     }
-
-    (void) passive(mon, uarmf, TRUE, !DEADMONSTER(mon), AT_KICK, FALSE);
-    if (DEADMONSTER(mon) && !trapkilled)
+    boolean is_alive = !DEADMONSTER(mon);
+    if (!was_alive && !is_alive && !trapkilled)
         killed(mon);
-
+    (void)passive(mon, uarmf, TRUE, !DEADMONSTER(mon), AT_KICK, FALSE);
     use_skill(P_MARTIAL_ARTS, 1);
 }
 
-STATIC_OVL boolean
+boolean
 maybe_kick_monster(mon, x, y)
 struct monst *mon;
 xchar x, y;
@@ -400,7 +398,6 @@ xchar x, y;
                 (void) passive(mon, uarmf, FALSE, 1, AT_KICK, FALSE);
             }
             update_u_action_revert(ACTION_TILE_NO_ACTION);
-
         }
         return;
     }
@@ -684,6 +681,7 @@ xchar x, y; /* coordinates where object was before the impact, not after */
     if (!Is_container(obj) || !Has_contents(obj) || Is_mbag(obj))
         return;
 
+    debugprint_pos();
     costly = ((shkp = shop_keeper(*in_rooms(x, y, SHOPBASE)))
               && costly_spot(x, y));
     insider = (*u.ushops && inside_shop(u.ux, u.uy)
@@ -720,12 +718,11 @@ xchar x, y; /* coordinates where object was before the impact, not after */
                     stolen_value(otmp, x, y, is_peaceful(shkp), TRUE);
             }
             if (otmp->quan > 1L) {
-                Sprintf(priority_debug_buf_2, "container_impact_dmg: %d", otmp->otyp);
+                debugprint("container_impact_dmg: %d", otmp->otyp);
                 useup(otmp);
             } else {
-                Strcpy(debug_buf_2, "container_impact_dmg");
+                debugprint("container_impact_dmg2: %d", otmp->otyp);
                 obj_extract_self(otmp);
-                Sprintf(priority_debug_buf_4, "container_impact_dmg: %d", otmp->otyp);
                 obfree(otmp, (struct obj *) 0);
             }
             /* contents of this container are no longer known */
@@ -886,10 +883,12 @@ boolean is_golf_swing;
 //        range = 1;
 
     /* see if the object has a place to move into */
-    if (!ZAP_POS(levl[x + u.dx][y + u.dy].typ)
+    if (!isok(x + u.dx, y + u.dy)
+        || !ZAP_POS(levl[x + u.dx][y + u.dy].typ)
         || closed_door(x + u.dx, y + u.dy))
         range = 1;
 
+    debugprint_pos();
     costly = (!(kickedobj->no_charge && !Has_contents(kickedobj))
               && (shkp = shop_keeper(*in_rooms(x, y, SHOPBASE))) != 0
               && costly_spot(x, y));
@@ -913,7 +912,7 @@ boolean is_golf_swing;
             pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s loose.", The(distant_name(kickedobj, xname)),
                   otense(kickedobj, "come"));
         kickedobj->speflags &= ~SPEFLAGS_CAUGHT_IN_LEAVES;
-        Strcpy(debug_buf_2, "really_kick_object");
+        debugprint("really_kick_object: %d", kickedobj->otyp);
         obj_extract_self(kickedobj);
         newsym(x, y);
         if (costly && (!costly_spot(u.ux, u.uy)
@@ -950,6 +949,7 @@ boolean is_golf_swing;
             {
                 if (kickedobj->keyotyp == STRANGE_OBJECT || kickedobj->keyotyp == NON_PM || kickedobj->keyotyp == SKELETON_KEY || kickedobj->keyotyp == MASTER_KEY)
                 {
+                    issue_achievement(GUI_ACHIEVEMENT_BROKE_CHEST_LOCK_BY_KICKING);
                     play_simple_container_sound(kickedobj, CONTAINER_SOUND_TYPE_BREAK_LOCK);
                     You_ex(ATR_NONE, CLR_MSG_SUCCESS, "break open the lock!");
                     breakchestlock(kickedobj, FALSE);
@@ -1043,7 +1043,7 @@ boolean is_golf_swing;
 
     if (costly && !isgold)
         addtobill(kickedobj, FALSE, FALSE, TRUE);
-    Strcpy(debug_buf_2, "really_kick_object2");
+    debugprint("really_kick_object2: %d", kickedobj->otyp);
     obj_extract_self(kickedobj);
     (void) snuff_candle(kickedobj);
     newsym(x, y);
@@ -1088,7 +1088,7 @@ boolean is_golf_swing;
     place_object(kickedobj, bhitpos.x, bhitpos.y);
     play_object_floor_sound(kickedobj, OBJECT_SOUND_TYPE_DROP_AFTER_THROW, Underwater);
     stackobj(kickedobj);
-    newsym(kickedobj->ox, kickedobj->oy);
+    newsym(bhitpos.x, bhitpos.y);
     return 1;
 }
 
@@ -1458,6 +1458,7 @@ boolean has_dir;
         {
             if (is_door_kickable_at_ptr(maploc) && !Levitation && rn2(30) < avrg_attrib)
             {
+                issue_achievement(GUI_ACHIEVEMENT_FOUND_SECRET_DOOR_OR_PASSAGE);
                 play_monster_weapon_hit_sound(&youmonst, HIT_SURFACE_SOURCE_LOCATION, xy_to_any(x, y), NATTK, (struct obj*)0, 5.0, HMON_MELEE);
                 cvt_sdoor_to_door(x, y); /* ->typ = DOOR */
                 pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "Crash!  %s a secret door!",
@@ -1503,6 +1504,7 @@ boolean has_dir;
         {
             if (!Levitation && rn2(30) < avrg_attrib)
             {
+                issue_achievement(GUI_ACHIEVEMENT_FOUND_SECRET_DOOR_OR_PASSAGE);
                 play_monster_weapon_hit_sound(&youmonst, HIT_SURFACE_SOURCE_LOCATION, xy_to_any(x, y), NATTK, (struct obj*)0, 5.0, HMON_MELEE);
                 pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "Crash!  You kick open a secret passage!");
                 exercise(A_DEX, TRUE);
@@ -1880,6 +1882,8 @@ boolean has_dir;
 
             if (!is_door_indestructible_at_ptr(maploc))
             {
+                //if (maploc->doormask & D_LOCKED)
+                //    issue_achievement(GUI_ACHIEVEMENT_KICKED_IN_LOCKED_DOOR);
                 maploc->doormask &= ~D_MASK;
                 maploc->doormask |= D_NODOOR;
                 maploc->subtyp = 0;
@@ -1893,6 +1897,8 @@ boolean has_dir;
         }
         else if (ACURR(A_STR) > 18 && !rn2(5) && !shopdoor)
         {
+            //if (maploc->doormask & D_LOCKED)
+            //    issue_achievement(GUI_ACHIEVEMENT_KICKED_IN_LOCKED_DOOR);
             play_simple_location_sound(x, y, LOCATION_SOUND_TYPE_WHAM);
             play_simple_location_sound(x, y, LOCATION_SOUND_TYPE_BREAK);
             pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "As you kick the %s, it shatters to pieces!", get_door_name_at(x, y));
@@ -1908,6 +1914,8 @@ boolean has_dir;
         } 
         else
         {
+            //if (maploc->doormask & D_LOCKED)
+            //    issue_achievement(GUI_ACHIEVEMENT_KICKED_IN_LOCKED_DOOR);
             play_simple_location_sound(x, y, LOCATION_SOUND_TYPE_WHAM);
             play_simple_location_sound(x, y, LOCATION_SOUND_TYPE_BREAK);
             pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "As you kick the %s, it crashes open!", get_door_name_at(x, y));
@@ -2058,6 +2066,7 @@ boolean dropall;
      * unsavory pline repetitions.
      */
     if (costly) {
+        debugprint_pos();
         if ((shkp = shop_keeper(*in_rooms(x, y, SHOPBASE))) != 0) {
             debit = ESHK(shkp)->debit;
             robbed = ESHK(shkp)->robbed;
@@ -2079,7 +2088,7 @@ boolean dropall;
         if ((isrock && obj->otyp == BOULDER)
             || (!dropall && rn2(obj->otyp == BOULDER ? 30 : 3)))
             continue;
-        Strcpy(debug_buf_2, "impact_drop");
+        debugprint("impact_drop");
         obj_extract_self(obj);
 
         if (costly) {
@@ -2237,8 +2246,11 @@ boolean shop_floor_obj;
             otmp->no_charge = 0;
     }
 
+    boolean ogone = FALSE;
     if (otmp->owornmask)
-        remove_worn_item(otmp, TRUE);
+        ogone = remove_worn_item(otmp, TRUE);
+    if (ogone)
+        return TRUE;
 
     /* some things break rather than ship */
     if (breaktest(otmp)) {
@@ -2260,9 +2272,8 @@ boolean shop_floor_obj;
             if (otmp->otyp == EGG && (otmp->speflags & SPEFLAGS_YOURS) && otmp->corpsenm >= LOW_PM)
                 change_luck(-1* (int)min(otmp->quan, 5L), TRUE);
         }
-        Strcpy(debug_buf_2, "ship_object");
+        debugprint("ship_object: %d", otmp->otyp);
         obj_extract_self(otmp);
-        Sprintf(priority_debug_buf_4, "ship_object: %d", otmp->otyp);
         obfree(otmp, (struct obj *) 0);
         return TRUE;
     }
@@ -2316,7 +2327,7 @@ boolean near_hero;
         if (!near_hero ^ (where == MIGR_WITH_HERO))
             continue;
 
-        Strcpy(debug_buf_2, "obj_delivery");
+        debugprint("obj_delivery: %d", otmp->otyp);
         obj_extract_self(otmp);
         otmp->owornmask = 0L;
 
@@ -2346,7 +2357,7 @@ boolean near_hero;
                         continue;
                 } else if (breaktest(otmp)) {
                     /* assume it broke before player arrived, no messages */
-                    Sprintf(priority_debug_buf_3, "obj_delivery: %d", otmp->otyp);
+                    debugprint("obj_delivery3: %d", otmp->otyp);
                     delobj(otmp);
                     continue;
                 }
@@ -2362,7 +2373,7 @@ boolean near_hero;
             otmp->ox = otmp->oy = 0;
             if (rloco(otmp) && !nobreak && breaktest(otmp)) {
                 /* assume it broke before player arrived, no messages */
-                Sprintf(priority_debug_buf_3, "obj_delivery2: %d", otmp->otyp);
+                debugprint("obj_delivery2: %d", otmp->otyp);
                 delobj(otmp);
             }
         }
@@ -2394,7 +2405,7 @@ uint64_t deliverflags;
             continue;
 
         if ((mtmp->data->mflags2 & otmp->corpsenm) != 0) {
-            Strcpy(debug_buf_2, "deliver_obj_to_mon");
+            debugprint("deliver_obj_to_mon");
             obj_extract_self(otmp);
             otmp->owornmask = 0L;
             otmp->ox = otmp->oy = 0;

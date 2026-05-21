@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Text;
 using SkiaSharp;
 using System.Diagnostics;
+using System.Globalization;
+
 
 #if GNH_MAUI
 using GnollHackM;
@@ -47,6 +49,8 @@ namespace GnollHackX
         private static readonly SKColor GHDarkOrange = new SKColor(136, 96, 0);
         private static readonly SKColor GHVeryDarkOrange = new SKColor(116, 76, 0);
 
+        public static readonly SKColor GHSemiTransparentBlack = new SKColor(0 , 0, 0, 128);
+
         public static readonly SKColorFilter MapHighlightColorFilter = SKColorFilter.CreateLighting(new SKColor(255, 255, 255), new SKColor(10, 10, 10));
         public static readonly SKColorFilter LookHighlightColorFilter = SKColorFilter.CreateLighting(new SKColor(255, 245, 255), new SKColor(10, 0, 10));
         public static readonly SKColorFilter HighlightColorFilter = SKColorFilter.CreateLighting(new SKColor(255, 255, 255), new SKColor(20, 20, 20));
@@ -57,6 +61,12 @@ namespace GnollHackX
                                 0.21f, 0.72f, 0.07f, 0, 0,
                                 0,     0,     0,     1, 0
                             });
+        public static readonly SKColorFilter InventoryLightWornColorFilter = SKColorFilter.CreateBlendMode(SKColors.SaddleBrown.WithAlpha(160), SKBlendMode.SrcIn);
+        public static readonly SKColorFilter InventoryLightUnwornColorFilter = SKColorFilter.CreateBlendMode(SKColors.SaddleBrown.WithAlpha(96), SKBlendMode.SrcIn);
+        public static readonly SKColorFilter InventoryLightInactiveColorFilter = SKColorFilter.CreateBlendMode(SKColors.SaddleBrown.WithAlpha(48), SKBlendMode.SrcIn);
+        public static readonly SKColorFilter InventoryDarkWornColorFilter = SKColorFilter.CreateBlendMode(SKColors.Gray.WithAlpha(160), SKBlendMode.SrcIn);
+        public static readonly SKColorFilter InventoryDarkUnwornColorFilter = SKColorFilter.CreateBlendMode(SKColors.Gray.WithAlpha(96), SKBlendMode.SrcIn);
+        public static readonly SKColorFilter InventoryDarkInactiveColorFilter = SKColorFilter.CreateBlendMode(SKColors.Gray.WithAlpha(48), SKBlendMode.SrcIn);
 
         public static SKColor NHColor2SKColor(int nhclr, int attr)
         {
@@ -281,6 +291,7 @@ namespace GnollHackX
                 case ghmenu_styles.GHMENU_STYLE_VIEW_FILE:
                     break;
                 case ghmenu_styles.GHMENU_STYLE_INVENTORY:
+                case ghmenu_styles.GHMENU_STYLE_INVENTORY_EQUIPMENT:
                 case ghmenu_styles.GHMENU_STYLE_SKILLS_ALTERNATE:
                 case ghmenu_styles.GHMENU_STYLE_SPELLS_ALTERNATE:
                 case ghmenu_styles.GHMENU_STYLE_VIEW_SPELL_ALTERNATE:
@@ -356,6 +367,7 @@ namespace GnollHackX
                 case ghmenu_styles.GHMENU_STYLE_VIEW_FILE:
                     break;
                 case ghmenu_styles.GHMENU_STYLE_INVENTORY:
+                case ghmenu_styles.GHMENU_STYLE_INVENTORY_EQUIPMENT:
                 case ghmenu_styles.GHMENU_STYLE_SKILLS_ALTERNATE:
                 case ghmenu_styles.GHMENU_STYLE_SPELLS_ALTERNATE:
                 case ghmenu_styles.GHMENU_STYLE_VIEW_SPELL_ALTERNATE:
@@ -426,6 +438,7 @@ namespace GnollHackX
                 case ghmenu_styles.GHMENU_STYLE_VIEW_FILE:
                     break;
                 case ghmenu_styles.GHMENU_STYLE_INVENTORY:
+                case ghmenu_styles.GHMENU_STYLE_INVENTORY_EQUIPMENT:
                 case ghmenu_styles.GHMENU_STYLE_SKILLS_ALTERNATE:
                 case ghmenu_styles.GHMENU_STYLE_SPELLS_ALTERNATE:
                 case ghmenu_styles.GHMENU_STYLE_VIEW_SPELL_ALTERNATE:
@@ -541,6 +554,7 @@ namespace GnollHackX
                 case ghmenu_styles.GHMENU_STYLE_VIEW_FILE:
                     break;
                 case ghmenu_styles.GHMENU_STYLE_INVENTORY:
+                case ghmenu_styles.GHMENU_STYLE_INVENTORY_EQUIPMENT:
                 case ghmenu_styles.GHMENU_STYLE_SKILLS_ALTERNATE:
                 case ghmenu_styles.GHMENU_STYLE_SPELLS_ALTERNATE:
                 case ghmenu_styles.GHMENU_STYLE_VIEW_SPELL_ALTERNATE:
@@ -608,6 +622,7 @@ namespace GnollHackX
                 case ghmenu_styles.GHMENU_STYLE_VIEW_FILE:
                     break;
                 case ghmenu_styles.GHMENU_STYLE_INVENTORY:
+                case ghmenu_styles.GHMENU_STYLE_INVENTORY_EQUIPMENT:
                 case ghmenu_styles.GHMENU_STYLE_SKILLS_ALTERNATE:
                     break;
                 case ghmenu_styles.GHMENU_STYLE_PERMANENT_INVENTORY:
@@ -641,6 +656,7 @@ namespace GnollHackX
                     res = 21;
                     break;
                 case ghmenu_styles.GHMENU_STYLE_CHOOSE_PLAYER:
+                    res = 16;
                     break;
                 case ghmenu_styles.GHMENU_STYLE_CHOOSE_DIFFICULTY:
                     break;
@@ -676,6 +692,7 @@ namespace GnollHackX
                 case ghmenu_styles.GHMENU_STYLE_VIEW_SPELL:
                 case ghmenu_styles.GHMENU_STYLE_SPELLS_ALTERNATE:
                 case ghmenu_styles.GHMENU_STYLE_VIEW_SPELL_ALTERNATE:
+                case ghmenu_styles.GHMENU_STYLE_CHOOSE_PLAYER:
                     return true;
                 default:
                     return false;
@@ -863,6 +880,10 @@ namespace GnollHackX
                     break;
                 case BorderStyles.Simple:
                 case BorderStyles.SimpleAlternative:
+                case BorderStyles.SimpleTransformTopLeft:
+                case BorderStyles.SimpleAlternativeTransformTopLeft:
+                case BorderStyles.SimpleTransformTopRight:
+                case BorderStyles.SimpleAlternativeTransformTopRight:
                     {
                         double bordermarginsmall = GetSmallBorderMargin(width, height);
                         double bordermarginx = bordermarginsmall + (width / GHConstants.BackgroundBorderDivisor - bordermarginsmall) / 2;
@@ -890,6 +911,10 @@ namespace GnollHackX
                     break;
                 case BorderStyles.Simple:
                 case BorderStyles.SimpleAlternative:
+                case BorderStyles.SimpleTransformTopLeft:
+                case BorderStyles.SimpleAlternativeTransformTopLeft:
+                case BorderStyles.SimpleTransformTopRight:
+                case BorderStyles.SimpleAlternativeTransformTopRight:
                     {
                         double bordermarginx = (width / GHConstants.BackgroundBorderDivisor);
                         double bordermarginy = (height / GHConstants.BackgroundBorderDivisor);
@@ -921,6 +946,10 @@ namespace GnollHackX
                     break;
                 case BorderStyles.Simple:
                 case BorderStyles.SimpleAlternative:
+                case BorderStyles.SimpleTransformTopLeft:
+                case BorderStyles.SimpleAlternativeTransformTopLeft:
+                case BorderStyles.SimpleTransformTopRight:
+                case BorderStyles.SimpleAlternativeTransformTopRight:
                     {
                         double bordermarginx = (width / GHConstants.BackgroundBorderDivisor);
                         double bordermarginy = (height / GHConstants.BackgroundBorderDivisor);
@@ -961,12 +990,16 @@ namespace GnollHackX
             switch(borderstyle)
             {
                 case BorderStyles.Simple:
+                case BorderStyles.SimpleTransformTopLeft:
+                case BorderStyles.SimpleTransformTopRight:
                     cornerbitmap = GHApp.SimpleFrameTopLeftCornerBitmap;
                     break;
                 case BorderStyles.Small:
                     cornerbitmap = GHApp.SimpleFrameSmallTopLeftCornerBitmap;
                     break;
                 case BorderStyles.SimpleAlternative:
+                case BorderStyles.SimpleAlternativeTransformTopLeft:
+                case BorderStyles.SimpleAlternativeTransformTopRight:
                     cornerbitmap = GHApp.SimpleFrame2TopLeftCornerBitmap;
                     break;
                 case BorderStyles.SmallAlternative:
@@ -976,7 +1009,7 @@ namespace GnollHackX
                     cornerbitmap = GHApp.SimpleFrameTopLeftCornerBitmap;
                     break;
             }
-            double scale = Math.Max(0.1, Math.Min(1.0, bordermargin / (double)cornerbitmap.Height));
+            double scale = Math.Max(0.1, Math.Min(1.0, bordermargin / (double)Math.Max(1 , cornerbitmap.Height)));
             return scale;
         }
         public static double GetBorderWidth(BorderStyles borderstyle, double width, double height)
@@ -988,6 +1021,48 @@ namespace GnollHackX
         {
             double scale = GetBorderScale(borderstyle, width, height);
             return GHApp.SimpleFrameLeftVerticalBitmap.Width * scale;
+        }
+        public static double GetBorderCornerWidth(BorderStyles borderstyle, double width, double height)
+        {
+            SKImage cornerbitmap, borderhorizontal, bordervertical;
+            switch (borderstyle)
+            {
+                case BorderStyles.Simple:
+                case BorderStyles.SimpleTransformTopLeft:
+                case BorderStyles.SimpleTransformTopRight:
+                    borderhorizontal = GHApp.SimpleFrameTopHorizontalBitmap;
+                    bordervertical = GHApp.SimpleFrameLeftVerticalBitmap;
+                    cornerbitmap = GHApp.SimpleFrameTopLeftCornerBitmap;
+                    break;
+                case BorderStyles.Small:
+                    borderhorizontal = GHApp.SimpleFrameTopHorizontalBitmap;
+                    bordervertical = GHApp.SimpleFrameLeftVerticalBitmap;
+                    cornerbitmap = GHApp.SimpleFrameSmallTopLeftCornerBitmap;
+                    break;
+                case BorderStyles.SimpleAlternative:
+                case BorderStyles.SimpleAlternativeTransformTopLeft:
+                case BorderStyles.SimpleAlternativeTransformTopRight:
+                    borderhorizontal = GHApp.SimpleFrame2TopHorizontalBitmap;
+                    bordervertical = GHApp.SimpleFrame2LeftVerticalBitmap;
+                    cornerbitmap = GHApp.SimpleFrame2TopLeftCornerBitmap;
+                    break;
+                case BorderStyles.SmallAlternative:
+                    borderhorizontal = GHApp.SimpleFrame2TopHorizontalBitmap;
+                    bordervertical = GHApp.SimpleFrame2LeftVerticalBitmap;
+                    cornerbitmap = GHApp.SimpleFrame2SmallTopLeftCornerBitmap;
+                    break;
+                default:
+                    borderhorizontal = GHApp.SimpleFrameTopHorizontalBitmap;
+                    bordervertical = GHApp.SimpleFrameLeftVerticalBitmap;
+                    cornerbitmap = GHApp.SimpleFrameTopLeftCornerBitmap;
+                    break;
+            }
+
+            double borderscalex = (width / GHConstants.BackgroundBorderDivisor / 6) / Math.Max(1, bordervertical.Width);
+            double borderscaley = (height / GHConstants.BackgroundBorderDivisor / 6) / Math.Max(1, borderhorizontal.Height);
+            double borderscale = Math.Max(0.10, Math.Min(10.0, Math.Sqrt(borderscalex * borderscaley)));
+
+            return cornerbitmap.Width * borderscale;
         }
 
         public static uint GetMainCanvasAnimationInterval(MapRefreshRateStyle mapRefreshRate)
@@ -1321,12 +1396,12 @@ namespace GnollHackX
             return false;
         }
 
-        public static double CalculateButtonSideWidth(double canvasViewWidth, double canvasViewHeight, bool usingDesktopButtons, bool usingSimpleCmdLayout, int stoneButtonRows, float inverseCanvasScale, float customScale, int noOfLandscapeButtonsInRow, int noOfPortraitButtonsInRow, bool isSmaller)
+        public static double CalculateButtonSideWidth(double canvasViewWidth, double canvasViewHeight, bool usingDesktopButtons, bool usingSimpleCmdLayout, int stoneButtonRows, float inverseCanvasScale, float customScale, int noOfLandscapeButtonsInRow, int noOfPortraitButtonsInRow, bool isSmaller, bool showKeyboardShortcuts)
         {
             double tmpSideWidth = UIUtils.CalculatePreliminaryButtonSideWidth(canvasViewWidth, canvasViewHeight, usingDesktopButtons, usingSimpleCmdLayout, inverseCanvasScale, customScale, noOfLandscapeButtonsInRow, noOfPortraitButtonsInRow, isSmaller);
             if (noOfLandscapeButtonsInRow > 0 && noOfPortraitButtonsInRow > 0) /* Yes/no buttons are not limited by height */
                 return tmpSideWidth;
-            double tmpSideHeight = UIUtils.CalculatePreliminaryButtonSideHeight(canvasViewWidth, canvasViewHeight, usingDesktopButtons, usingSimpleCmdLayout, stoneButtonRows, inverseCanvasScale, customScale, noOfLandscapeButtonsInRow, noOfPortraitButtonsInRow, isSmaller);
+            double tmpSideHeight = UIUtils.CalculatePreliminaryButtonSideHeight(canvasViewWidth, canvasViewHeight, usingDesktopButtons, usingSimpleCmdLayout, stoneButtonRows, inverseCanvasScale, customScale, noOfLandscapeButtonsInRow, noOfPortraitButtonsInRow, isSmaller, showKeyboardShortcuts);
             return Math.Min(tmpSideWidth, tmpSideHeight);
         }
 
@@ -1340,7 +1415,7 @@ namespace GnollHackX
             return tmpsidewidth;
         }
 
-        public static double CalculatePreliminaryButtonSideHeight(double canvasViewWidth, double canvasViewHeight, bool usingDesktopButtons, bool usingSimpleCmdLayout, int stoneButtonRows, float inverseCanvasScale, float customScale, int noOfLandscapeButtonsInRow, int noOfPortraitButtonsInRow, bool isSmaller)
+        public static double CalculatePreliminaryButtonSideHeight(double canvasViewWidth, double canvasViewHeight, bool usingDesktopButtons, bool usingSimpleCmdLayout, int stoneButtonRows, float inverseCanvasScale, float customScale, int noOfLandscapeButtonsInRow, int noOfPortraitButtonsInRow, bool isSmaller, bool showKeyboardShortcuts)
         {
             if(inverseCanvasScale == 0.0f)
                 inverseCanvasScale = 1.0f;
@@ -1354,7 +1429,7 @@ namespace GnollHackX
             float minNoOfLabeledButtonRows = minNoOfContextButtonRows + noOfCommandRows;
             int noOfVerticalSmallerButtons = stoneButtonRows; // usingSimpleCmdLayout ? (isWideLandscape ? 2 : isLandscape ? 3 : 4) : (isWideLandscape ? 2 : isLandscape ? 3 : 5);
             float labeledButtonFontSizeRelativeToButtonSize = GHConstants.ContextButtonBaseFontSize / 50f;
-            double noOfButtonWidthsNeededForHeight = minNoOfLabeledButtonRows * (1.0f + labeledButtonFontSizeRelativeToButtonSize)
+            double noOfButtonWidthsNeededForHeight = minNoOfLabeledButtonRows * (1.0f + labeledButtonFontSizeRelativeToButtonSize * (showKeyboardShortcuts ? GHConstants.TextRowMultiplierWithKeyboardShortcuts : 1.0f))
                 //+ statusBarRowSizeRelativeToButtonWidth
                 + noOfVerticalSmallerButtons * 75f / 80f;
             double statusBarSize = CalculateStatusBarSkiaHeight(inverseCanvasScale, customScale, canvasViewWidth, canvasViewHeight) / inverseCanvasScale;
@@ -1429,7 +1504,7 @@ namespace GnollHackX
             float freeSpace = skiaCanvasHeight - skiaStatusBarHeight - 2 * orbHeight - skillButtonHeight - noOfCommandRows * commandRowHeight + (noOfCommandRows - 1) * 6 * inverseCanvasScale;
             int requiredNumberOfTextRows = 9;
             float freeSpacePerTextRow = freeSpace / requiredNumberOfTextRows;
-            float fontHeight = messageFontSize * inverseCanvasScale;
+            float fontHeight = Math.Max(0.01f, messageFontSize * inverseCanvasScale);
             float possibleScaling = freeSpacePerTextRow / fontHeight;
 
             return Math.Max(1.0f, Math.Min(possibleScaling, Math.Min(GHConstants.WindowMessageFontSizeMaxMultiplier, (float)relevantScale)));

@@ -230,7 +230,7 @@ int fd;
     int count, i;
     mapseen *curr_ms, *last_ms;
 
-    Strcpy(debug_buf_4, "restore_dungeon");
+    //debugprint("restore_dungeon");
     mread(fd, (genericptr_t) &n_dgns, sizeof(n_dgns));
     mread(fd, (genericptr_t) dungeons, sizeof(dungeon) * (size_t) n_dgns);
     mread(fd, (genericptr_t) &dungeon_topology, sizeof dungeon_topology);
@@ -1226,6 +1226,21 @@ d_level *lev;
             return curr;
     }
     return (branch *) 0;
+}
+
+branch*
+get_current_branch(lev)
+d_level* lev;
+{
+    if (!lev || lev->dnum == main_dungeon_dnum)
+        return (branch*)0;
+
+    branch* curr;
+    for (curr = branches; curr; curr = curr->next) {
+        if (lev->dnum == curr->end1.dnum || lev->dnum == curr->end2.dnum)
+            return curr;
+    }
+    return (branch*)0;
 }
 
 /* returns True iff the branch 'lev' is in a branch which builds up */
@@ -2374,7 +2389,7 @@ int fd;
 
     load = (mapseen *) alloc(sizeof *load);
 
-    Strcpy(debug_buf_4, "load_mapseen");
+    //debugprint("load_mapseen");
     mread(fd, (genericptr_t) &branchnum, sizeof branchnum);
     for (brindx = 0, curr = branches; curr; curr = curr->next, ++brindx)
         if (brindx == branchnum)
@@ -2561,7 +2576,7 @@ mapseen *mptr;
 
 /* recalculate mapseen for the current level */
 void
-recalc_mapseen()
+recalc_mapseen(VOID_ARGS)
 {
     mapseen *mptr;
     struct monst *mtmp = (struct monst*)0;
@@ -2620,6 +2635,7 @@ recalc_mapseen()
     mptr->flags.yacc_hint_shown = (at_dgn_entrance("Hellish Pastures") && u.uevent.bovine_portal_hint && !u.uevent.hellish_pastures_entered);
     mptr->flags.quantum_hint_shown = (at_dgn_entrance("The Large Circular Dungeon") && u.uevent.quantum_portal_hint && !u.uevent.large_circular_dgn_entered);
 
+    debugprint_pos();
     /* track rooms the hero is in */
     for (i = 0; i < SIZE(u.urooms); ++i) {
         if (!u.urooms[i])
@@ -2934,6 +2950,7 @@ int reason; /* how hero died; used when disclosing end-of-game level */
     winid win;
     int lastdun = -1;
 
+    debugprint_pos();
     /* lazy initialization */
     (void) recalc_mapseen();
 

@@ -24,6 +24,7 @@ const char
 STATIC_VAR const struct innate 
   arc_abil[] = { { 1, STEALTH, "", "" }, /* &(HStealth) */
                  { 1, FAST, "", "" },
+                 { 7, CORPSE_PROPERTY_APPRAISAL, "sensitive to corpses", "" },
                  { 10, SEARCHING, "perceptive", "" },
                  { 0, 0, 0, 0 } },
 
@@ -33,10 +34,12 @@ STATIC_VAR const struct innate
                  { 0, 0, 0, 0 } },
 
   cav_abil[] = { { 7, FAST, "quick", "slow" },
+                 { 10, CORPSE_PROPERTY_APPRAISAL, "sensitive to corpses", "" },
                  { 15, WARNING, "sensitive", "" },
                  { 0, 0, 0, 0 } },
 
   hea_abil[] = { { 1, POISON_RESISTANCE, "", "" },
+                 { 1, CORPSE_PROPERTY_APPRAISAL, "sensitive to corpses", "" },
                  { 7, LYCANTHROPY_RESISTANCE, "immune to lycanthropy", "less protected from lycanthropy" },
                  { 14, SICK_RESISTANCE, "healthy", "" },
                  { 0, 0, 0, 0 } },
@@ -58,7 +61,8 @@ STATIC_VAR const struct innate
                  { 34, TELEPORT_CONTROL, "controlled", "uncontrolled" },
                  { 0, 0, 0, 0 } },
 
-  pri_abil[] = { {  7, WARN_UNDEAD, "sensitive to undead", "" },
+  pri_abil[] = { {  4, CORPSE_PROPERTY_APPRAISAL, "sensitive to corpses", "" },
+                 {  7, WARN_UNDEAD, "sensitive to undead", "" },
                  { 10, WARN_DEMON, "sensitive to demons", "" },
                  { 13, WARN_ANGEL, "sensitive to angels", "" },
                  { 16, CURSE_RESISTANCE, "holy", "less holy" },
@@ -111,7 +115,9 @@ STATIC_VAR const struct innate
                  { 0, 0, 0, 0 } },
 
   gnl_abil[] = { { 1, LYCANTHROPY_RESISTANCE, "", "" },
-                   { 0, 0, 0, 0 } },
+                 { 1, CORPSE_PROPERTY_APPRAISAL, "", "" },
+                 { 1, EDIBILITY_APPRAISAL, "", "" },
+                 { 0, 0, 0, 0 } },
 
   hum_abil[] = { { 0, 0, 0, 0 } };
 
@@ -412,12 +418,13 @@ boolean exclaim; /* emphasis */
 
 /* called when an attack or trap has poisoned hero (used to be in mon.c) */
 void
-poisoned(reason, typ, pkiller, fatal, thrown_weapon, poison_strength)
+poisoned(reason, typ, pkiller, fatal, thrown_weapon, poison_strength, mattacker)
 const char *reason,    /* controls what messages we display */
            *pkiller;   /* for score+log file if fatal */
 int typ, fatal;        /* if fatal is 0, limit damage to adjattrib */
 boolean thrown_weapon; /* thrown weapons are less deadly */
 int poison_strength;   /* d6 per level damage*/
+struct monst* mattacker;
 {
     int i, loss, kprefix = KILLED_BY_AN;
     double damage = 0;
@@ -466,7 +473,7 @@ int poison_strength;   /* d6 per level damage*/
     if (i == 0 && typ != A_CHA)
     {
         /* no more instant kill but (4 + poison strength)d6 + 10 damage */
-        damage = adjust_damage(d(poison_strength ? 4 + poison_strength : 6, 6) + 10, (struct monst*)0, &youmonst, AD_DRST, ADFLAGS_NONE);
+        damage = adjust_damage(d(poison_strength ? 4 + poison_strength : 6, 6) + 10, mattacker, &youmonst, AD_DRST, ADFLAGS_NONE);
         losehp(damage, pkiller, kprefix); /* poison damage */
 
         //Attribute loss
@@ -484,7 +491,7 @@ int poison_strength;   /* d6 per level damage*/
     else
     {
         /* HP damage; more likely--but less severe--with missiles */
-        damage = adjust_damage(poison_strength ? d(poison_strength, 6) : thrown_weapon ? rnd(6) : rn1(10, 6), (struct monst*)0, & youmonst, AD_DRST, ADFLAGS_NONE); //10...15
+        damage = adjust_damage(poison_strength ? d(poison_strength, 6) : thrown_weapon ? rnd(6) : rn1(10, 6), mattacker, & youmonst, AD_DRST, ADFLAGS_NONE); //10...15
         losehp(damage, pkiller, kprefix); /* poison damage */
 
         if (rn2(100) < (poison_strength ? 5 * poison_strength : 15))
@@ -527,11 +534,12 @@ int poison_strength;   /* d6 per level damage*/
 
 /* called when an attack with elemental enchantment has hit the hero (used to be in mon.c) */
 void
-extra_enchantment_damage(reason, elemental_enchantment, pkiller, lifesavedalready)
+extra_enchantment_damage(reason, elemental_enchantment, pkiller, lifesavedalready, mattacker)
 const char* reason,    /* controls what messages we display */
 * pkiller;   /* for score+log file if fatal */
 uchar elemental_enchantment;
 boolean lifesavedalready;
+struct monst* mattacker;
 {
     int kprefix = KILLED_BY_AN;
     double damage = 0;
@@ -563,7 +571,7 @@ boolean lifesavedalready;
             }
 
             play_sfx_sound(SFX_MONSTER_COVERED_IN_FROST);
-            damage = adjust_damage(d(12, 6), (struct monst*)0, &youmonst, AD_COLD, ADFLAGS_NONE);
+            damage = adjust_damage(d(12, 6), mattacker, &youmonst, AD_COLD, ADFLAGS_NONE);
             losehp(damage, pkiller, kprefix);
             break;
         }
@@ -581,7 +589,7 @@ boolean lifesavedalready;
             }
 
             play_sfx_sound(SFX_MONSTER_ON_FIRE);
-            damage = adjust_damage(d(4, 6), (struct monst*)0, &youmonst, AD_FIRE, ADFLAGS_NONE);
+            damage = adjust_damage(d(4, 6), mattacker, &youmonst, AD_FIRE, ADFLAGS_NONE);
             losehp(damage, pkiller, kprefix);
             break;
         }
@@ -599,7 +607,7 @@ boolean lifesavedalready;
             }
 
             play_sfx_sound(SFX_MONSTER_GETS_ZAPPED);
-            damage = adjust_damage(d(6, 6), (struct monst*)0, &youmonst, AD_ELEC, ADFLAGS_NONE);
+            damage = adjust_damage(d(6, 6), mattacker, &youmonst, AD_ELEC, ADFLAGS_NONE);
             losehp(damage, pkiller, kprefix);
             break;
         }
@@ -608,7 +616,7 @@ boolean lifesavedalready;
             pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s%s %s imbued by death magic!",
                 isupper((uchar)*reason) ? "" : "The ", reason,
                 plural ? "were" : "was");
-            if (Death_resistance || is_not_living(youmonst.data) || is_demon(youmonst.data))
+            if (Death_resistance || Invulnerable || is_not_living(youmonst.data) || is_demon(youmonst.data))
             {
                 play_sfx_sound(SFX_GENERAL_UNAFFECTED);
                 u_shieldeff();
@@ -621,7 +629,7 @@ boolean lifesavedalready;
             if (lifesavedalready)
             {
                 //Just do 10d6 damage if life was saved by amulet of life saving
-                damage = adjust_damage(d(10, 6), (struct monst*)0, &youmonst, AD_DRAY, ADFLAGS_NONE);
+                damage = adjust_damage(d(10, 6), mattacker, &youmonst, AD_DRAY, ADFLAGS_NONE);
                 losehp(damage, pkiller, kprefix);
             }
             else
@@ -1863,7 +1871,7 @@ int propidx; /* OBSOLETE: special cases can have negative values */
                 int64_t dur = u.uprops[propidx].intrinsic & TIMEOUT;
                 if (*buf)
                     Strcat(buf, " and");
-                Sprintf(eos(buf), " %s%s (%lld round%s left)", because_used ? "" : "because of ", "an effect", (long long)dur, plur(dur));
+                Sprintf(eos(buf), " %s%s (%lld turn%s left)", because_used ? "" : "because of ", "an effect", (long long)dur, plur(dur));
             }
         }
         else { /* negative property index */
@@ -2169,7 +2177,7 @@ struct monst* mon;
         u.uspellcastingbonus_all = 0;
         u.uexperiencebonus = 0;
         u.uarcherybonus = 0;
-        u.xray_range = Extended_XRay_vision ? 6 : XRay_vision ? 4 : -1;
+        u.xray_range = Astral_vision ? ASTRAL_VISION_RANGE : XRay_vision ? XRAY_VISION_RANGE : -1;
 
         u.moreluck = 0;
         u.luck_does_not_timeout = 0;

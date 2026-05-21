@@ -12,7 +12,7 @@ STATIC_DCL boolean FDECL(m_dowear_type,
                       (struct monst *, int64_t, BOOLEAN_P, BOOLEAN_P));
 STATIC_DCL int FDECL(extra_pref, (struct monst *, struct obj *));
 STATIC_DCL void FDECL(set_mon_temporary_property, (struct monst*, int, UNSIGNED_SHORT_P));
-
+STATIC_DCL boolean FDECL(mon_wears_misc_subtype, (struct monst*, SCHAR_P));
 
 const struct worn {
     int64_t w_mask;
@@ -202,7 +202,15 @@ boolean verbose_and_update_stats;
         obj->nknown = TRUE;
     }
 
+    int trackidx = add_to_obj_tracking(obj);
+    int trackidx2 = add_to_obj_tracking(oobj);
     update_all_character_properties(obj, verbose_and_update_stats);
+    boolean obj_gone = finish_obj_tracking(trackidx);
+    boolean oobj_gone = finish_obj_tracking(trackidx2);
+    if (obj_gone)
+        obj = 0;
+    if (oobj_gone)
+        oobj = 0;
 
     /* Note that this does not work for weapons if there is an old weapon, since we do not know whether the change was caused by the old or the new weapon */
     if ((obj && !oobj) || (oobj && !obj))
@@ -271,23 +279,23 @@ boolean verbose_and_update_stats;
 }
 
 
-void
+boolean
 setnotworn(obj)
 register struct obj* obj;
 {
-    setnotworncore(obj, TRUE);
+    return setnotworncore(obj, TRUE);
 }
 
-void
+boolean
 setnotwornquietly(obj)
 register struct obj* obj;
 {
-    setnotworncore(obj, FALSE);
+    return setnotworncore(obj, FALSE);
 }
 
 /* called e.g. when obj is destroyed */
 /* Updated to use the extrinsic and blocked fields. */
-void
+boolean
 setnotworncore(obj, verbose)
 register struct obj *obj;
 boolean verbose;
@@ -295,7 +303,7 @@ boolean verbose;
     register const struct worn *wp;
 
     if (!obj)
-        return;
+        return FALSE;
 
     int oldmanamax = u.uenmax;
     int oldhpmax = u.uhpmax;
@@ -320,7 +328,11 @@ boolean verbose;
         }
     }
 
+    int trackidx = add_to_obj_tracking(obj);
     update_all_character_properties(obj, verbose);
+    boolean obj_gone = finish_obj_tracking(trackidx);
+    if (obj_gone)
+        obj = 0;
 
     if (obj)
     {
@@ -350,6 +362,7 @@ boolean verbose;
         context.botl = context.botlx = 1;
     }
     update_inventory();
+    return obj_gone;
 }
 
 /* return item worn in slot indiciated by wornmask; needed by poly_obj() */
@@ -682,6 +695,8 @@ boolean silently;
     boolean was_fearful = is_fearful(mtmp);
     boolean was_fleeing = is_fleeing(mtmp);
     boolean was_charmed = is_charmed(mtmp);
+    boolean was_controlled = is_controlled(mtmp);
+    boolean was_charmed_or_controlled = is_charmed_or_controlled(mtmp);
     boolean was_tame = is_tame(mtmp);
     boolean was_peaceful = is_peaceful(mtmp);
     boolean was_silenced = is_silenced(mtmp);
@@ -960,14 +975,24 @@ boolean silently;
         if (is_charmed(mtmp) && !was_charmed)
         {
             res = TRUE;
-            pline("%s is charmed!", Monnam(mtmp));
+            pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "%s is charmed!", Monnam(mtmp));
             if (is_tame(mtmp) && !was_tame)
                 pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "%s looks friendly.", Monnam(mtmp));
             else
                 pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s looks %s for a while.", Monnam(mtmp), is_tame(mtmp) ? "a little perplexed" :
                     is_peaceful(mtmp) ? "a little uncomfortable" : "uncomfortable");
         }
-        if (!is_charmed(mtmp) && was_charmed)
+        if (is_controlled(mtmp) && !was_controlled)
+        {
+            res = TRUE;
+            pline_ex(ATR_NONE, CLR_MSG_SUCCESS, "%s is controlled!", Monnam(mtmp));
+            if (is_tame(mtmp) && !was_tame)
+                pline_ex(ATR_NONE, CLR_MSG_POSITIVE, "%s looks friendly.", Monnam(mtmp));
+            else
+                pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s looks %s for a while.", Monnam(mtmp), is_tame(mtmp) ? "a little perplexed" :
+                    is_peaceful(mtmp) ? "a little uncomfortable" : "uncomfortable");
+        }
+        if (!is_charmed_or_controlled(mtmp) && was_charmed_or_controlled)
         {
             res = TRUE;
             if (is_tame(mtmp))
@@ -1385,6 +1410,10 @@ boolean creation, commanded;
     boolean wears_ringr = FALSE;
     boolean wears_ringl = FALSE;
     boolean wears_misc1 = FALSE;
+    boolean wears_misc2 = FALSE;
+    boolean wears_misc3 = FALSE;
+    boolean wears_misc4 = FALSE;
+    boolean wears_misc5 = FALSE;
 
     struct obj* old_shirt = which_armor(mon, W_ARMU);
     struct obj* old_suit = which_armor(mon, W_ARM);
@@ -1399,6 +1428,10 @@ boolean creation, commanded;
     struct obj* old_ringr = which_armor(mon, W_RINGR);
     struct obj* old_ringl = which_armor(mon, W_RINGL);
     struct obj* old_misc1 = which_armor(mon, W_MISC);
+    struct obj* old_misc2 = which_armor(mon, W_MISC2);
+    struct obj* old_misc3 = which_armor(mon, W_MISC3);
+    struct obj* old_misc4 = which_armor(mon, W_MISC4);
+    struct obj* old_misc5 = which_armor(mon, W_MISC5);
 
     int old_shirt_delay = old_shirt ? objects[old_shirt->otyp].oc_delay : 0;
     int old_suit_delay = old_suit ? objects[old_suit->otyp].oc_delay : 0;
@@ -1413,6 +1446,10 @@ boolean creation, commanded;
     int old_ringr_delay = old_ringr ? objects[old_ringr->otyp].oc_delay : 0;
     int old_ringl_delay = old_ringl ? objects[old_ringl->otyp].oc_delay : 0;
     int old_misc1_delay = old_misc1 ? objects[old_misc1->otyp].oc_delay : 0;
+    int old_misc2_delay = old_misc2 ? objects[old_misc2->otyp].oc_delay : 0;
+    int old_misc3_delay = old_misc3 ? objects[old_misc3->otyp].oc_delay : 0;
+    int old_misc4_delay = old_misc4 ? objects[old_misc4->otyp].oc_delay : 0;
+    int old_misc5_delay = old_misc5 ? objects[old_misc5->otyp].oc_delay : 0;
 
     /* Main armor */
     if (can_wear_shirt(mon->data) && (cursed_items_are_positive_mon(mon) || !((old_cloak && old_cloak->cursed) || (old_robe && old_robe->cursed) || (old_suit && old_suit->cursed))) )
@@ -1458,63 +1495,118 @@ boolean creation, commanded;
 
     /* Always check miscellaneous */
     wears_misc1 = m_dowear_type(mon, W_MISC, creation, FALSE);
+    if (old_misc1 || wears_misc1)
+    {
+        wears_misc2 = m_dowear_type(mon, W_MISC2, creation, FALSE);
+        if (old_misc2 || wears_misc2)
+        {
+            wears_misc3 = m_dowear_type(mon, W_MISC3, creation, FALSE);
+            if (old_misc3 || wears_misc3)
+            {
+                wears_misc4 = m_dowear_type(mon, W_MISC4, creation, FALSE);
+                if (old_misc4 || wears_misc4)
+                {
+                    wears_misc5 = m_dowear_type(mon, W_MISC5, creation, FALSE);
+                }
+            }
+        }
+    }
 
     update_all_mon_statistics(mon, creation);
 
-    struct obj* new_shirt = which_armor(mon, W_ARMU);
-    struct obj* new_suit = which_armor(mon, W_ARM);
-    struct obj* new_robe = which_armor(mon, W_ARMO);
-    struct obj* new_cloak = which_armor(mon, W_ARMC);
-    struct obj* new_gloves = which_armor(mon, W_ARMG);
-    struct obj* new_helmet = which_armor(mon, W_ARMH);
-    struct obj* new_bracers = which_armor(mon, W_ARMB);
-    struct obj* new_boots = which_armor(mon, W_ARMF);
-    struct obj* new_shield = which_armor(mon, W_ARMS);
-    struct obj* new_amulet = which_armor(mon, W_AMUL);
-    struct obj* new_ringr = which_armor(mon, W_RINGR);
-    struct obj* new_ringl = which_armor(mon, W_RINGL);
-    struct obj* new_misc1 = which_armor(mon, W_MISC);
+    /* Allocate delay only if not creation */
+    if (!creation)
+    {
+        struct obj* new_shirt = which_armor(mon, W_ARMU);
+        struct obj* new_suit = which_armor(mon, W_ARM);
+        struct obj* new_robe = which_armor(mon, W_ARMO);
+        struct obj* new_cloak = which_armor(mon, W_ARMC);
+        struct obj* new_gloves = which_armor(mon, W_ARMG);
+        struct obj* new_helmet = which_armor(mon, W_ARMH);
+        struct obj* new_bracers = which_armor(mon, W_ARMB);
+        struct obj* new_boots = which_armor(mon, W_ARMF);
+        struct obj* new_shield = which_armor(mon, W_ARMS);
+        struct obj* new_amulet = which_armor(mon, W_AMUL);
+        struct obj* new_ringr = which_armor(mon, W_RINGR);
+        struct obj* new_ringl = which_armor(mon, W_RINGL);
+        struct obj* new_misc1 = which_armor(mon, W_MISC);
+        struct obj* new_misc2 = which_armor(mon, W_MISC2);
+        struct obj* new_misc3 = which_armor(mon, W_MISC3);
+        struct obj* new_misc4 = which_armor(mon, W_MISC4);
+        struct obj* new_misc5 = which_armor(mon, W_MISC5);
 
-    int new_shirt_delay = new_shirt ? objects[new_shirt->otyp].oc_delay : 0;
-    int new_suit_delay = new_suit ? objects[new_suit->otyp].oc_delay : 0;
-    int new_robe_delay = new_robe ? objects[new_robe->otyp].oc_delay : 0;
-    int new_cloak_delay = new_cloak ? objects[new_cloak->otyp].oc_delay : 0;
-    int new_gloves_delay = new_gloves ? objects[new_gloves->otyp].oc_delay : 0;
-    int new_helmet_delay = new_helmet ? objects[new_helmet->otyp].oc_delay : 0;
-    int new_bracers_delay = new_bracers ? objects[new_bracers->otyp].oc_delay : 0;
-    int new_boots_delay = new_boots ? objects[new_boots->otyp].oc_delay : 0;
-    int new_shield_delay = new_shield ? objects[new_shield->otyp].oc_delay : 0;
-    int new_amulet_delay = new_amulet ? objects[new_amulet->otyp].oc_delay : 0;
-    int new_ringr_delay = new_ringr ? objects[new_ringr->otyp].oc_delay : 0;
-    int new_ringl_delay = new_ringl ? objects[new_ringl->otyp].oc_delay : 0;
-    int new_misc1_delay = new_misc1 ? objects[new_misc1->otyp].oc_delay : 0;
+        int new_shirt_delay = new_shirt ? objects[new_shirt->otyp].oc_delay : wears_shirt ? 1 : 0;
+        int new_suit_delay = new_suit ? objects[new_suit->otyp].oc_delay : wears_suit ? 1 : 0;
+        int new_robe_delay = new_robe ? objects[new_robe->otyp].oc_delay : wears_robe ? 1 : 0;
+        int new_cloak_delay = new_cloak ? objects[new_cloak->otyp].oc_delay : wears_cloak ? 1 : 0;
+        int new_gloves_delay = new_gloves ? objects[new_gloves->otyp].oc_delay : wears_gloves ? 1 : 0;
+        int new_helmet_delay = new_helmet ? objects[new_helmet->otyp].oc_delay : wears_helmet ? 1 : 0;
+        int new_bracers_delay = new_bracers ? objects[new_bracers->otyp].oc_delay : wears_bracers? 1 : 0;
+        int new_boots_delay = new_boots ? objects[new_boots->otyp].oc_delay : wears_boots ? 1 : 0;
+        int new_shield_delay = new_shield ? objects[new_shield->otyp].oc_delay : wears_shield ? 1 : 0;
+        int new_amulet_delay = new_amulet ? objects[new_amulet->otyp].oc_delay : wears_amulet ? 1 : 0;
+        int new_ringr_delay = new_ringr ? objects[new_ringr->otyp].oc_delay : wears_ringr ? 1 : 0;
+        int new_ringl_delay = new_ringl ? objects[new_ringl->otyp].oc_delay : wears_ringl ? 1 : 0;
+        int new_misc1_delay = new_misc1 ? objects[new_misc1->otyp].oc_delay : wears_misc1 ? 1 : 0;
+        int new_misc2_delay = new_misc2 ? objects[new_misc2->otyp].oc_delay : wears_misc2 ? 1 : 0;
+        int new_misc3_delay = new_misc3 ? objects[new_misc3->otyp].oc_delay : wears_misc3 ? 1 : 0;
+        int new_misc4_delay = new_misc4 ? objects[new_misc4->otyp].oc_delay : wears_misc4 ? 1 : 0;
+        int new_misc5_delay = new_misc5 ? objects[new_misc5->otyp].oc_delay : wears_misc5 ? 1 : 0;
 
-    boolean takes_off_old_suit = wears_shirt || wears_suit;
-    boolean takes_off_old_robe = wears_shirt || wears_suit || wears_robe;
-    boolean takes_off_old_cloak = wears_shirt || wears_suit || wears_robe || wears_cloak;
+        boolean takes_off_old_suit = wears_shirt || wears_suit;
+        boolean takes_off_old_robe = wears_shirt || wears_suit || wears_robe;
+        boolean takes_off_old_cloak = wears_shirt || wears_suit || wears_robe || wears_cloak;
 
-    int totaldelay = 0;
-    totaldelay += takes_off_old_cloak ? old_cloak_delay : 0;
-    totaldelay += takes_off_old_robe ? old_robe_delay : 0;
-    totaldelay += takes_off_old_suit ? old_suit_delay : 0;
-    totaldelay += wears_shirt ? old_shirt_delay + new_shirt_delay : 0;
-    totaldelay += wears_suit ? new_suit_delay : 0;
-    totaldelay += wears_robe ? new_robe_delay : 0;
-    totaldelay += wears_cloak ? new_cloak_delay : 0;
-    totaldelay += wears_gloves ? old_gloves_delay + new_gloves_delay : 0;
-    totaldelay += wears_helmet ? old_helmet_delay + new_helmet_delay : 0;
-    totaldelay += wears_bracers ? old_bracers_delay + new_bracers_delay : 0;
-    totaldelay += wears_boots ? old_boots_delay + new_boots_delay : 0;
-    totaldelay += wears_shield ? old_shield_delay + new_shield_delay : 0;
-    totaldelay += wears_amulet ? old_amulet_delay + new_amulet_delay : 0;
-    totaldelay += wears_ringl ? old_ringl_delay + new_ringl_delay : 0;
-    totaldelay += wears_ringr ? old_ringr_delay + new_ringr_delay : 0;
-    totaldelay += wears_misc1 ? old_misc1_delay + new_misc1_delay : 0;
+        int totaldelay = 0;
+        totaldelay += takes_off_old_cloak ? old_cloak_delay : 0;
+        totaldelay += takes_off_old_robe ? old_robe_delay : 0;
+        totaldelay += takes_off_old_suit ? old_suit_delay : 0;
+        totaldelay += wears_shirt ? old_shirt_delay + new_shirt_delay : 0;
+        totaldelay += wears_suit ? new_suit_delay : 0;
+        totaldelay += wears_robe ? new_robe_delay : 0;
+        totaldelay += wears_cloak ? new_cloak_delay : 0;
+        totaldelay += wears_gloves ? old_gloves_delay + new_gloves_delay : 0;
+        totaldelay += wears_helmet ? old_helmet_delay + new_helmet_delay : 0;
+        totaldelay += wears_bracers ? old_bracers_delay + new_bracers_delay : 0;
+        totaldelay += wears_boots ? old_boots_delay + new_boots_delay : 0;
+        totaldelay += wears_shield ? old_shield_delay + new_shield_delay : 0;
+        totaldelay += wears_amulet ? old_amulet_delay + new_amulet_delay : 0;
+        totaldelay += wears_ringl ? old_ringl_delay + new_ringl_delay : 0;
+        totaldelay += wears_ringr ? old_ringr_delay + new_ringr_delay : 0;
+        totaldelay += wears_misc1 ? old_misc1_delay + new_misc1_delay : 0;
+        totaldelay += wears_misc2 ? old_misc2_delay + new_misc2_delay : 0;
+        totaldelay += wears_misc3 ? old_misc3_delay + new_misc3_delay : 0;
+        totaldelay += wears_misc4 ? old_misc4_delay + new_misc4_delay : 0;
+        totaldelay += wears_misc5 ? old_misc5_delay + new_misc5_delay : 0;
 
-    mon->mfrozen = totaldelay;
-    if (mon->mfrozen)
-        mon->mcanmove = 0;
+        mon->mfrozen = totaldelay;
+        if (mon->mfrozen)
+        {
+            mon->mcanmove = 0;
+            refresh_m_tile_gui_info(mon, TRUE);
+        }
+    }
+}
 
+STATIC_OVL boolean
+mon_wears_misc_subtype(mon, subtyp)
+struct monst* mon;
+schar subtyp;
+{
+    if (!mon)
+        return FALSE;
+
+    if (subtyp == MISC_MULTIPLE_PERMITTED)
+        return FALSE;
+
+    struct obj* obj;
+    for (obj = mon->minvent; obj; obj = obj->nobj)
+    {
+        if (obj->oclass == MISCELLANEOUS_CLASS && objects[obj->otyp].oc_subtyp == subtyp 
+            && (obj->owornmask & W_MISCITEMS) != 0)
+            return TRUE;
+    }
+    return FALSE;
 }
 
 /* 0 if nothing happened, TRUE if new was worn (and old consequently removed, if any) */
@@ -1546,7 +1638,7 @@ boolean racialexception;
         return 0; /* no such thing as better rings */
     if (old && flag == W_RINGR)
         return 0; /* no such thing as better rings */
-    if (old && flag == W_MISC)
+    if (old && (flag & W_MISCITEMS) != 0)
         return 0; /* no such thing as better misc items */
     best = old;
 
@@ -1572,11 +1664,17 @@ boolean racialexception;
             best = obj;
             goto outer_break; /* no such thing as better rings */
         case W_MISC:
-            if (!can_wear_miscellaneous(mon->data, obj->otyp))
+        case W_MISC2:
+        case W_MISC3:
+        case W_MISC4:
+        case W_MISC5:
+            if (obj->oclass != MISCELLANEOUS_CLASS || !can_wear_miscellaneous(mon->data, obj->otyp))
                 continue;
-            if (obj->oclass != MISCELLANEOUS_CLASS || (is_priest(mon->data) && obj->cursed) || is_cursed_magic_item(obj) || (obj->owornmask && obj->owornmask != flag))
+            if (((is_priest(mon->data) || obj->bknown) && obj->cursed && !cursed_items_are_positive_mon(mon))
+                || ((objects[obj->otyp].oc_name_known || !is_peaceful(mon)) && is_cursed_magic_item(obj) && !is_sex_changing_item(obj))
+                || (obj->owornmask && obj->owornmask != flag))
                 continue;
-            if (objects[obj->otyp].oc_subtyp != MISC_BELT && !likes_magic(mon->data) && !(mon->mnum == PM_MINOTAUR && objects[obj->otyp].oc_subtyp == MISC_NOSERING))
+            if (objects[obj->otyp].oc_subtyp > MISC_MULTIPLE_PERMITTED && mon_wears_misc_subtype(mon, objects[obj->otyp].oc_subtyp))
                 continue;
             best = obj;
             goto outer_break; /* no such thing as better misc items */
@@ -1630,15 +1728,44 @@ boolean racialexception;
         }
         if (obj->owornmask)
             continue;
-        /* I'd like to define a VISIBLE_ARM_BONUS which doesn't assume the
-         * monster knows obj->enchantment, but if I did that, a monster would keep
-         * switching forever between two -2 caps since when it took off one
-         * it would forget enchantment and once again think the object is better
-         * than what it already has.
-         */
-        if (best && (ARM_AC_BONUS(best, mon->data) + extra_pref(mon, best)
-                     >= ARM_AC_BONUS(obj, mon->data) + extra_pref(mon, obj)))
-            continue;
+
+        if (best)
+        {
+            /* Do not wear cursed magic items */
+            if ((objects[obj->otyp].oc_name_known || !is_peaceful(mon)) && is_cursed_magic_item(obj) && !is_sex_changing_item(obj))
+                continue;
+
+            /* Prefer non-cursed items */
+            if ((!best->cursed || !best->bknown) && obj->cursed && obj->bknown && !cursed_items_are_positive_mon(mon))
+                continue;
+
+            /* Prefer artifacts */
+            if (best->oartifact && !obj->oartifact)
+                continue;
+
+            /* Prefer items with highest number of mythic properties */
+            int best_mythic_no = (best->mythic_prefix != 0) + (best->mythic_suffix != 0);
+            int obj_mythic_no = (obj->mythic_prefix != 0) + (obj->mythic_suffix != 0);
+            int best_power_no = (objects[best->otyp].oc_oprop != NO_POWER) + (objects[best->otyp].oc_oprop2 != NO_POWER) + (objects[best->otyp].oc_oprop3 != NO_POWER);
+            int obj_power_no = (objects[obj->otyp].oc_oprop != NO_POWER) + (objects[obj->otyp].oc_oprop2 != NO_POWER) + (objects[obj->otyp].oc_oprop3 != NO_POWER);
+            int best_total_no = best_mythic_no + best_power_no;
+            int obj_total_no = obj_mythic_no + obj_power_no;
+
+            if (best_total_no > obj_total_no)
+                continue;
+            if (obj_total_no > 0 && best_total_no == obj_total_no
+                && getprice(best, FALSE) > getprice(obj, FALSE))
+                continue;
+            /* I'd like to define a VISIBLE_ARM_BONUS which doesn't assume the
+             * monster knows obj->enchantment, but if I did that, a monster would keep
+             * switching forever between two -2 caps since when it took off one
+             * it would forget enchantment and once again think the object is better
+             * than what it already has.
+             */
+            if (ARM_AC_BONUS(best, mon->data) + extra_pref(mon, best)
+                >= ARM_AC_BONUS(obj, mon->data) + extra_pref(mon, obj))
+                continue;
+        }
         best = obj;
     }
 outer_break:
@@ -1657,23 +1784,20 @@ outer_break:
             dismount_steed(DISMOUNT_FELL);
     }
 
-    if (!creation) 
+    if (!creation && canseemon(mon))
     {
-        if (canseemon(mon)) 
-        {
-            char buf[BUFSZ];
+        char buf[BUFSZ];
 
-            if (old)
-                Sprintf(buf, " removes %s and", distant_name(old, doname));
-            else
-                buf[0] = '\0';
-            pline("%s%s puts on %s.", Monnam(mon), buf,
-                  distant_name(best, doname));
-            if (autocurse)
-                pline_multi_ex(ATR_NONE, Hallucination ? CLR_MSG_HALLUCINATED : CLR_MSG_NEGATIVE, no_multiattrs, multicolor_buffer, "%s %s %s %s for a moment.", s_suffix(Monnam(mon)),
-                      simpleonames(best), otense(best, "glow"),
-                      hcolor_multi_buf2(NH_BLACK));
-        } /* can see it */
+        if (old)
+            Sprintf(buf, " removes %s and", distant_name(old, doname));
+        else
+            buf[0] = '\0';
+        pline("%s%s puts on %s.", Monnam(mon), buf,
+            distant_name(best, doname));
+        if (autocurse)
+            pline_multi_ex(ATR_NONE, Hallucination ? CLR_MSG_HALLUCINATED : CLR_MSG_NEGATIVE, no_multiattrs, multicolor_buffer, "%s %s %s %s for a moment.", s_suffix(Monnam(mon)),
+                simpleonames(best), otense(best, "glow"),
+                hcolor_multi_buf2(NH_BLACK));
     }
 
     /* Put new on */
@@ -1690,6 +1814,9 @@ outer_break:
         } /* else if (!mon->minvis) pline("%s suddenly appears!",
              Amonnam(mon)); */
     }
+
+    if (is_sex_changing_item(best))
+        mon_item_change_sex_and_useup(mon, best, creation);
 
     return 1;
 }
@@ -1772,7 +1899,7 @@ struct obj *obj;
 
     }
 
-    Strcpy(debug_buf_2, "m_lose_armor");
+    debugprint("m_lose_armor");
     obj_extract_self(obj);
     place_object(obj, mon->mx, mon->my);
     /* call stackobj() if we ever drop anything that can merge */

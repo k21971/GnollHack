@@ -496,6 +496,18 @@ register struct monst *mtmp;
             update_unweapon();
         }
     }
+    else if (iflags.autoswap_polearms && unweapon1 && uwep && is_appliable_pole_type_weapon(uwep) && ((uswapwep && !is_unweapon(uswapwep)) || (!uswapwep && Role_if(PM_MONK))))
+    {
+        boolean cursed_weapon_blocks_swap = (uwep && objects[uwep->otyp].oc_bimanual) || (uwep && uarms && !flags.swap_rhand_only) ? ((uwep && welded(uwep, &youmonst)) || (uarms && welded(uarms, &youmonst))) : (uwep && welded(uwep, &youmonst));
+        if (!cursed_weapon_blocks_swap)
+        {
+            if (uwep && objects[uwep->otyp].oc_bimanual)
+                (void)doswapweapon();
+            else
+                (void)doswapweapon_right_or_both();
+            update_unweapon();
+        }
+    }
 
     char qbuf[BUFSZ * 2];
     Strcpy(qbuf, "");
@@ -1232,7 +1244,7 @@ boolean* obj_destroyed;
                         else if (obj == uarms)
                             uwep2gone(); /* set unweapon */
                     }
-                    Sprintf(priority_debug_buf_2, "hmon_hitmon: %d", obj->otyp);
+                    debugprint("hmon_hitmon1: %d", obj->otyp);
                     useup(obj);
                     if (!more_than_1)
                         obj = (struct obj*) 0;
@@ -1418,7 +1430,7 @@ boolean* obj_destroyed;
                         play_simple_object_sound(obj, OBJECT_SOUND_TYPE_BREAK);
                         You_ex(ATR_NONE, CLR_MSG_WARNING, "break %s.  That's bad luck!", ysimple_name(obj));
                         change_luck(-2, TRUE);
-                        Sprintf(priority_debug_buf_2, "hmon_hitmon2: %d", obj->otyp);
+                        debugprint("hmon_hitmon2: %d", obj->otyp);
                         useup(obj);
                         obj = (struct obj*) 0;
                         unarmed = FALSE; /* avoid obj==0 confusion */
@@ -1439,7 +1451,7 @@ boolean* obj_destroyed;
                     You_ex(ATR_NONE, CLR_MSG_WARNING, "succeed in destroying %s.  Congratulations!",
                         ysimple_name(obj));
                     release_camera_demon(obj, u.ux, u.uy);
-                    Sprintf(priority_debug_buf_2, "hmon_hitmon3: %d", obj->otyp);
+                    debugprint("hmon_hitmon3: %d", obj->otyp);
                     useup(obj);
                     return TRUE;
                 case CORPSE: /* fixed by polder@cs.vu.nl */
@@ -1486,12 +1498,12 @@ boolean* obj_destroyed;
     do { \
             if (thrown)                      \
             { \
-                    Sprintf(priority_debug_buf_4, "useup_eggs: %d", (o)->otyp); \
+                    debugprint("useup_eggs: %d", (o)->otyp); \
                     obfree(o, (struct obj*)0); \
             } \
             else                             \
             {\
-                Sprintf(priority_debug_buf_3, "useup_eggs: %d", (o)->otyp); \
+                debugprint("useup_eggs2: %d", (o)->otyp); \
                 useupall(o);                 \
             }\
             o = (struct obj*) 0;            \
@@ -1633,14 +1645,16 @@ boolean* obj_destroyed;
                     }
                     if (thrown)
                     {
-                        Sprintf(priority_debug_buf_4, "hmon_hitmon: %d", obj->otyp);
+                        debugprint("hmon_hitmon8: %d", obj->otyp);
                         obfree(obj, (struct obj*)0);
                     }
                     else
                     {
-                        Sprintf(priority_debug_buf_2, "hmon_hitmon4: %d", obj->otyp);
+                        debugprint("hmon_hitmon4: %d", obj->otyp);
                         useup(obj);
                     }
+                    obj = (struct obj*)0;
+                    *obj_destroyed = TRUE;
                     hittxt = TRUE;
                     get_dmg_bonus = FALSE;
                     damage = 0;
@@ -1660,12 +1674,13 @@ boolean* obj_destroyed;
                         extratmp = weapon_extra_dmg_value(obj, mon, &youmonst, basedmg);
                         damage += adjust_damage(extratmp, &youmonst, mon, objects[obj->otyp].oc_extra_damagetype, ADFLAGS_NONE);
                     }
-                    Sprintf(priority_debug_buf_4, "hmon_hitmon2: %d", obj->otyp);
-                    Sprintf(priority_debug_buf_2, "hmon_hitmon5: %d", obj->otyp);
+                    debugprint("hmon_hitmon2b: %d", obj->otyp);
                     if (thrown)
                         obfree(obj, (struct obj*) 0);
                     else
                         useup(obj);
+                    obj = (struct obj*)0;
+                    *obj_destroyed = TRUE;
                     hittxt = TRUE;
                     get_dmg_bonus = FALSE;
                     break;
@@ -1961,7 +1976,7 @@ boolean* obj_destroyed;
         }
     }
 
-    if (jousting && !isdisintegrated) 
+    if (jousting && obj && !isdisintegrated) 
     {
         damage += adjust_damage(d(2, (obj == uwep) ? 10 : 2), &youmonst, mon, objects[obj->otyp].oc_damagetype, ADFLAGS_NONE); /* [was in weapon_dmg_value()] */
         You("joust %s%s", mon_nam(mon), canseemon(mon) ? exclam((int)ceil(damage)) : ".");
@@ -1975,9 +1990,10 @@ boolean* obj_destroyed;
             if (obj == uarms)
                 uwep2gone(); /* set unweapon */
             /* minor side-effect: broken lance won't split puddings */
-            Sprintf(priority_debug_buf_2, "hmon_hitmon6: %d", obj->otyp);
+            debugprint("hmon_hitmon6: %d", obj->otyp);
             useup(obj);
             obj = 0;
+            *obj_destroyed = TRUE;
         }
         /* avoid migrating a dead monster */
         if (mon->mhp > (int)ceil(damage)) 
@@ -2097,7 +2113,7 @@ boolean* obj_destroyed;
         const char* critical_text = skill_critical_success ? " critically" : "";
 
         if (thrown)
-            hit_with_hit_tile(mshot_xname(obj), mon, exclam(destroyed ? 100 : damagedealt), hide_damage_amount ? -1 : damagedealt, critical_text, hit_tile, FALSE);
+            hit_with_hit_tile(obj ? mshot_xname(obj) : "something", mon, exclam(destroyed ? 100 : damagedealt), hide_damage_amount ? -1 : damagedealt, critical_text, hit_tile, FALSE);
         else if (!hide_damage_amount && damagedealt > 0) 
         {
 
@@ -2217,7 +2233,7 @@ boolean* obj_destroyed;
 
     boolean uses_spell_flags = obj ? object_uses_spellbook_wand_flags_and_properties(obj) : FALSE;
 
-    int crit_strike_probability = get_critical_strike_percentage_chance(obj, mon, &youmonst);
+    int crit_strike_probability = obj ? get_critical_strike_percentage_chance(obj, mon, &youmonst) : 0;
     int crit_strike_die_roll_threshold = crit_strike_probability / 5;
 
     /* Wounding */
@@ -2369,7 +2385,7 @@ boolean* obj_destroyed;
        "poisoned <obj>" has now been given; we want just "<obj>" for
        last message, so reformat while obj is still accessible */
     if (unpoisonmsg || unenchantmsg)
-        Strcpy(saved_oname, cxname(obj));
+        Strcpy(saved_oname, obj ? cxname(obj) : "something");
 
     /* [note: thrown obj might go away during killed()/xkilled() call
        (via 'thrownobj'; if swallowed, it gets added to engulfer's
@@ -2377,14 +2393,13 @@ boolean* obj_destroyed;
     
     if (mon)
     {
-
         if (needpoismsg)
         {
             //play_sfx_sound_at_location(SFX_GENERAL_UNAFFECTED, mon->mx, mon->my);
             pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "poison doesn't seem to affect %s.", mon_nam(mon));
         }
 
-        if (needenchantmsg && !destroyed)    
+        if (needenchantmsg && (!destroyed || needenchantmsg > 0))
         {
             if (iflags.using_gui_sounds)
                 delay_output_milliseconds(100);
@@ -2412,18 +2427,22 @@ boolean* obj_destroyed;
                 break;
             case COLD_ENCHANTMENT:
                 play_sfx_sound_at_location(SFX_MONSTER_COVERED_IN_FROST, mon->mx, mon->my);
+                display_gui_effect(GUI_EFFECT_FREEZE, 0, mon->mx, mon->my, 0, 0, 0UL);
                 pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "cold sears %s.", mon_nam(mon));
                 break;
             case FIRE_ENCHANTMENT:
                 play_sfx_sound_at_location(SFX_MONSTER_ON_FIRE, mon->mx, mon->my);
+                display_gui_effect(GUI_EFFECT_FIRE, 0, mon->mx, mon->my, 0, 0, 0UL);
                 pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "fire burns %s.", mon_nam(mon));
                 break;
             case LIGHTNING_ENCHANTMENT:
                 play_sfx_sound_at_location(SFX_MONSTER_GETS_ZAPPED, mon->mx, mon->my);
+                display_gui_effect(GUI_EFFECT_LIGHTNING, 0, mon->mx, mon->my, 0, 0, 0UL);
                 pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s is jolted by lightning.", Monnam(mon));
                 break;
             case DEATH_ENCHANTMENT:
                 play_sfx_sound_at_location(SFX_MONSTER_IS_HIT_WITH_DEATH_MAGIC, mon->mx, mon->my);
+                display_gui_effect(GUI_EFFECT_DEATH_MAGIC, 0, mon->mx, mon->my, 0, 0, 0UL);
                 pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s feels its life energy draining away.", Monnam(mon));
                 break;
             default:
@@ -2446,6 +2465,7 @@ boolean* obj_destroyed;
             {
                 delay_output_milliseconds(100);
                 play_sfx_sound_at_location(SFX_MONSTER_IS_HIT_WITH_DEATH_MAGIC, mon->mx, mon->my);
+                display_gui_effect(GUI_EFFECT_DEATH_MAGIC, 0, mon->mx, mon->my, 0, 0, 0UL);
                 delay_output_milliseconds(200);
             }
             pline_The("magic was deadly...");
@@ -2496,7 +2516,7 @@ boolean* obj_destroyed;
 
         if (obj->where == OBJ_INVENT)
         {
-            Sprintf(priority_debug_buf_2, "hmon_hitmon7: %d", obj->otyp);
+            debugprint("hmon_hitmon7: %d", obj->otyp);
             if (obj->quan > 1)
                 useup(obj);
             else
@@ -2505,7 +2525,7 @@ boolean* obj_destroyed;
                     uwepgone(); /* set unweapon */
                 else if (obj == uarms)
                     uwep2gone(); /* set unweapon */
-                Sprintf(priority_debug_buf_3, "hmon_hitmon: %d", obj->otyp);
+                debugprint("hmon_hitmon9: %d", obj->otyp);
                 useupall(obj);
                 obj = 0;
             }
@@ -2515,14 +2535,14 @@ boolean* obj_destroyed;
             /* in case MON_AT+enexto for invisible mon */
             int x = obj->ox, y = obj->oy;
             /* not useupf(), which charges */
-            Sprintf(priority_debug_buf_3, "hmon_hitmon-delobj1: %d", obj->otyp);
+            debugprint("hmon_hitmon-delobj1: %d", obj->otyp);
             delobj(obj);
             newsym(x, y);
             obj = (struct obj*)0;
         }
         else if (obj->where == OBJ_FREE)
         {
-            Sprintf(priority_debug_buf_4, "hmon_hitmon3: %d", obj->otyp);
+            debugprint("hmon_hitmon3b: %d", obj->otyp);
             obfree(obj, (struct obj*)0);
             obj = (struct obj*)0;
         }
@@ -2773,7 +2793,7 @@ struct attack *mattk;
         if (!Upolyd)
             break; /* no longer have ability to steal */
         /* take the object away from the monster */
-        Strcpy(debug_buf_2, "steal_it");
+        debugprint("steal_it");
         obj_extract_self(otmp);
         if ((unwornmask = otmp->owornmask) != 0L) {
             mdef->worn_item_flags &= ~unwornmask;
@@ -3051,7 +3071,7 @@ int specialdmg; /* blessed and/or silver bonus against various things */
            real gold only, no lesser coins */
         mongold = findgold(mdef->minvent);
         if (mongold) {
-            Strcpy(debug_buf_2, "damageum");
+            debugprint("damageum");
             obj_extract_self(mongold);
             if (merge_choice(invent, mongold) || inv_cnt(FALSE) < 52) {
                 addinv(mongold);
@@ -3060,7 +3080,7 @@ int specialdmg; /* blessed and/or silver bonus against various things */
                 play_ui_sound(UI_SOUND_KNAPSACK_FULL);
                 You_ex(ATR_NONE, CLR_MSG_SUCCESS, "grab %s's gold, but find no room in your inventory.",
                     mon_nam(mdef));
-                dropyf(mongold);
+                (void)dropyf(mongold);
             }
         }
         exercise(A_DEX, TRUE);

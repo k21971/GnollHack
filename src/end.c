@@ -725,6 +725,10 @@ boolean require_restoring;
         program_state.panic_handling = handling;
 }
 
+#ifdef GNOLLHACK_MAIN_PROGRAM
+STATIC_VAR char* dbufs = 0;
+#endif
+
 /*VARARGS1*/
 void panic
 VA_DECL(const char *, str)
@@ -732,15 +736,41 @@ VA_DECL(const char *, str)
     VA_START(str);
     VA_INIT(str, char *);
 
-    if (program_state.panicking++)
-        NH_abort(); /* avoid loops - this should never happen*/
+    issue_breadcrumb("Panic: Start");
 
-    if (iflags.window_inited) {
+#ifdef GNOLLHACK_MAIN_PROGRAM
+    /* Check that dbufs has been freed in the case of recursive panic calls */
+    if (dbufs)
+        free(dbufs);
+    dbufs = 0;
+#endif
+
+    if (program_state.panicking++)
+    {
+        issue_breadcrumb("Panic: panicking++");
+        issue_simple_gui_command(GUI_CMD_EXIT_APP_ON_MAIN_SCREEN);
+        NH_abort(); /* avoid loops - this should never happen*/
+    }
+
+    if (iflags.window_inited) 
+    {
         raw_print("\r\nOops...");
         wait_synch(); /* make sure all pending output gets flushed */
         exit_nhwindows((char *) 0);
         iflags.window_inited = 0; /* they're gone; force raw_print()ing */
     }
+
+    char buf[BUFSZ];
+    Vsprintf(buf, str, VA_ARGS);
+
+#ifdef GNOLLHACK_MAIN_PROGRAM
+    if (issue_gui_command)
+    {
+        /* allocate before error save file, which has more debugprints */
+        dbufs = allocate_buffer_with_debug_buffers(buf);
+        /* free below after saving error save file */
+    }
+#endif
 
     raw_print(program_state.gameover
                   ? "Postgame wrapup disrupted."
@@ -755,7 +785,8 @@ VA_DECL(const char *, str)
     else if (program_state.something_worth_saving)
         raw_print("\nError save file being written.\n");
 #else /* !NOTIFY_GNOLLHACK_BUGS */
-    if (!wizard) {
+    if (!wizard) 
+    {
         const char *maybe_rebuild = !program_state.something_worth_saving
                                      ? "."
                                      : ", and it may be possible to rebuild.";
@@ -771,12 +802,16 @@ VA_DECL(const char *, str)
                        maybe_rebuild);
     }
 #endif /* ?NOTIFY_GNOLLHACK_BUGS */
+
     /* XXX can we move this above the prints?  Then we'd be able to
      * suppress "it may be possible to rebuild" based on dosave0()
      * or say it's NOT possible to rebuild. */
-    if (program_state.something_worth_saving && !iflags.debug_fuzzer) {
+    if (program_state.something_worth_saving && !iflags.debug_fuzzer) 
+    {
         set_error_savefile();
+        issue_breadcrumb("Panic: Saving Error savefile");
         int saveres = dosave0(TRUE);
+        issue_breadcrumb2("Panic: Saved Error savefile", saveres);
         if (saveres) {
             /* os/win port specific recover instructions */
             if (sysopt.recover)
@@ -784,38 +819,36 @@ VA_DECL(const char *, str)
         }
     }
 #endif /* !MICRO */
-    {
-        char buf[BUFSZ];
 
-        Vsprintf(buf, str, VA_ARGS);
-        raw_print(buf);
-        paniclog("panic", buf);
+    raw_print(buf);
+    paniclog("panic", buf);
 
 #ifdef GNOLLHACK_MAIN_PROGRAM
+    if (dbufs)
+    {
         if (issue_gui_command)
-        {
-            char dbufs[BUFSZ * 18];
-            Sprintf(dbufs, "%s|P1:%s, P2:%s, P3:%s, P4:%s, B1:%s, B2:%s, B3:%s, B4:%s", buf, priority_debug_buf_1, priority_debug_buf_2, priority_debug_buf_3, priority_debug_buf_4, debug_buf_1, debug_buf_2, debug_buf_3, debug_buf_4);
             issue_debuglog_panic(0, dbufs);
-        }
-
-        if (open_special_view)
-        {
-            /* Add mode to posted panic */
-            char mbuf[BUFSZ] = "";
-            (void)describe_mode(mbuf);
-            Sprintf(eos(buf), " [%s]", mbuf);
-
-            struct special_view_info info = { 0 };
-            info.viewtype = SPECIAL_VIEW_PANIC;
-            info.text = buf;
-            (void)open_special_view(info);
-        }
-        /* Special view now handles both sending the crash report and forum posting */
-        //if (issue_gui_command)
-        //    issue_gui_command(GUI_CMD_POST_DIAGNOSTIC_DATA, DIAGNOSTIC_DATA_PANIC, 0, buf);
-#endif
+        free(dbufs);
+        dbufs = 0;
     }
+
+    if (open_special_view)
+    {
+        /* Add mode to posted panic */
+        char mbuf[BUFSZ] = "";
+        (void)describe_mode(mbuf);
+        Sprintf(eos(buf), " [%s]", mbuf);
+
+        struct special_view_info info = { 0 };
+        info.viewtype = SPECIAL_VIEW_PANIC;
+        info.text = buf;
+        (void)open_special_view(info);
+    }
+    /* Special view now handles both sending the crash report and forum posting */
+    //if (issue_gui_command)
+    //    issue_gui_command(GUI_CMD_POST_DIAGNOSTIC_DATA, DIAGNOSTIC_DATA_PANIC, 0, buf);
+#endif
+
 #if defined(WIN32) && !defined(GNH_MOBILE)
     interject(INTERJECT_PANIC);
 #endif
@@ -983,9 +1016,9 @@ time_t when; /* date+time at end of game */
     dump_plines();
     putstr(NHW_DUMPTXT, 0, "");
     putstr(0, ATR_HEADING, "Inventory:");
-    (void) display_inventory((char *) 0, TRUE, SHOWWEIGHTS_NONE);
-    container_contents(invent, how != SNAPSHOT, TRUE, FALSE, SHOWWEIGHTS_NONE);
-    magic_chest_contents(how != SNAPSHOT, TRUE, FALSE, SHOWWEIGHTS_NONE);
+    (void) display_inventory((char *) 0, TRUE, SHOWWEIGHTS_NONE, FALSE);
+    container_contents(invent, how != SNAPSHOT, TRUE, FALSE, SHOWWEIGHTS_NONE, FALSE);
+    magic_chest_contents(how != SNAPSHOT, TRUE, FALSE, SHOWWEIGHTS_NONE, FALSE);
     enlightenment(how == SNAPSHOT ? BASICENLIGHTENMENT | GAMEENLIGHTENMENT : (BASICENLIGHTENMENT | MAGICENLIGHTENMENT | GAMEENLIGHTENMENT),
                   how == SNAPSHOT ? ENL_GAMEINPROGRESS : (how >= PANICKED) ? ENL_GAMEOVERALIVE : ENL_GAMEOVERDEAD);
     putstr(NHW_DUMPTXT, 0, "");
@@ -1112,9 +1145,9 @@ boolean taken;
         
         if (c == 'y') {
             /* caller has already ID'd everything */
-            (void) display_inventory((char *) 0, FALSE, SHOWWEIGHTS_NONE);
-            container_contents(invent, TRUE, TRUE, FALSE, SHOWWEIGHTS_NONE);
-            magic_chest_contents(TRUE, TRUE, FALSE, SHOWWEIGHTS_NONE);
+            (void) display_inventory((char *) 0, FALSE, SHOWWEIGHTS_NONE, FALSE);
+            container_contents(invent, TRUE, TRUE, FALSE, SHOWWEIGHTS_NONE, FALSE);
+            magic_chest_contents(TRUE, TRUE, FALSE, SHOWWEIGHTS_NONE, FALSE);
         }
         if (c == 'q')
             done_stopprint++;
@@ -1373,6 +1406,44 @@ winid endwin;
 }
 #endif
 
+int64_t
+count_archaeologist_item_score(list)
+struct obj* list;
+{
+    struct obj* otmp;
+    int64_t score = 0;
+    for (otmp = list; otmp; otmp = otmp->nobj)
+    {
+        if (otmp->oartifact && (program_state.gameover || otmp->nknown || otmp->aknown))
+        {
+            score += ARCHAEOLOGIST_PER_ARTIFACT_SCORE * otmp->quan;
+        }
+        else if (otmp->otyp == STATUE && otmp->special_quality == SPEQUAL_STATUE_HISTORIC)
+        {
+            score += ARCHAEOLOGIST_PER_HISTORIC_STATUE_SCORE * otmp->quan;
+        }
+        else if (otmp->otyp == SARCOPHAGUS)
+        {
+            score += ARCHAEOLOGIST_PER_SARCOPHAGUS_SCORE * otmp->quan;
+        }
+        else if (otmp->otyp == MUMMY_WRAPPING)
+        {
+            score += ARCHAEOLOGIST_PER_MUMMY_WRAPPING_SCORE * otmp->quan;
+        }
+        else if (otmp->oclass == ART_CLASS)
+        {
+            score += ARCHAEOLOGIST_ART_OBJECT_SCORE_MULTIPLIER * (get_object_base_value(otmp) * otmp->quan);
+        }
+
+        if (Has_contents(otmp))
+        {
+            int64_t cont_score = count_archaeologist_item_score(otmp->cobj);
+            score += cont_score;
+        }
+    }
+    return score;
+}
+
 struct item_score_count_result
 count_artifacts(list)
 struct obj* list;
@@ -1412,6 +1483,52 @@ struct obj* list;
         if (Has_contents(otmp))
         {
             struct item_score_count_result cont_cnt = count_historic_statues(otmp->cobj);
+            cnt.quantity += cont_cnt.quantity;
+            cnt.score += cont_cnt.score;
+        }
+    }
+    return cnt;
+}
+
+struct item_score_count_result
+count_sarcophaguses(list)
+struct obj* list;
+{
+    struct obj* otmp;
+    struct item_score_count_result cnt = { 0 };
+    for (otmp = list; otmp; otmp = otmp->nobj)
+    {
+        if (otmp->otyp == SARCOPHAGUS)
+        {
+            cnt.quantity += otmp->quan;
+            cnt.score += ARCHAEOLOGIST_PER_SARCOPHAGUS_SCORE * otmp->quan;
+        }
+        if (Has_contents(otmp))
+        {
+            struct item_score_count_result cont_cnt = count_sarcophaguses(otmp->cobj);
+            cnt.quantity += cont_cnt.quantity;
+            cnt.score += cont_cnt.score;
+        }
+    }
+    return cnt;
+}
+
+struct item_score_count_result
+count_mummy_wrappings(list)
+struct obj* list;
+{
+    struct obj* otmp;
+    struct item_score_count_result cnt = { 0 };
+    for (otmp = list; otmp; otmp = otmp->nobj)
+    {
+        if (otmp->otyp == MUMMY_WRAPPING)
+        {
+            cnt.quantity += otmp->quan;
+            cnt.score += ARCHAEOLOGIST_PER_MUMMY_WRAPPING_SCORE * otmp->quan;
+        }
+        if (Has_contents(otmp))
+        {
+            struct item_score_count_result cont_cnt = count_mummy_wrappings(otmp->cobj);
             cnt.quantity += cont_cnt.quantity;
             cnt.score += cont_cnt.score;
         }
@@ -1661,7 +1778,7 @@ int how;
                 bless(potion);
                 (void) peffects(potion); /* always -1 for restore ability */
                 /* not useup(); we haven't put this potion into inventory */
-                Sprintf(priority_debug_buf_4, "done: %d", potion->otyp);
+                debugprint("done: %d", potion->otyp);
                 obfree(potion, (struct obj *) 0);
             }
             killer.name[0] = '\0';
@@ -1727,7 +1844,7 @@ int how;
                 pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "medallion crumbles to dust!");
                 if (uamul)
                 {
-                    Sprintf(priority_debug_buf_2, "done: %d", uamul->otyp);
+                    debugprint("done3: %d", uamul->otyp);
                     useup(uamul);
                 }
             }
@@ -1744,7 +1861,7 @@ int how;
                     pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s crumbles to dust!", cxname(lifesaver));
                     if (lifesaver)
                     {
-                        Sprintf(priority_debug_buf_2, "done2: %d", lifesaver->otyp);
+                        debugprint("done2: %d", lifesaver->otyp);
                         useup(lifesaver);
                     }
                 }
@@ -1859,6 +1976,7 @@ int how;
     boolean has_existing_save_file = (wizard || discover || CasualMode) && check_existing_save_file();
     boolean disclose_and_dumplog_ok = !(how < ASCENDED && CasualMode && has_existing_save_file);
     //int64_t tmp;
+    issue_breadcrumb2("really_done", how);
 
     /*
      *  The game is now over...
@@ -1966,12 +2084,12 @@ int how;
        big trouble (`obj_is_local' panic) for savebones() -> savelev() */
     if (thrownobj && thrownobj->where == OBJ_FREE)
     {
-        Sprintf(priority_debug_buf_4, "really_done: %d", thrownobj->otyp);
+        debugprint("really_done: %d", thrownobj->otyp);
         obfree(thrownobj, (struct obj*)0);
     }
     if (kickedobj && kickedobj->where == OBJ_FREE)
     {
-        Sprintf(priority_debug_buf_4, "really_done2: %d", kickedobj->otyp);
+        debugprint("really_done2: %d", kickedobj->otyp);
         obfree(kickedobj, (struct obj*)0);
     }
 
@@ -2194,6 +2312,72 @@ int how;
         }
 #endif
     }
+
+    if (how == ASCENDED && !CasualMode && !flags.non_scoring)
+    {
+        /* Ascended with points, can be Modern or Classic mode */
+        if (u.u_gamescore >= 1000000L)
+            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_WITH_AT_LEAST_ONE_MILLION_POINTS);
+        if (u.u_gamescore >= 5000000L)
+            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_WITH_AT_LEAST_FIVE_MILLION_POINTS);
+        if (u.u_gamescore >= 10000000L)
+            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_WITH_AT_LEAST_TEN_MILLION_POINTS);
+        if (u.u_gamescore >= 50000000L)
+            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_WITH_AT_LEAST_FIFTY_MILLION_POINTS);
+        if (u.u_gamescore >= 100000000L)
+            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_WITH_AT_LEAST_HUNDRED_MILLION_POINTS);
+
+        /* Ascended within turns, these only in Classic mode */
+        if (!ModernMode)
+        {
+            if (context.game_difficulty >= 0)
+            {
+                if (moves <= 40000)
+                    issue_achievement(GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITHIN_40000_TURNS);
+                if (moves <= 35000)
+                    issue_achievement(GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITHIN_35000_TURNS);
+                if (moves <= 30000)
+                    issue_achievement(GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITHIN_30000_TURNS);
+                if (moves <= 25000)
+                    issue_achievement(GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITHIN_25000_TURNS);
+                if (moves <= 20000)
+                    issue_achievement(GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITHIN_20000_TURNS);
+                if (moves <= 15000)
+                    issue_achievement(GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITHIN_15000_TURNS);
+            }
+            if (context.game_difficulty >= 1)
+            {
+                if (moves <= 40000)
+                    issue_achievement(GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITHIN_40000_TURNS);
+                if (moves <= 35000)
+                    issue_achievement(GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITHIN_35000_TURNS);
+                if (moves <= 30000)
+                    issue_achievement(GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITHIN_30000_TURNS);
+                if (moves <= 25000)
+                    issue_achievement(GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITHIN_25000_TURNS);
+                if (moves <= 20000)
+                    issue_achievement(GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITHIN_20000_TURNS);
+                if (moves <= 15000)
+                    issue_achievement(GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITHIN_15000_TURNS);
+            }
+            if (context.game_difficulty >= 2)
+            {
+                if (moves <= 40000)
+                    issue_achievement(GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITHIN_40000_TURNS);
+                if (moves <= 35000)
+                    issue_achievement(GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITHIN_35000_TURNS);
+                if (moves <= 30000)
+                    issue_achievement(GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITHIN_30000_TURNS);
+                if (moves <= 25000)
+                    issue_achievement(GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITHIN_25000_TURNS);
+                if (moves <= 20000)
+                    issue_achievement(GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITHIN_20000_TURNS);
+                if (moves <= 15000)
+                    issue_achievement(GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITHIN_15000_TURNS);
+            }
+        }
+    }
+
 
     if (u.ugrave_arise >= LOW_PM && !done_stopprint)
     {
@@ -2555,9 +2739,9 @@ int how;
 }
 
 void
-container_contents(list, identified, all_containers, reportempty, show_weights)
+container_contents(list, identified, all_containers, reportempty, show_weights, show_quick)
 struct obj *list;
-boolean identified, all_containers, reportempty;
+boolean identified, all_containers, reportempty, show_quick;
 int show_weights;
 {
     register struct obj *box, *obj;
@@ -2633,7 +2817,7 @@ int show_weights;
                         else
                             totalweight += obj->owt;
     
-                        Sprintf(&buf[2], "%2d - %s", count, show_weights > SHOWWEIGHTS_NONE ? (flags.inventory_weights_last ? doname_with_price_and_weight_last(obj, loadstonecorrectly) : doname_with_price_and_weight_first(obj, loadstonecorrectly)) : doname_with_price(obj));
+                        Sprintf(&buf[2], "%2d - %s", count, show_weights > SHOWWEIGHTS_NONE ? (flags.inventory_weights_last ? doname_with_price_and_weight_last(obj, loadstonecorrectly, show_quick) : doname_with_price_and_weight_first(obj, loadstonecorrectly, show_quick)) : show_quick ? doname_with_price_quick(obj) : doname_with_price(obj));
                         //Strcpy(&buf[2], doname_with_price_and_weight_first(obj));
                         putstr(tmpwin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
                     }
@@ -2657,7 +2841,7 @@ int show_weights;
                 destroy_nhwindow(tmpwin);
                 if (all_containers)
                     container_contents(contained_object_chain(box), identified, TRUE,
-                                       reportempty, show_weights);
+                                       reportempty, show_weights, show_quick);
             } 
             else if (reportempty) 
             {
@@ -2671,8 +2855,8 @@ int show_weights;
 }
 
 void
-magic_chest_contents(identified, all_containers, reportempty, show_weights)
-boolean identified, all_containers, reportempty;
+magic_chest_contents(identified, all_containers, reportempty, show_weights, show_quick)
+boolean identified, all_containers, reportempty, show_quick;
 int show_weights;
 {
     register struct obj* obj;
@@ -2723,7 +2907,7 @@ int show_weights;
                 else
                     totalweight += obj->owt;
 
-                Sprintf(&buf[2], "%2d - %s", count, show_weights > SHOWWEIGHTS_NONE ? (flags.inventory_weights_last ? doname_with_price_and_weight_last(obj, loadstonecorrectly) : doname_with_price_and_weight_first(obj, loadstonecorrectly)) : doname_with_price(obj));
+                Sprintf(&buf[2], "%2d - %s", count, show_weights > SHOWWEIGHTS_NONE ? (flags.inventory_weights_last ? doname_with_price_and_weight_last(obj, loadstonecorrectly, show_quick) : doname_with_price_and_weight_first(obj, loadstonecorrectly, show_quick)) : show_quick ? doname_with_price_quick(obj) : doname_with_price(obj));
                 //Strcpy(&buf[2], doname_with_price_and_weight_first(obj));
                 putstr(tmpwin, ATR_INDENT_AT_DASH | ATR_ORDERED_LIST, buf);
             }
@@ -2741,7 +2925,7 @@ int show_weights;
         display_nhwindow(tmpwin, TRUE);
         destroy_nhwindow(tmpwin);
         if (all_containers)
-            container_contents(magic_objs, identified, TRUE, reportempty, show_weights);
+            container_contents(magic_objs, identified, TRUE, reportempty, show_weights, show_quick);
     }
     else if (reportempty)
     {
@@ -2759,6 +2943,7 @@ int status;
 const char* mesg;
 boolean fullterminate;
 {
+    issue_breadcrumb3("nh_bail", status, (int)fullterminate);
     clearlocks();
     exit_nhwindows(mesg);
     if (fullterminate)
@@ -2780,6 +2965,7 @@ void
 nh_terminate(status)
 int status;
 {
+    issue_breadcrumb2("nh_terminate", status);
     program_state.in_moveloop = 0; /* won't be returning to normal play */
     program_state.freeing_dynamic_data = 1;
     stop_animations();
@@ -3067,7 +3253,7 @@ boolean ask, isend;
                 if (class_header && mlet != prev_mlet) 
                 {
                     Strcpy(buf, def_monsyms[(int) mlet].name);
-                    putstr(klwin, ask ? ATR_NONE : iflags.menu_headings,
+                    putstr(klwin, ask ? ATR_NONE : iflags.menu_headings | ATR_HEADING,
                            upstart(buf));
                     prev_mlet = mlet;
                 }
@@ -3584,7 +3770,7 @@ restore_killers(fd)
 int fd;
 {
     struct kinfo *kptr;
-    Strcpy(debug_buf_4, "restore_killers");
+    //debugprint("restore_killers");
 
     for (kptr = &killer; kptr != (struct kinfo *) 0; kptr = kptr->next) {
         mread(fd, (genericptr_t) kptr, sizeof (struct kinfo));
@@ -3738,13 +3924,21 @@ get_current_game_score(VOID_ARGS)
     {
     case PM_ARCHAEOLOGIST:
     {
-        struct item_score_count_result cnt = count_artifacts(invent);
-        struct item_score_count_result cnt2 = count_artifacts(magic_objs);
-        struct item_score_count_result cnt3 = count_historic_statues(invent);
-        struct item_score_count_result cnt4 = count_historic_statues(magic_objs);
-        struct item_score_count_result cnt5 = count_valuable_art_objects(invent);
-        struct item_score_count_result cnt6 = count_valuable_art_objects(magic_objs);
-        Role_Specific_Score = cnt.score + cnt2.score + cnt3.score + cnt4.score + (cnt5.score + cnt6.score) * ARCHAEOLOGIST_ART_OBJECT_SCORE_MULTIPLIER;
+        //struct item_score_count_result cnt = count_artifacts(invent);
+        //struct item_score_count_result cnt2 = count_artifacts(magic_objs);
+        //struct item_score_count_result cnt3 = count_historic_statues(invent);
+        //struct item_score_count_result cnt4 = count_historic_statues(magic_objs);
+        //struct item_score_count_result cnt5 = count_sarcophaguses(invent);
+        //struct item_score_count_result cnt6 = count_sarcophaguses(magic_objs); /* Should not fit in, but let's check anyway */
+        //struct item_score_count_result cnt7 = count_mummy_wrappings(invent);
+        //struct item_score_count_result cnt8 = count_mummy_wrappings(magic_objs);
+        //struct item_score_count_result cnt9 = count_valuable_art_objects(invent);
+        //struct item_score_count_result cnt10 = count_valuable_art_objects(magic_objs);
+        //Role_Specific_Score = cnt.score + cnt2.score + cnt3.score + cnt4.score + cnt5.score + cnt6.score + cnt7.score + cnt8.score + (cnt9.score + cnt10.score) * ARCHAEOLOGIST_ART_OBJECT_SCORE_MULTIPLIER;
+
+        int64_t score1 = count_archaeologist_item_score(invent);
+        int64_t score2 = count_archaeologist_item_score(magic_objs);
+        Role_Specific_Score = score1 + score2;
         Role_Achievement_Score = ARCHAEOLOGIST_ROLE_ACHIEVEMENT_SCORE * (int64_t)u.uachieve.role_achievement;
         break;
     }
@@ -4133,6 +4327,7 @@ reset_remaining_static_variables(VOID_ARGS)
     aborting = FALSE;
 #endif
     reset_allmain();
+    reset_apply();
     reset_hunger_status();
     reset_drawbridge();
     reset_dig();
@@ -4180,6 +4375,7 @@ reset_remaining_dynamic_data(VOID_ARGS)
 void
 reset_game(VOID_ARGS)
 {
+    issue_breadcrumb("reset_game");
     dmonsfree();
     *plname = 0;
     *recovery_plname = 0;

@@ -340,7 +340,7 @@ dig(VOID_ARGS)
         case 0:
             if (!welded(wep, &youmonst)) {
                 You_ex(ATR_NONE, CLR_MSG_WARNING, "fumble and drop %s.", yname(wep));
-                dropx(wep);
+                (void)dropx(wep);
             } else {
                 if (u.usteed)
                     pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s and %s %s!", Yobjnam2(wep, "bounce"),
@@ -458,11 +458,11 @@ dig(VOID_ARGS)
         {
             struct obj *bobj;
 
-            fracture_rock(obj, TRUE);
+            (void)fracture_rock(obj, TRUE);
             if ((bobj = sobj_at(BOULDER, dpx, dpy)) != 0) 
             {
                 /* another boulder here, restack it to the top */
-                Strcpy(debug_buf_2, "dig");
+                debugprint("dig");
                 obj_extract_self(bobj);
                 place_object(bobj, dpx, dpy);
             }
@@ -558,6 +558,7 @@ dig(VOID_ARGS)
         } 
         else if (lev->typ == SDOOR) 
         {
+            issue_achievement(GUI_ACHIEVEMENT_FOUND_SECRET_DOOR_OR_PASSAGE);
             play_simple_location_sound(dpx, dpy, LOCATION_SOUND_TYPE_BREAK);
             cvt_sdoor_to_door(dpx, dpy); /* ->typ = DOOR */
             digtxt = "You break through a secret door!";
@@ -1016,8 +1017,7 @@ coord *cc;
             pline("KADOOM!  The boulder falls in!");
             (void) delfloortrap(ttmp);
         }
-        Sprintf(priority_debug_buf_2, "dighole: %d", boulder_here->otyp);
-        Sprintf(priority_debug_buf_3, "dighole: %d", boulder_here->otyp);
+        debugprint("dighole: %d", boulder_here->otyp);
         delobj(boulder_here);
         return TRUE;
 
@@ -2302,7 +2302,10 @@ struct obj* origobj;
                 play_simple_location_sound(zx, zy, LOCATION_SOUND_TYPE_BREAK);
                 int otherflags = room->doormask & ~D_MASK;
                 if (room->typ == SDOOR)
+                {
+                    issue_achievement(GUI_ACHIEVEMENT_FOUND_SECRET_DOOR_OR_PASSAGE);
                     transform_location_type(zx, zy, DOOR, 0);  /* doormask set below */
+                }
                 else if (cansee(zx, zy))
                     pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s is razed!", get_door_name_at_ptr(room));
                 watch_dig((struct monst*)0, zx, zy, TRUE);
@@ -2678,8 +2681,7 @@ struct obj* origobj;
                 if(see_it)
                     pline("%s!", Tobjnam(otmp, "evaporate"));
 
-                Sprintf(priority_debug_buf_2, "zap_evaporation: %d", otmp->otyp);
-                Sprintf(priority_debug_buf_3, "zap_evaporation: %d", otmp->otyp);
+                debugprint("zap_evaporation: %d", otmp->otyp);
                 delobj(otmp);
             }
         }
@@ -2952,7 +2954,7 @@ buried_ball_to_punishment()
     cc.y = u.uy;
     ball = buried_ball(&cc);
     if (ball) {
-        Strcpy(debug_buf_2, "buried_ball_to_punishment");
+        debugprint("buried_ball_to_punishment");
         obj_extract_self(ball);
 #if 0
         /* rusting buried metallic objects is not implemented yet */
@@ -2976,7 +2978,7 @@ buried_ball_to_freedom()
     cc.y = u.uy;
     ball = buried_ball(&cc);
     if (ball) {
-        Strcpy(debug_buf_2, "buried_ball_to_freedom");
+        debugprint("buried_ball_to_freedom");
         obj_extract_self(ball);
 #if 0
         /* rusting buried metallic objects is not implemented yet */
@@ -3018,11 +3020,10 @@ boolean *dealloced;
     if (otmp->otyp == LEASH && otmp->leashmon != 0)
         o_unleash(otmp);
 
-    Strcpy(debug_buf_3, "bury_an_obj");
+    debugprint("bury_an_obj1: %d", otmp->otyp);
     if (otmp->lamplit && otmp->otyp != POT_OIL)
         end_burn(otmp, TRUE);
 
-    Strcpy(debug_buf_2, "bury_an_obj");
     obj_extract_self(otmp);
 
     if (is_obj_unburiable(otmp)) //(otmp == uchain || obj_resists(otmp, 0, 0))
@@ -3048,7 +3049,7 @@ boolean *dealloced;
         /* merges into burying material */
         if (dealloced)
             *dealloced = TRUE;
-        Sprintf(priority_debug_buf_4, "bury_an_obj: %d", otmp->otyp);
+        debugprint("bury_an_obj2: %d", otmp->otyp);
         obfree(otmp, (struct obj *) 0);
         return otmp2;
     }
@@ -3060,10 +3061,7 @@ boolean *dealloced;
         ; /* should cancel timer if under_ice */
     } else if ((under_ice ? otmp->oclass == POTION_CLASS : is_rottable(otmp))
                && !obj_resists(otmp, 5, 95)) {
-        Sprintf(priority_debug_buf_1, "bury_an_obj (timed): %d, %d", otmp->otyp, otmp->corpsenm);
-        Strcpy(priority_debug_buf_2, "bury_an_obj");
-        Strcpy(priority_debug_buf_3, "bury_an_obj");
-        Strcpy(priority_debug_buf_4, "bury_an_obj");
+        debugprint("bury_an_obj (timed): %d, %d", otmp->otyp, otmp->corpsenm);
         (void) start_timer((under_ice ? 0L : 250L) + (int64_t) rnd(250),
                            TIMER_OBJECT, ROT_ORGANIC, obj_to_any(otmp));
 #if 0
@@ -3088,6 +3086,7 @@ int x, y;
     int64_t loss = 0L;
     boolean costly;
 
+    debugprint_pos();
     costly = ((shkp = shop_keeper(*in_rooms(x, y, SHOPBASE)))
               && costly_spot(x, y));
 
@@ -3147,7 +3146,7 @@ boolean verbose, buriedsearchableonly;
             }
             else
             {
-                Strcpy(debug_buf_2, "unearth_objs");
+                debugprint("unearth_objs");
                 obj_extract_self(otmp);
                 if (otmp->timed)
                     (void) stop_timer(ROT_ORGANIC, obj_to_any(otmp));
@@ -3174,7 +3173,7 @@ boolean verbose, buriedsearchableonly;
  * away, any contents become newly buried objects.
  */
 /* ARGSUSED */
-void
+int
 rot_organic(arg, timeout)
 anything *arg;
 int64_t timeout UNUSED;
@@ -3195,18 +3194,18 @@ int64_t timeout UNUSED;
         if (obj->cobj == cobj_to_bury)
             break; /* Something's wrong, avoid infine loop */
     }
-    Strcpy(debug_buf_2, "rot_organic");
+    debugprint("rot_organic: %d", obj->otyp);
     obj_extract_self(obj);
-    Sprintf(priority_debug_buf_4, "rot_organic: %d", obj->otyp);
     //context.suppress_container_deletion_warning = 1;
     obfree(obj, (struct obj *) 0);
     //context.suppress_container_deletion_warning = 0;
+    return TRUE;
 }
 
 /*
  * Called when a corpse has rotted completely away.
  */
-void
+int
 rot_corpse(arg, timeout)
 anything *arg;
 int64_t timeout;
@@ -3215,6 +3214,8 @@ int64_t timeout;
     struct obj *obj = arg->a_obj;
     boolean on_floor = obj->where == OBJ_FLOOR,
             in_invent = obj->where == OBJ_INVENT;
+
+    int obj_gone = 0;
 
     if (on_floor) {
         x = obj->ox;
@@ -3256,8 +3257,8 @@ int64_t timeout;
            freeing a worn object doesn't get a false hit */
         obj->owornmask = 0L;
     }
-    Sprintf(priority_debug_buf_3, "rot_corpse: %d, %d", obj->otyp, obj->corpsenm);
-    rot_organic(arg, timeout);
+    debugprint("rot_corpse: %d, %d", obj->otyp, obj->corpsenm);
+    obj_gone = rot_organic(arg, timeout);
     if (on_floor) {
         struct monst *mtmp = m_at(x, y);
 
@@ -3270,6 +3271,7 @@ int64_t timeout;
         newsym(x, y);
     } else if (in_invent)
         update_inventory();
+    return obj_gone;
 }
 
 #if 0
@@ -3319,6 +3321,7 @@ unearth_you()
     under_ground(0);
     if (!uamul || uamul->otyp != AMULET_OF_STRANGULATION)
         Strangled = 0;
+    debugprint_pos();
     vision_recalc(0);
 }
 

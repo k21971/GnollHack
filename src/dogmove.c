@@ -34,6 +34,7 @@ struct monst *mon;
 
     dummy = zeroobj;
     dummy.otyp = GOLD_PIECE; /* not STRANGE_OBJECT or tools of interest */
+    dummy.oclass = COIN_CLASS;
     dummy.oartifact = 1; /* so real artifact won't override "don't keep it" */
     pickaxe = unihorn = key = (struct obj *) 0;
     wep = MON_WEP(mon);
@@ -215,7 +216,8 @@ struct monst *mtmp;
 struct obj *obj;
 {
     int nutrit;
-    int nutr_size_mult = (int)mon_nutrition_size_multiplier(mtmp);
+    int nutr_mult = (int)mon_nutrition_factor(obj, mtmp, TRUE);
+    int nutr_divisor = (int)mon_nutrition_factor(obj, mtmp, FALSE);
 
     /*
      * It is arbitrary that the pet takes the same length of time to eat
@@ -223,33 +225,28 @@ struct obj *obj;
      */
     if (obj->oclass == FOOD_CLASS) 
     {
-        boolean is_veg = FALSE;
         if (obj->otyp == CORPSE && obj->corpsenm >= LOW_PM)
         {
             mtmp->meating = 3 + (mons[obj->corpsenm].cwt >> 6);
+            if (mtmp->meating < 3)
+                mtmp->meating = 3;
             nutrit = mons[obj->corpsenm].cnutrit;
-            if (is_vegetarian_food(&mons[obj->corpsenm]) || is_vegan_food(&mons[obj->corpsenm]))
-                is_veg = TRUE;
-        } 
+            refresh_m_tile_gui_info(mtmp, FALSE);
+        }
         else 
         {
             mtmp->meating = objects[obj->otyp].oc_delay;
             nutrit = objects[obj->otyp].oc_nutrition;
-            if(obj->otyp == TIN && (obj->special_quality == SPEQUAL_TIN_CONTAINS_SPINACH || (obj->corpsenm >= LOW_PM && (is_vegetarian_food(&mons[obj->corpsenm]) || is_vegan_food(&mons[obj->corpsenm])))))
-                is_veg = TRUE;
-            else if(obj->material == MAT_VEGGY)
-                is_veg = TRUE;
+            refresh_m_tile_gui_info(mtmp, FALSE);
         }
 
-        nutrit *= nutr_size_mult;
-
-        if(herbivorous(mtmp->data) && is_veg)
-            nutrit *= 4;
+        nutrit = (nutrit * nutr_mult) / nutr_divisor;
 
         if (obj->oeaten)
         {
             mtmp->meating = eaten_stat(mtmp->meating, obj);
             nutrit = eaten_stat(nutrit, obj);
+            refresh_m_tile_gui_info(mtmp, FALSE);
         }
     } 
     else if (obj->oclass == COIN_CLASS) 
@@ -258,7 +255,8 @@ struct obj *obj;
         if (mtmp->meating < 0)
             mtmp->meating = 1;
         nutrit = (int) (obj->quan / 2);
-        nutrit *= nutr_size_mult;
+        nutrit = (nutrit * nutr_mult) / nutr_divisor;
+        refresh_m_tile_gui_info(mtmp, FALSE);
     }
     else if (obj->oclass == POTION_CLASS)
     {
@@ -267,7 +265,8 @@ struct obj *obj;
         int nutrition = (int)d(max(0, objects[obj->otyp].oc_potion_nutrition_dice + nutrdicebuc * bcsign(obj)), 
             max(1, objects[obj->otyp].oc_potion_nutrition_diesize)) 
             + objects[obj->otyp].oc_potion_nutrition_plus + bcsign(obj) * (int)objects[obj->otyp].oc_potion_nutrition_buc_multiplier;
-        nutrit = nutrition * nutr_size_mult;
+        nutrit = (nutrition * nutr_mult) / nutr_divisor;
+        refresh_m_tile_gui_info(mtmp, FALSE);
     }
     else
     {
@@ -277,7 +276,10 @@ struct obj *obj;
          * eat.c.  (This also applies to pets eating gold.)
          */
         mtmp->meating = obj->owt / 20 + 1;
-        nutrit = nutr_size_mult * (int)obj_nutrition(obj, mtmp); // objects[obj->otyp].oc_nutrition;
+        if (mtmp->meating < 1)
+            mtmp->meating = 1;
+        nutrit = (int)mon_obj_nutrition_value(obj, mtmp);
+        refresh_m_tile_gui_info(mtmp, FALSE);
     }
     if (nutrit < 0)
         nutrit = 0;
@@ -306,9 +308,9 @@ boolean devour;
         edog->hungrytime = monstermoves;
     nutrit = dog_nutrition(mtmp, obj);
 
-    deadmimic = (obj->otyp == CORPSE && obj->corpsenm >= LOW_PM && is_mimic(&mons[obj->corpsenm]));
-    slimer = (obj->otyp == CORPSE && obj->corpsenm == PM_GREEN_SLIME) && !has_unchanging(mtmp) && !resists_slime(mtmp);
-    poly = polyfodder(obj) && !has_unchanging(mtmp);
+    deadmimic = (obj->otyp == CORPSE && obj->corpsenm >= LOW_PM && is_mimic(&mons[obj->corpsenm])) && !resists_mimicking(mtmp);
+    slimer = (obj->otyp == CORPSE && obj->corpsenm == PM_GREEN_SLIME) && !resists_slime(mtmp);
+    poly = polyfodder(obj) && !resists_polymorph(mtmp);
     grow = mlevelgain(obj);
     heal = mhealup(obj);
     curepetrification = mcurepetrification(obj);
@@ -321,6 +323,7 @@ boolean devour;
             mtmp->meating /= 2;
         if (nutrit > 1)
             nutrit = (nutrit * 3) / 4;
+        refresh_m_tile_gui_info(mtmp, FALSE);
     }
     edog->hungrytime += nutrit;
     mtmp->mprops[CONFUSION] &= ~M_INTRINSIC_ACQUIRED;
@@ -426,7 +429,7 @@ boolean devour;
     else if (obj == uball) 
     {
         unpunish();
-        Sprintf(priority_debug_buf_3, "dog_eat: %d", obj->otyp);
+        debugprint("dog_eat: %d", obj->otyp);
         delobj(obj); /* we assume this can't be unpaid */
     } 
     else if (obj == uchain) 
@@ -453,7 +456,7 @@ boolean devour;
         if (obj->otyp == STATUE)
             pre_break_statue(obj);
 
-        Sprintf(priority_debug_buf_3, "dog_eat2: %d", obj->otyp);
+        debugprint("dog_eat2: %d", obj->otyp);
         delobj(obj);
     }
 
@@ -675,6 +678,10 @@ boolean verbose;
                 newsym(mtmp->mx, mtmp->my);
             }
         }    
+        break;
+    case EDIBLEFX_CURE_HALLUCINATION:
+        if (!otmp->cursed)
+            mcurehallucination(mtmp, verbose);
         break;
     }
     return;
@@ -1360,7 +1367,7 @@ int udist;
                                     pline("%s picks up %s.", Monnam(mtmp), distant_name(otmp, doname));
                             }
 
-                            Strcpy(debug_buf_2, "dog_invent");
+                            debugprint("dog_invent");
                             obj_extract_self(otmp);
                             newsym(omx, omy);
                             (void) mpickobj(mtmp, otmp);
@@ -1708,6 +1715,7 @@ score_targ(mtmp, mtarg)
 struct monst *mtmp, *mtarg;
 {
     int64_t score = 0L;
+    boolean is_conf_etc = is_confused(mtmp) || is_hallucinating(mtmp) || is_stunned(mtmp);
 
     /* If the monster is confused, normal scoring is disrupted -
      * anything may happen
@@ -1715,7 +1723,8 @@ struct monst *mtmp, *mtarg;
 
     /* Give 1 in 3 chance of safe breathing even if pet is confused or
      * if you're on the quest start level */
-    if (!is_confused(mtmp) || !rn2(3) || Is_qstart(&u.uz)) {
+    if (!is_conf_etc || !rn2(3) || Is_qstart(&u.uz))
+    {
         int mtmp_lev;
         aligntyp align1 = A_NONE, align2 = A_NONE; /* For priests, minions */
         boolean faith1 = TRUE,  faith2 = TRUE;
@@ -1738,23 +1747,27 @@ struct monst *mtmp, *mtarg;
             || mtarg->data->msound == MS_GUARDIAN)
             return -5000L;
         /* D: Fixed angelic beings using gaze attacks on coaligned priests */
-        if (faith1 && faith2 && align1 == align2 && is_peaceful(mtarg)) {
+        if (faith1 && faith2 && align1 == align2 && is_peaceful(mtarg)) 
+        {
             score -= 5000L;
             return score;
         }
-        /* Is monster adjacent? */
-        if (distmin(mtmp->mx, mtmp->my, mtarg->mx, mtarg->my) <= 1) {
-            score -= 3000L;
-            return score;
-        }
         /* Is the monster peaceful or tame? */
-        if ((is_peaceful(mtarg) && !mon_has_bloodlust(mtmp) /*mtmp->ispacifist*/) || is_tame(mtarg) || mtarg == &youmonst) {
+        if ((is_peaceful(mtarg) && !mon_has_bloodlust(mtmp) /*mtmp->ispacifist*/) || is_tame(mtarg) || mtarg == &youmonst)
+        {
             /* Pets will never be targeted */
             score -= 3000L;
             return score;
         }
+        /* Is monster adjacent? */
+        if (distmin(mtmp->mx, mtmp->my, mtarg->mx, mtarg->my) <= 1) 
+        {
+            score -= 3000L;
+            return score;
+        }
         /* Is master/pet behind monster? Check up to 15 squares beyond pet. */
-        if (find_friends(mtmp, mtarg, 15)) {
+        if (find_friends(mtmp, mtarg, 15)) 
+        {
             score -= 3000L;
             return score;
         }
@@ -1800,7 +1813,7 @@ struct monst *mtmp, *mtarg;
        similar targets are abundant. */
     score += rnd(5);
     /* Pet may decide not to use ranged attack when confused */
-    if (is_confused(mtmp) && !rn2(3))
+    if (is_conf_etc && !rn2(3))
         score -= 1000;
     return score;
 }
@@ -2074,6 +2087,7 @@ int after; /* this is extra fast monster movement */
                         && (has_see_invisible(mtmp) || !is_invisible(mtmp2)))
                     || (slurps_items(mtmp2->data) && rn2(10))
                     || (is_tame(mtmp2) && !Conflict && !is_crazed(mtmp2))
+                    || !check_mon_wants_to_attack_target(mtmp, mtmp2)
                     || (max_passive_dmg(mtmp2, mtmp) >= mtmp->mhp)
                     || (is_peaceful(mtmp2) && (mtmp2->data->msound == MS_GUARDIAN
                          || mtmp2->data->msound == MS_LEADER || (!mon_has_bloodlust(mtmp)
@@ -2097,6 +2111,7 @@ int after; /* this is extra fast monster movement */
 
             if ((mstatus & MM_HIT) && !(mstatus & MM_DEF_DIED) && rn2(4)
                 && mtmp2->mlstmv != monstermoves
+                && check_mon_wants_to_attack_target(mtmp2, mtmp)
                 && !onscary(mtmp->mx, mtmp->my, mtmp2)
                 /* monnear check needed: long worms hit on tail */
                 && monnear(mtmp2, mtmp->mx, mtmp->my)) 
@@ -2266,10 +2281,10 @@ int after; /* this is extra fast monster movement */
 
             if (mtarg == &youmonst)
             {
-                Sprintf(debug_buf_4, "mattacku dog1, mx:%d, my:%d, mux:%d, muy:%d, ux:%d, uy:%d, peaceful:%d, tame:%d, blinded:%d, crazed:%d, confused:%d, conflict:%d, displaced:%d",
-                    (int)mtmp->mx, (int)mtmp->my, (int)mtmp->mux, (int)mtmp->muy, (int)u.ux, (int)u.uy,
+                debugprint("dog_move mattacku1, mnum:%d, mx:%d, my:%d, mux:%d, muy:%d, ux:%d, uy:%d, peaceful:%d, tame:%d, blinded:%d, crazed:%d, confused:%d, conflict:%d, displaced:%d, invisible:%d",
+                    (int)mtmp->mnum, (int)mtmp->mx, (int)mtmp->my, (int)mtmp->mux, (int)mtmp->muy, (int)u.ux, (int)u.uy,
                     is_peaceful(mtmp) != 0, is_tame(mtmp) != 0, is_blinded(mtmp) != 0, is_crazed(mtmp) != 0, is_confused(mtmp) != 0,
-                    Conflict != 0, Displaced != 0);
+                    Conflict != 0, Displaced != 0, Invis != 0);
                 if (mattacku(mtmp))
                     return 2;
             }
@@ -2289,7 +2304,10 @@ int after; /* this is extra fast monster movement */
                  * nothing will happen.
                  */
                 if ((mstatus & MM_HIT) && !(mstatus & MM_DEF_DIED)
-                    && rn2(4) && mtarg != &youmonst)
+                    && rn2(4)
+                    && mtarg != &youmonst
+                    && check_mon_wants_to_attack_target(mtarg, mtmp)
+                    )
                 {
 
                     /* Can monster see? If it can, it can retaliate
@@ -2320,17 +2338,17 @@ newdogpos:
 
             if (info[chi] & ALLOW_U)
             {
+                set_apparxy(mtmp); /* May need to update after mattacku above */
                 if (mtmp->mleashed)
                 { /* play it safe */
                     play_sfx_sound(SFX_PULLS_FREE_OF_LEASH);
-                    pline("%s breaks loose of %s leash!", Monnam(mtmp),
-                          mhis(mtmp));
+                    pline("%s breaks loose of %s leash!", Monnam(mtmp), mhis(mtmp));
                     m_unleash(mtmp, FALSE);
                 }
-                Sprintf(debug_buf_4, "mattacku dog2, mx:%d, my:%d, mux:%d, muy:%d, ux:%d, uy:%d, peaceful:%d, tame:%d, blinded:%d, crazed:%d, confused:%d, conflict:%d, displaced:%d", 
-                    (int)mtmp->mx, (int)mtmp->my, (int)mtmp->mux, (int)mtmp->muy, (int)u.ux, (int)u.uy, 
+                debugprint("dog_move mattacku2, mnum:%d, mx:%d, my:%d, mux:%d, muy:%d, ux:%d, uy:%d, peaceful:%d, tame:%d, blinded:%d, crazed:%d, confused:%d, conflict:%d, displaced:%d, invisible:%d",
+                    (int)mtmp->mnum, (int)mtmp->mx, (int)mtmp->my, (int)mtmp->mux, (int)mtmp->muy, (int)u.ux, (int)u.uy,
                     is_peaceful(mtmp) != 0, is_tame(mtmp) != 0, is_blinded(mtmp) != 0, is_crazed(mtmp) != 0, is_confused(mtmp) != 0, 
-                    Conflict != 0, Displaced != 0);
+                    Conflict != 0, Displaced != 0, Invisib != 0);
                 (void) mattacku(mtmp);
                 return 0;
             }
@@ -2341,6 +2359,7 @@ newdogpos:
 
             /* insert a worm_move() if worms ever begin to eat things */
             wasseen = canseemon(mtmp);
+            debugprint("dog_move: mnum=%d, omx=%d, omy=%d, nix=%d, niy=%d", mtmp->mnum, omx, omy, nix, niy);
             remove_monster(omx, omy);
             place_monster(mtmp, nix, niy);
             play_movement_sound(mtmp, CLIMBING_TYPE_NONE);
@@ -2356,6 +2375,7 @@ newdogpos:
                                  && glyph_is_object(levl[nix][niy].hero_memory_layers.glyph))
                                    ? vobj_at(nix, niy) : 0;
 #endif
+                issue_achievement(GUI_ACHIEVEMENT_DETERMINED_CURSED_STATUS_WITH_PET);
                 const char *what = cursedobj[chi] ? distant_name(cursedobj[chi], doname) : something;
                 play_monster_unhappy_sound(mtmp, MONSTER_UNHAPPY_SOUND_WARN_CURSED);
                 pline_multi_ex(ATR_NONE, CLR_MSG_ATTENTION, no_multiattrs, what != something ? multicolor_orange3 : get_colorless_multicolor_buffer(), "%s %s reluctantly over %s.", noit_Monnam(mtmp),
@@ -2433,6 +2453,7 @@ newdogpos:
         dognext:
             if (!m_in_out_region(mtmp, nix, niy))
                 return 1;
+            debugprint("dog_move2: mnum=%d, mx=%d, my=%d, cc.x=%d, cc.y=%d", mtmp->mnum, mtmp->mx, mtmp->my, cc.x, cc.y);
             remove_monster(mtmp->mx, mtmp->my);
             place_monster(mtmp, cc.x, cc.y);
             newsym(cc.x, cc.y);
@@ -2547,6 +2568,8 @@ struct monst *mtmp;
             free_mobj(mtmp);
         newsym(mtmp->mx, mtmp->my);
     }
+    else
+        refresh_m_tile_gui_info(mtmp, FALSE);
 }
 
 STATIC_OVL void

@@ -26,7 +26,7 @@ namespace GnollHackX.Pages.Game
 #endif
 {
     [XamlCompilation(XamlCompilationOptions.Compile)]
-    public partial class GameMenuPage : ContentPage, ICloseablePage
+    public partial class GameMenuPage : ContentPage, ICloseablePage, IKeyPressHandlingPage, ISpecialKeyPressHandlingPage
     {
         public GamePage _gamePage;
  
@@ -94,9 +94,9 @@ namespace GnollHackX.Pages.Game
             MainLayout.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
             GHApp.CollectNursery();
-            _gamePage.GenericButton_Clicked(btnSave, EventArgs.Empty, GHUtils.Meta('s'));
-            var page = await GHApp.Navigation.PopModalAsync();
-            GHApp.DisconnectIViewHandlers(page);
+            //GHApp.AddSentryBreadcrumb(btnSave.Text + " menu button pressed.", GHConstants.SentryGnollHackButtonClickCategoryName);
+            _gamePage.GenericButton_Clicked(btnSave, EventArgs.Empty, GHApp.MapCommand(GHUtils.Meta('s')));
+            await GHApp.PopModalPageAsync();
         }
 
         private async void btnQuit_Clicked(object sender, EventArgs e)
@@ -109,9 +109,9 @@ namespace GnollHackX.Pages.Game
             MainLayout.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
             GHApp.CollectNursery();
-            _gamePage.GenericButton_Clicked(btnQuit, EventArgs.Empty, _gamePage.GameEnded ? 'q' : GHUtils.Meta('q'));
-            var page = await GHApp.Navigation.PopModalAsync();
-            GHApp.DisconnectIViewHandlers(page);
+            //GHApp.AddSentryBreadcrumb(btnQuit.Text + " menu button pressed.", GHConstants.SentryGnollHackButtonClickCategoryName);
+            _gamePage.GenericButton_Clicked(btnQuit, EventArgs.Empty, _gamePage.GameEnded ? 'q' : GHApp.MapCommand(GHUtils.Meta('q')));
+            await GHApp.PopModalPageAsync();
         }
 
         public void ClosePage()
@@ -134,14 +134,16 @@ namespace GnollHackX.Pages.Game
         {
             await BackToGame();
         }
+
         private async Task BackToGame()
         {
             MainLayout.IsEnabled = false;
             _backPressed = true;
             GHApp.PlayButtonClickedSound();
             GHApp.CollectNursery();
-            var page = await GHApp.Navigation.PopModalAsync();
-            GHApp.DisconnectIViewHandlers(page);
+            await GHApp.PopModalPageAsync();
+            GHApp.UpdateFreeDiskSpace();
+            GHApp.UpdateUsedMemory();
         }
 
         private async void btnOptions_Clicked(object sender, EventArgs e)
@@ -155,9 +157,8 @@ namespace GnollHackX.Pages.Game
             GHApp.PlayButtonClickedSound();
             GHApp.DebugWriteRestart("ProfilingStopwatch.Restart: Options");
             GHApp.CollectNursery();
-            _gamePage.GenericButton_Clicked(btnOptions, EventArgs.Empty, 'O');
-            var page = await GHApp.Navigation.PopModalAsync();
-            GHApp.DisconnectIViewHandlers(page);
+            _gamePage.GenericButton_Clicked(btnOptions, EventArgs.Empty, GHApp.MapCommand('O'));
+            await GHApp.PopModalPageAsync();
         }
 
         private async void btnSnapshot_Clicked(object sender, EventArgs e)
@@ -170,9 +171,8 @@ namespace GnollHackX.Pages.Game
             MainLayout.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
             GHApp.CollectNursery();
-            _gamePage.GenericButton_Clicked(btnSnapshot, EventArgs.Empty, GHUtils.Meta(28));
-            var page = await GHApp.Navigation.PopModalAsync();
-            GHApp.DisconnectIViewHandlers(page);
+            _gamePage.GenericButton_Clicked(btnSnapshot, EventArgs.Empty, GHApp.MapCommand(GHUtils.Meta(29)));
+            await GHApp.PopModalPageAsync();
         }
 
         private async void btnSettings_Clicked(object sender, EventArgs e)
@@ -185,7 +185,7 @@ namespace GnollHackX.Pages.Game
             MainLayout.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
             var settingsPage = new SettingsPage(this, null);
-            await GHApp.Navigation.PushModalAsync(settingsPage);
+            await GHApp.PushModalPageAsync(settingsPage);
             MainLayout.IsEnabled = true;
         }
 
@@ -200,7 +200,7 @@ namespace GnollHackX.Pages.Game
             GHApp.PlayButtonClickedSound();
             var libPage = new LibraryPage();
             libPage.ReadLibrary();
-            await GHApp.Navigation.PushModalAsync(libPage);
+            await GHApp.PushModalPageAsync(libPage);
             MainLayout.IsEnabled = true;
         }
 
@@ -215,7 +215,7 @@ namespace GnollHackX.Pages.Game
             GHApp.PlayButtonClickedSound();
             var oraclePage = new OraclePage();
             oraclePage.ReadConsultations();
-            await GHApp.Navigation.PushModalAsync(oraclePage);
+            await GHApp.PushModalPageAsync(oraclePage);
             MainLayout.IsEnabled = true;
         }
 
@@ -234,8 +234,7 @@ namespace GnollHackX.Pages.Game
                 _backPressed = true;
                 MainLayout.IsEnabled = false;
                 GHApp.CollectNursery();
-                var page = await GHApp.Navigation.PopModalAsync();
-                GHApp.DisconnectIViewHandlers(page);
+                await GHApp.PopModalPageAsync();
             }
             return false;
         }
@@ -283,8 +282,7 @@ namespace GnollHackX.Pages.Game
             if (_gamePage.ShownTip == -1)
                 _gamePage.ShowGUITips(false);
             GHApp.CollectNursery();
-            var page = await GHApp.Navigation.PopModalAsync();
-            GHApp.DisconnectIViewHandlers(page);
+            await GHApp.PopModalPageAsync();
         }
 
         private double _currentPageWidth = 0;
@@ -311,7 +309,7 @@ namespace GnollHackX.Pages.Game
             MainLayout.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
             var verPage = new VersionPage(_gamePage);
-            await GHApp.Navigation.PushModalAsync(verPage);
+            await GHApp.PushModalPageAsync(verPage);
             MainLayout.IsEnabled = true;
         }
 
@@ -386,13 +384,16 @@ namespace GnollHackX.Pages.Game
             {
                 /* Android seems to trigger app switching (OnSleep / OnResume) using OpenBrowser; use WebView instead */
                 var wikiPage = new WikiPage("Wiki", GHConstants.GnollHackWikiPage);
-                await GHApp.Navigation.PushModalAsync(wikiPage);
+                await GHApp.PushModalPageAsync(wikiPage);
             }
             MainLayout.IsEnabled = true;
         }
 
         public bool HandleKeyPress(int key, bool isCtrl, bool isMeta)
         {
+            if (GHApp.PushingModalPage) /* Ignore key presses when opening a page */
+                return true;
+
             bool handled = false;
             try
             {

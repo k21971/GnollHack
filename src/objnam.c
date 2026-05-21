@@ -1324,13 +1324,17 @@ char** attrs_ptr, ** colors_ptr;
 
     boolean ispoisoned = FALSE,
             with_price = (doname_flags & DONAME_WITH_PRICE) != 0,
+            hide_unpaid = (doname_flags & DONAME_HIDE_UNPAID) != 0,
             vague_quan = (doname_flags & DONAME_VAGUE_QUAN) != 0,
+            special_quan = (doname_flags & DONAME_USE_SPECIAL_QUAN) != 0,
             weightfirst = (doname_flags & DONAME_WITH_WEIGHT_FIRST) != 0,
             weightlast = (doname_flags & DONAME_WITH_WEIGHT_LAST) != 0,
             loadstonecorrectly = (doname_flags & DONAME_LOADSTONE_CORRECTLY) != 0,
             lit_in_front = (doname_flags & DONAME_LIT_IN_FRONT) != 0,
+            hide_worn = (doname_flags & DONAME_HIDE_WORN) != 0,
             comparison_stats = (doname_flags & DONAME_COMPARISON) != 0 && iflags.show_comparison_stats && !iflags.in_dumplog && !program_state.gameover,
-            do_library = (doname_flags & DONAME_NO_LIBRARY) == 0 && !iflags.in_dumplog;
+            do_library = (doname_flags & DONAME_NO_LIBRARY) == 0 && !iflags.in_dumplog,
+            show_quick = (doname_flags & DONAME_SHOW_QUICK_ITEMS) != 0 && !iflags.in_dumplog;
     boolean known, dknown, cknown, bknown, lknown, tknown;
     int omndx = obj->corpsenm, isenchanted = 0;
     char prefix[PREFIXBUFSZ] = "";
@@ -1339,9 +1343,12 @@ char** attrs_ptr, ** colors_ptr;
                                 end (Strcat is used on the end) */
     char *bp = xname(obj);
 
-    if (iflags.override_ID) {
+    if (iflags.override_ID)
+    {
         known = dknown = cknown = bknown = lknown = tknown = TRUE;
-    } else {
+    }
+    else
+    {
         known = obj->known;
         dknown = obj->dknown;
         cknown = obj->cknown;
@@ -1356,41 +1363,55 @@ char** attrs_ptr, ** colors_ptr;
      * combining both into one function taking a parameter.
      */
     /* must check opoisoned--someone can have a weirdly-named fruit */
-    if (!strncmp(bp, "poisoned ", 9) && obj->opoisoned) {
+    if (!strncmp(bp, "poisoned ", 9) && obj->opoisoned)
+    {
         bp += 9;
         ispoisoned = TRUE;
     }
 
-    if (!strncmp(bp, "freezing ", 9) && obj->elemental_enchantment == COLD_ENCHANTMENT) {
+    if (!strncmp(bp, "freezing ", 9) && obj->elemental_enchantment == COLD_ENCHANTMENT) 
+    {
         bp += 9;
         isenchanted = obj->elemental_enchantment;
-    } else if (!strncmp(bp, "flaming ", 8) && obj->elemental_enchantment == FIRE_ENCHANTMENT) {
+    } 
+    else if (!strncmp(bp, "flaming ", 8) && obj->elemental_enchantment == FIRE_ENCHANTMENT) 
+    {
         bp += 8;
         isenchanted = obj->elemental_enchantment;
     }
-    else if (!strncmp(bp, "electrified ", 12) && obj->elemental_enchantment == LIGHTNING_ENCHANTMENT) {
+    else if (!strncmp(bp, "electrified ", 12) && obj->elemental_enchantment == LIGHTNING_ENCHANTMENT) 
+    {
         bp += 12;
         isenchanted = obj->elemental_enchantment;
     }
-    else if (!strncmp(bp, "death-magical ", 14) && obj->elemental_enchantment == DEATH_ENCHANTMENT) {
+    else if (!strncmp(bp, "death-magical ", 14) && obj->elemental_enchantment == DEATH_ENCHANTMENT) 
+    {
         bp += 14;
         isenchanted = obj->elemental_enchantment;
     }
 
-    if (obj->quan != 1L) {
+    int64_t quan = special_quan ? iflags.payobj_special_quan : obj->quan;
+    if (quan != 1L) 
+    {
         if (dknown || !vague_quan)
-            Sprintf(prefix, "%lld ", (long long)obj->quan);
+            Sprintf(prefix, "%lld ", (long long)quan);
         else
             Strcpy(prefix, "some ");
-    } else if (obj->otyp == CORPSE) {
+    }
+    else if (obj->otyp == CORPSE)
+    {
         /* skip article prefix for corpses [else corpse_xname()
            would have to be taught how to strip it off again] */
         *prefix = '\0';
-    } else if (obj_is_pname(obj) || the_unique_obj(obj)) {
+    }
+    else if (obj_is_pname(obj) || the_unique_obj(obj)) 
+    {
         if (!strncmpi(bp, "the ", 4))
             bp += 4;
         Strcpy(prefix, "the ");
-    } else {
+    } 
+    else
+    {
         Strcpy(prefix, "a ");
     }
 
@@ -1413,7 +1434,8 @@ char** attrs_ptr, ** colors_ptr;
 
     if (bknown && obj->oclass != COIN_CLASS
         && (obj->otyp != POT_WATER || !objects[POT_WATER].oc_name_known
-            || (!obj->cursed && !obj->blessed))) {
+            || (!obj->cursed && !obj->blessed))) 
+    {
         /* allow 'blessed clear potion' if we don't know it's holy water;
          * always allow "uncursed potion of water"
          */
@@ -1492,7 +1514,8 @@ char** attrs_ptr, ** colors_ptr;
     }
 
 
-    if (cknown && Has_contained_contents(obj)) {
+    if (cknown && Has_contained_contents(obj))
+    {
         /* we count the number of separate stacks, which corresponds
            to the number of inventory slots needed to be able to take
            everything out if no merges occur */
@@ -1520,11 +1543,11 @@ char** attrs_ptr, ** colors_ptr;
     /* post and prefixes */
     switch (is_weptool(obj) ? WEAPON_CLASS : obj->oclass) {
     case AMULET_CLASS:
-        if (obj->owornmask & W_AMUL)
+        if ((obj->owornmask & W_AMUL) != 0 && !hide_worn)
             Strcat(bp, " (being worn)");
         break;
     case MISCELLANEOUS_CLASS:
-        if (obj->owornmask & W_MISCITEMS)
+        if ((obj->owornmask & W_MISCITEMS) != 0 && !hide_worn)
         {
             if(strcmp(misc_type_worn_texts[objects[obj->otyp].oc_subtyp], "") == 0)
                 Strcat(bp, " (being worn)");
@@ -1559,7 +1582,7 @@ char** attrs_ptr, ** colors_ptr;
         }
         break;
     case ARMOR_CLASS:
-        if (obj->owornmask & W_ARMS)
+        if ((obj->owornmask & W_ARMS) != 0 && !hide_worn)
         {
             if(is_shield(obj))
             {
@@ -1593,7 +1616,7 @@ char** attrs_ptr, ** colors_ptr;
                 }
             }
         }
-        else if (obj->owornmask & W_ARMOR)
+        else if ((obj->owornmask & W_ARMOR) != 0 && !hide_worn)
         {
             Strcat(bp, (obj == uskin) ? " (embedded in your skin"
                        /* in case of perm_invent update while Wear/Takeoff
@@ -1650,7 +1673,8 @@ weapon_here:
             }
         }
         add_erosion_words(obj, prefix);
-        if (known) {
+        if (known) 
+        {
             Strcat(prefix, sitoa(obj->enchantment));
             Strcat(prefix, " ");
         }
@@ -1676,17 +1700,21 @@ weapon_here:
                 break;
             }
         }
-        if (obj->owornmask & (W_BLINDFOLD | W_SADDLE)) { /* blindfold */
+        if ((obj->owornmask & (W_BLINDFOLD | W_SADDLE)) != 0 && !hide_worn) 
+        { /* blindfold */
             Strcat(bp, " (being worn)");
             break;
         }
         if (obj->otyp == LEASH && obj->leashmon != 0) {
             struct monst *mlsh = find_mid(obj->leashmon, FM_FMON);
 
-            if (!mlsh) {
+            if (!mlsh) 
+            {
                 impossible("leashed monster not on this level");
                 obj->leashmon = 0;
-            } else {
+            } 
+            else 
+            {
                 Sprintf(eos(bp), " (attached to %s)",
                         noit_mon_nam(mlsh));
             }
@@ -1766,6 +1794,10 @@ weapon_here:
 
         break;
     case WAND_CLASS:
+        if (show_quick && context.quick_zap_wand_oid && context.quick_zap_wand_oid == obj->o_id)
+        {
+            Strcat(bp, " (quick wand)");
+        }
         break;
     case POTION_CLASS:
         if (obj->otyp == POT_OIL)
@@ -1793,16 +1825,21 @@ weapon_here:
         }
         break;
     case RING_CLASS:
- ring:
-        if (obj->owornmask & W_RINGR)
-            Strcat(bp, " (on right ");
-        if (obj->owornmask & W_RINGL)
-            Strcat(bp, " (on left ");
-        if (obj->owornmask & W_RING) {
-            Strcat(bp, body_part(HAND));
-            Strcat(bp, ")");
+    ring:
+        if (!hide_worn)
+        {
+            if (obj->owornmask & W_RINGR)
+                Strcat(bp, " (on right ");
+            if (obj->owornmask & W_RINGL)
+                Strcat(bp, " (on left ");
+            if (obj->owornmask & W_RING)
+            {
+                Strcat(bp, body_part(HAND));
+                Strcat(bp, ")");
+            }
         }
-        if (known && objects[obj->otyp].oc_enchantable) {
+        if (known && objects[obj->otyp].oc_enchantable) 
+        {
             Strcat(prefix, sitoa(obj->enchantment));
             Strcat(prefix, " ");
         }
@@ -1825,7 +1862,7 @@ weapon_here:
             /* (quan == 1) => want corpse_xname() to supply article,
                (quan != 1) => already have count or "some" as prefix;
                "corpse" is already in the buffer returned by xname() */
-            unsigned cxarg = (((obj->quan != 1L) ? 0 : CXN_ARTICLE)
+            unsigned cxarg = (((quan != 1L) ? 0 : CXN_ARTICLE)
                               | CXN_NOCORPSE);
             char *cxstr = corpse_xname(obj, prefix, cxarg);
 
@@ -1839,8 +1876,8 @@ weapon_here:
             if (known && stale_egg(obj))
                 Strcat(prefix, "stale ");
 #endif
-            if (omndx >= LOW_PM
-                && (known || (mvitals[omndx].mvflags & MV_KNOWS_EGG))) {
+            if (omndx >= LOW_PM && (known || (mvitals[omndx].mvflags & MV_KNOWS_EGG))) 
+            {
                 Strcat(prefix, mons[omndx].mname);
                 Strcat(prefix, " ");
                 if (obj->speflags & SPEFLAGS_YOURS)
@@ -1853,7 +1890,7 @@ weapon_here:
     case BALL_CLASS:
     case CHAIN_CLASS:
         add_erosion_words(obj, prefix);
-        if (obj->owornmask & W_BALL)
+        if ((obj->owornmask & W_BALL) != 0 && !hide_worn)
             Strcat(bp, " (chained to you)");
         break;
     case GEM_CLASS:
@@ -1870,10 +1907,27 @@ weapon_here:
         break;
     }
 
+    if (show_quick)
+    {
+        if (context.quick_engrave_obj_oid && context.quick_engrave_obj_oid == obj->o_id)
+        {
+            Strcat(bp, " (quick engrave)");
+        }
+        if (context.quick_pickaxe_obj_oid && context.quick_pickaxe_obj_oid == obj->o_id)
+        {
+            Strcat(bp, " (quick pick-axe)");
+        }
+        if (context.quick_bag_obj_oid && context.quick_bag_obj_oid == obj->o_id)
+        {
+            Strcat(bp, " (quick bag)");
+        }
+    }
+
     const char* hand_s = body_part(HAND);
     const char* hands_s = makeplural(hand_s);
-    if ((obj->owornmask & W_WEP) && !mrg_to_wielded) {
-        if (obj->quan != 1L || !is_wieldable_weapon(obj))
+    if ((obj->owornmask & W_WEP) && !mrg_to_wielded && !hide_worn) 
+    {
+        if (quan != 1L || !is_wieldable_weapon(obj))
         {
             if (u.twoweap)
             {
@@ -1884,7 +1938,9 @@ weapon_here:
             }
             else
                 Strcat(bp, " (wielded)");
-        } else {
+        } 
+        else 
+        {
 
             Sprintf(eos(bp), " (%sweapon in %s%s)",
                     is_obj_tethered_weapon(obj, obj->owornmask) ? "tethered " : "", u.twoweap && !bimanual(obj) ? "right " : "", bimanual(obj)? hands_s : hand_s);
@@ -1892,8 +1948,9 @@ weapon_here:
         }
     }
 
-    if ((obj->owornmask & W_WEP2) && obj->oclass != ARMOR_CLASS && !mrg_to_wielded) {
-        if (obj->quan != 1L || !is_wieldable_weapon(obj))
+    if ((obj->owornmask & W_WEP2) && obj->oclass != ARMOR_CLASS && !mrg_to_wielded && !hide_worn) 
+    {
+        if (quan != 1L || !is_wieldable_weapon(obj))
         {
             if (u.twoweap)
                 if (bimanual(obj))
@@ -1915,13 +1972,15 @@ weapon_here:
         }
     }
 
-    if (obj->owornmask & W_SWAPWEP) {
+    if ((obj->owornmask & W_SWAPWEP) != 0 && !hide_worn) 
+    {
         if (u.twoweap && !bimanual(obj))
             Sprintf(eos(bp), " (readied as alternate right %s weapon)", hand_s);
         else
             Strcat(bp, " (readied as alternate weapon)");
     }
-    if (obj->owornmask & W_SWAPWEP2) {
+    if ((obj->owornmask & W_SWAPWEP2) != 0 && !hide_worn)
+    {
         if (is_shield(obj))
             Strcat(bp, " (readied as shield)");
         else
@@ -1932,20 +1991,28 @@ weapon_here:
                 Strcat(bp, " (readied as another alternate weapon)");
         }
     }
-    if (obj->owornmask & W_QUIVER) {
-        switch (obj->oclass) {
+    if ((obj->owornmask & W_QUIVER) != 0 && !hide_worn) 
+    {
+        switch (obj->oclass) 
+        {
         case WEAPON_CLASS:
-            if (is_ammo(obj)) {
-                if (objects[obj->otyp].oc_skill == -P_BOW) {
+            if (is_ammo(obj)) 
+            {
+                if (objects[obj->otyp].oc_skill == -P_BOW) 
+                {
                     /* Ammo for a bow */
                     Strcat(bp, " (in quiver)");
                     break;
-                } else {
+                }
+                else 
+                {
                     /* Ammo not for a bow */
                     Strcat(bp, " (in quiver pouch)");
                     break;
                 }
-            } else {
+            }
+            else 
+            {
                 /* Weapons not considered ammo */
                 Strcat(bp, " (at the ready)");
                 break;
@@ -1966,15 +2033,20 @@ weapon_here:
 
     /* treat 'restoring' like suppress_price because shopkeeper and
        bill might not be available yet while restore is in progress */
-    if (iflags.suppress_price || restoring || saving) {
+    if (iflags.suppress_price || restoring || saving) 
+    {
         ; /* don't attempt to obtain any stop pricing, even if 'with_price' */
-    } else if (is_unpaid(obj)) { /* in inventory or in container in invent */
+    }
+    else if (is_unpaid(obj) && !hide_unpaid) 
+    { /* in inventory or in container in invent */
         int64_t quotedprice = unpaid_cost(obj, TRUE);
 
         Sprintf(eos(bp), " (%s, %lld %s)",
                 obj->unpaid ? "unpaid" : "contents",
                 (long long)quotedprice, currency(quotedprice));
-    } else if (with_price) { /* on floor or in container on floor */
+    }
+    else if (with_price) 
+    { /* on floor or in container on floor */
         int nochrg = 0;
         int64_t price = get_cost_of_shop_item(obj, &nochrg);
 
@@ -1986,7 +2058,8 @@ weapon_here:
             Strcat(bp, " (no charge)");
     }
 
-    if (!strncmp(prefix, "a ", 2)) {
+    if (!strncmp(prefix, "a ", 2)) 
+    {
         /* save current prefix, without "a "; might be empty */
         Strcpy(tmpbuf, prefix + 2);
         /* set prefix[] to "", "a ", or "an " */
@@ -2118,6 +2191,13 @@ struct obj *obj;
 }
 
 char*
+doname_payobj(obj)
+struct obj* obj;
+{
+    return doname_with_flags(obj, DONAME_HIDE_UNPAID | DONAME_USE_SPECIAL_QUAN, (char**)0, (char**)0);
+}
+
+char*
 doname_in_text(obj)
 struct obj* obj;
 {
@@ -2133,6 +2213,13 @@ struct obj *obj;
 }
 
 char*
+doname_with_price_quick(obj)
+struct obj* obj;
+{
+    return doname_with_flags(obj, DONAME_WITH_PRICE | DONAME_SHOW_QUICK_ITEMS, (char**)0, (char**)0);
+}
+
+char*
 doname_with_price_and_comparison(obj, comparison_stats, attrs_ptr, colors_ptr)
 struct obj* obj;
 boolean comparison_stats;
@@ -2143,11 +2230,11 @@ char** attrs_ptr, ** colors_ptr;
 
 /* Name of object including price. */
 char*
-doname_with_price_and_weight_last(obj,  loadstonecorrectly)
+doname_with_price_and_weight_last(obj,  loadstonecorrectly, show_quick)
 struct obj* obj;
-boolean loadstonecorrectly;
+boolean loadstonecorrectly, show_quick;
 {
-    return doname_with_flags(obj, DONAME_WITH_PRICE | DONAME_WITH_WEIGHT_LAST | (loadstonecorrectly ? DONAME_LOADSTONE_CORRECTLY : 0), (char**)0, (char**)0);
+    return doname_with_flags(obj, DONAME_WITH_PRICE | DONAME_WITH_WEIGHT_LAST | (show_quick ? DONAME_SHOW_QUICK_ITEMS : 0) | (loadstonecorrectly ? DONAME_LOADSTONE_CORRECTLY : 0), (char**)0, (char**)0);
 }
 
 char*
@@ -2179,11 +2266,11 @@ char** attrs_ptr, ** colors_ptr;
 
 /* Name of object including price. */
 char*
-doname_with_price_and_weight_first(obj, loadstonecorrectly)
+doname_with_price_and_weight_first(obj, loadstonecorrectly, show_quick)
 struct obj* obj;
-boolean loadstonecorrectly;
+boolean loadstonecorrectly, show_quick;
 {
-    return doname_with_flags(obj, DONAME_WITH_PRICE | DONAME_WITH_WEIGHT_FIRST | (loadstonecorrectly ? DONAME_LOADSTONE_CORRECTLY : 0), (char**)0, (char**)0);
+    return doname_with_flags(obj, DONAME_WITH_PRICE | DONAME_WITH_WEIGHT_FIRST | (show_quick ? DONAME_SHOW_QUICK_ITEMS : 0) | (loadstonecorrectly ? DONAME_LOADSTONE_CORRECTLY : 0), (char**)0, (char**)0);
 }
 
 char*
@@ -2216,12 +2303,12 @@ struct obj *obj;
 }
 
 char*
-doname_with_weight_first(obj, loadstonecorrectly, is_perm_inv)
+doname_with_weight_first(obj, loadstonecorrectly, is_perm_inv, addflags)
 struct obj* obj;
 boolean loadstonecorrectly, is_perm_inv;
-
+unsigned addflags;
 {
-    return doname_with_flags(obj, DONAME_WITH_WEIGHT_FIRST | (loadstonecorrectly ? DONAME_LOADSTONE_CORRECTLY : 0) | (is_perm_inv ? DONAME_HIDE_REMAINING_LIT_TURNS : 0), (char**)0, (char**)0);
+    return doname_with_flags(obj, DONAME_WITH_WEIGHT_FIRST | addflags | (loadstonecorrectly ? DONAME_LOADSTONE_CORRECTLY : 0) | (is_perm_inv ? DONAME_HIDE_REMAINING_LIT_TURNS : 0), (char**)0, (char**)0);
 }
 
 char*
@@ -2241,13 +2328,13 @@ struct obj* obj;
 
 
 char*
-doname_with_weight_last(obj, loadstonecorrectly, is_perm_inv)
+doname_with_weight_last(obj, loadstonecorrectly, is_perm_inv, addflags)
 struct obj* obj;
 boolean loadstonecorrectly, is_perm_inv;
+unsigned addflags;
 {
-    return doname_with_flags(obj, DONAME_WITH_WEIGHT_LAST | (loadstonecorrectly ? DONAME_LOADSTONE_CORRECTLY : 0) | (is_perm_inv ? DONAME_HIDE_REMAINING_LIT_TURNS : 0), (char**)0, (char**)0);
+    return doname_with_flags(obj, DONAME_WITH_WEIGHT_LAST | addflags | (loadstonecorrectly ? DONAME_LOADSTONE_CORRECTLY : 0) | (is_perm_inv ? DONAME_HIDE_REMAINING_LIT_TURNS : 0), (char**)0, (char**)0);
 }
-
 
 /* used from invent.c */
 boolean
@@ -2594,7 +2681,7 @@ size_t lenlimit;
         Strncpy(unamebuf, save_uname, sizeof unamebuf - 4);
         Strcpy(unamebuf + sizeof unamebuf - 4, "...");
         objects[obj->otyp].oc_uname = unamebuf;
-        //releaseobuf(outbuf);
+        releaseobuf(outbuf);
         outbuf = (*func)(obj);
         objects[obj->otyp].oc_uname = save_uname; /* restore called string */
         if (strlen(outbuf) <= lenlimit)
@@ -2607,7 +2694,7 @@ size_t lenlimit;
         Strncpy(onamebuf, save_oname, sizeof onamebuf - 4);
         Strcpy(onamebuf + sizeof onamebuf - 4, "...");
         ONAME(obj) = onamebuf;
-        //releaseobuf(outbuf);
+        releaseobuf(outbuf);
         outbuf = (*func)(obj);
         ONAME(obj) = save_oname; /* restore named string */
         if (strlen(outbuf) <= lenlimit)
@@ -2620,7 +2707,7 @@ size_t lenlimit;
         && strlen(save_oname) >= sizeof onamebuf) {
         objects[obj->otyp].oc_uname = unamebuf;
         ONAME(obj) = onamebuf;
-        //releaseobuf(outbuf);
+        releaseobuf(outbuf);
         outbuf = (*func)(obj);
         if (strlen(outbuf) <= lenlimit) {
             objects[obj->otyp].oc_uname = save_uname;
@@ -2634,12 +2721,12 @@ size_t lenlimit;
     save_obj = *obj;
     obj->bknown = obj->rknown = obj->greased = 0;
     obj->oeroded = obj->oeroded2 = 0;
-    //releaseobuf(outbuf);
+    releaseobuf(outbuf);
     outbuf = (*func)(obj);
     if (altfunc && strlen(outbuf) > lenlimit) {
         /* still long; use the alternate function (usually one of
            the jackets around minimal_xname()) */
-        //releaseobuf(outbuf);
+        releaseobuf(outbuf);
         outbuf = (*altfunc)(obj);
     }
     /* restore the object */
@@ -2918,6 +3005,16 @@ struct obj *obj;
     return s;
 }
 
+char*
+Doname_payobj2(obj)
+struct obj* obj;
+{
+    char* s = doname_payobj(obj);
+
+    *s = highc(*s);
+    return s;
+}
+
 /* returns "[your ]xname(obj)" or "Foobar's xname(obj)" or "the xname(obj)" */
 char *
 yname(obj)
@@ -3003,6 +3100,16 @@ struct obj *obj;
     return simpleoname;
 }
 
+char*
+simpleonames_payobj(obj)
+struct obj* obj;
+{
+    char* simpleoname = minimal_xname(obj);
+
+    if (iflags.payobj_special_quan != 1L)
+        simpleoname = makeplural(simpleoname);
+    return simpleoname;
+}
 /* "a scroll" or "scrolls"; "a silver bell" or "the Bell of Opening" */
 char *
 ansimpleoname(obj)
@@ -3026,12 +3133,43 @@ struct obj *obj;
     return simpleoname;
 }
 
+char*
+ansimpleoname_payobj(obj)
+struct obj* obj;
+{
+    char* simpleoname = simpleonames_payobj(obj);
+    int otyp = obj->otyp;
+
+    /* prefix with "the" if a unique item, or a fake one imitating same,
+       has been formatted with its actual name (we let typename() handle
+       any `known' and `dknown' checking necessary) */
+    if (otyp == FAKE_AMULET_OF_YENDOR)
+        otyp = AMULET_OF_YENDOR;
+    if (is_otyp_unique(otyp)
+        && !strcmp(simpleoname, OBJ_NAME(objects[otyp])))
+        return the(simpleoname);
+
+    /* simpleoname is singular if quan==1, plural otherwise */
+    if (iflags.payobj_special_quan == 1L)
+        simpleoname = an(simpleoname);
+    return simpleoname;
+}
+
 /* "the scroll" or "the scrolls" */
 char *
 thesimpleoname(obj)
 struct obj *obj;
 {
     char *simpleoname = simpleonames(obj);
+
+    return the(simpleoname);
+}
+
+char*
+thesimpleoname_payobj(obj)
+struct obj* obj;
+{
+    char* simpleoname = simpleonames_payobj(obj);
 
     return the(simpleoname);
 }
@@ -3901,6 +4039,9 @@ STATIC_VAR const struct alt_spellings {
     { "potion of super heroism", POT_SUPER_HEROISM },
     { "potion of superheroism", POT_SUPER_HEROISM },
     { "smooth shield", SHIELD_OF_REFLECTION },
+    { "bone mail", GNOLLISH_BONE_MAIL },
+    { "bone armor", GNOLLISH_BONE_MAIL },
+    { "haircloth robe", GNOLLISH_HAIRCLOTH_ROBE },
     { "gauntlets of power", GAUNTLETS_OF_OGRE_POWER },
     { "helmet of telepathy", HELM_OF_TELEPATHY },
     { "helmet of opposite alignment", HELM_OF_OPPOSITE_ALIGNMENT },
@@ -4272,13 +4413,17 @@ boolean* removed_from_game_ptr;
         }
         else if (!strncmpi(bp, "legendary ", l = 10))
         {
-            mythic_prefix = -2;
-            mythic_suffix = -2;
+            if (mythic_prefix <= 0)
+                mythic_prefix = -2;
+            if (mythic_suffix <= 0)
+                mythic_suffix = -2;
         }
         else if (!strncmpi(bp, "mythic ", l = 7))
         {
-            mythic_prefix = -1;
-            mythic_suffix = -1;
+            if (!mythic_prefix)
+                mythic_prefix = -1;
+            if (!mythic_suffix)
+                mythic_suffix = -1;
         }
         else if (!strncmpi(bp, "trapped ", l = 8)) {
             trapped = 0; /* undo any previous "untrapped" */
@@ -4773,21 +4918,24 @@ boolean* removed_from_game_ptr;
         && strncmpi(bp, "detect food", 11)
         && strncmpi(bp, "food detection", 14)
         && strncmpi(bp, "ring mail", 9)
-        && strncmpi(bp, "staff of withering", 18)
-        && strncmpi(bp, "one ring", 8)
+        && strncmpi(bp, "orcish ring mail", 16)
+        && strncmpi(bp, "staff of withering", 18)  /* ring */
         && strncmpi(bp, "wand of orcus", 13)
+        && strncmpi(bp, "gnollish studded leather armor", 30)
         && strncmpi(bp, "studded leather armor", 21)
         && strncmpi(bp, "leather armor", 13)
-        && strncmpi(bp, "tooled horn", 11)
+        && strncmpi(bp, "force field armor", 17)
+        && strncmpi(bp, "mage armor", 10)
+        && strncmpi(bp, "bone armor", 10)
+        && strncmpi(bp, "tooled horn", 11) /* tool */
         && strncmpi(bp, "food ration", 11)
         && strncmpi(bp, "weapon rack", 11)
-        && strncmpi(bp, "Ring of Three Wishes", 20)
         && strncmpi(bp, "ring of three wishes", 20)
-        && strncmpi(bp, "Serpent Ring of Set", 19)
         && strncmpi(bp, "serpent ring of set", 19)
-        && strncmpi(bp, "Ring of Conflict", 16)
         && strncmpi(bp, "ring of conflict", 16)
-        && strncmpi(bp, "oracular toadstool", 18)
+        && strncmpi(bp, "ruling ring of yendor", 21)
+        && strncmpi(bp, "one ring", 8)
+        && strncmpi(bp, "oracular toadstool", 18) /* tool */
         && strncmpi(bp, "meat ring", 9))
         for (i = 0; i < (int) (sizeof wrpsym); i++)
         {
@@ -5388,7 +5536,7 @@ retry:
     {
         place_object(otmp, u.ux, u.uy); /* make it viable light source */
         begin_burn(otmp, FALSE);
-        Strcpy(debug_buf_2, "readobjnam");
+        debugprint("readobjnam1: %d", otmp->otyp);
         obj_extract_self(otmp); /* now release it for caller's use */
     }
 
@@ -5816,7 +5964,7 @@ retry:
     if ((is_quest_artifact(otmp) || (otmp->oartifact && noartiexisting > 2 && rn2(noartiexisting - 1) > 1)) && !wiz_wishing) /* noartiexisting - 1 now accounts for Gladstone at Mines' End in order to achieve similar probabilities as in NetHack */
     {
         artifact_exists(otmp, safe_oname(otmp), FALSE);
-        Sprintf(priority_debug_buf_4, "readobjnam: %d", otmp->otyp);
+        debugprint("readobjnam2: %d", otmp->otyp);
         obfree(otmp, (struct obj *) 0);
         otmp = (struct obj *) &zeroobj;
         pline("For a moment, you feel %s in your %s, but it disappears!",
@@ -6024,12 +6172,12 @@ const char *lastR;
 
     char *bufp;
     /* convert size_t (or int for ancient systems) to ordinary unsigned */
-    size_t len, lenlimit,
+    size_t len;
+    const size_t lenlimit = QBUFSZ - 1,
         len_qpfx = (qprefix ? strlen(qprefix) : 0),
         len_qsfx = (qsuffix ? strlen(qsuffix) : 0),
-        len_lastR = strlen(lastR);
+        len_lastR = (lastR ? strlen(lastR) : 0);
 
-    lenlimit = QBUFSZ - 1;
     /* sanity check, aimed mainly at paniclog (it's conceivable for
        the result of short_oname() to be shorter than the length of
        the last resort string, but we ignore that possibility here) */
@@ -6069,12 +6217,12 @@ const char *lastR;
         /* too long; skip formatting, last resort output is truncated */
         if (len < lenlimit) 
         {
-            Strncpy(&qbuf[len], lastR, lenlimit - len);
+            Strncpy(&qbuf[len], lastR ? lastR : "", lenlimit >= len ? lenlimit - len : 0);
             qbuf[lenlimit] = '\0';
             len = strlen(qbuf);
             if (qsuffix && len < lenlimit)
             {
-                Strncpy(&qbuf[len], qsuffix, lenlimit - len);
+                Strncpy(&qbuf[len], qsuffix, lenlimit >= len ? lenlimit - len : 0);
                 qbuf[lenlimit] = '\0';
                 /* len = (unsigned) strlen(qbuf); */
             }
@@ -6085,12 +6233,12 @@ const char *lastR;
         /* suffix and last resort are guaranteed to fit */
         len += len_qsfx; /* include the pending suffix */
         /* format the object */
-        bufp = short_oname(obj, func, altfunc, lenlimit - len);
+        bufp = short_oname(obj, func, altfunc, lenlimit >= len ? lenlimit - len : 0);
         if (len + strlen(bufp) <= lenlimit)
             Strcat(qbuf, bufp); /* formatted name fits */
         else
-            Strcat(qbuf, lastR); /* use last resort */
-        //releaseobuf(bufp);
+            Strcat(qbuf, lastR ? lastR : ""); /* use last resort */
+        releaseobuf(bufp);
 
         if (qsuffix)
             Strcat(qbuf, qsuffix);

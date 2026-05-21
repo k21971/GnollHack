@@ -89,6 +89,7 @@ dosave()
         return 0;
     clear_nhwindow(WIN_MESSAGE);
     boolean confirm_save = TRUE;
+    issue_breadcrumb("dosave");
 
 #ifdef CONTINUE_PLAYING_AFTER_SAVING
     if (CasualMode) 
@@ -129,12 +130,14 @@ dosave()
 #if defined(UNIX) || defined(VMS) || defined(__EMX__)
         program_state.done_hup = 0;
 #endif
+        issue_breadcrumb("dosave: Saving");
         int saveres = dosave0(FALSE);
+        issue_breadcrumb2("dosave: Saved", saveres);
         if (saveres)
         {
             if (contplay)
             {
-                exit_hack_code = 1;
+                exit_hack_code = EXITHACK_RESTART_EXISTING;
                 //    display_popup_text("Game was saved successfully.", "Game Saved", POPUP_TEXT_GENERAL, ATR_NONE, NO_COLOR, NO_GLYPH, 0UL);
             }
             u.uhp = -1; /* universal game's over indicator */
@@ -161,11 +164,9 @@ boolean quietly;
     xchar ltmp;
     d_level uz_save;
     char whynot[BUFSZ];
-    Strcpy(debug_buf_1, "dosave0");
-    Strcpy(debug_buf_2, "dosave0");
-    Strcpy(debug_buf_3, "dosave0");
-    Strcpy(debug_buf_4, "dosave0");
     Strcpy(saved_dgnlvl_name_buf, "");
+    debugprint("dosave0");
+    issue_breadcrumb("Start dosave0");
 
 #ifdef WHEREIS_FILE
     delete_whereis();
@@ -239,6 +240,7 @@ boolean quietly;
         display_screen_text("Saving...", (const char*)0, (const char*)0, SCREEN_TEXT_SAVING, ATR_NONE, NO_COLOR, 0UL);
 
     print_current_dgnlvl(saved_dgnlvl_name_buf);
+    debugprint_pos();
     vision_recalc(2); /* shut down vision to prevent problems
                          in the event of an impossible() call */
 
@@ -366,6 +368,7 @@ boolean quietly;
 
     post_to_forum_printf(LL_GAME_SAVE, "saved %s game %s", uhis(), saved_dgnlvl_name_buf);
     Strcpy(saved_dgnlvl_name_buf, "");
+    issue_breadcrumb("Finish dosave0");
     return 1;
 }
 
@@ -1487,7 +1490,7 @@ int fd;
     /* bwrite() before bufon() uses plain write() */
     bwrite(fd, (genericptr_t) &plsiztmp, sizeof(plsiztmp));
     bwrite(fd, (genericptr_t) plname, plsiztmp);
-    Sprintf(priority_debug_buf_4, "store_plname_in_file (fd=%d)", fd);
+    //debugprint("store_plname_in_file (fd=%d)", fd);
     bufon(fd);
     return;
 }
@@ -1535,7 +1538,7 @@ int64_t time_stamp;
     bufoff(fd);
     /* bwrite() before bufon() uses plain write() */
     bwrite(fd, (genericptr_t)&gamestats, sizeof gamestats);
-    Sprintf(priority_debug_buf_4, "store_save_game_stats_in_file (fd=%d)", fd);
+    //debugprint("store_save_game_stats_in_file (fd=%d)", fd);
     bufon(fd);
     return;
 }
@@ -1592,7 +1595,7 @@ int fd;
     bufoff(fd);
     /* bwrite() before bufon() uses plain write() */
     bwrite(fd, (genericptr_t) &sfsaveinfo, sizeof sfsaveinfo);
-    Sprintf(priority_debug_buf_4, "store_savefileinfo (fd=%d)", fd);
+    //debugprint("store_savefileinfo (fd=%d)", fd);
     bufon(fd);
     return;
 }

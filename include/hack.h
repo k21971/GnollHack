@@ -460,6 +460,7 @@ extern short tile2enlargement[MAX_TILES];
 #define INCLUDE_HERO 0x80     /* show hero among engulfer's inventory */
 #define OBJECT_COMPARISON 0x100     /* compare objects with currently worn ones */
 #define WORN_UNSELECTABLE 0x200     /* worn objects are not selectable */
+#define SHOW_QUICK 0x400      /* show quick items */
 
 /* Flags to control query_category() */
 /* BY_NEXTHERE used by query_category() too, so skip 0x01 */
@@ -530,9 +531,9 @@ extern short tile2enlargement[MAX_TILES];
 #define dnq(query) yn_function(query, dnqchars, 'q', dnqdescs)
 #define idq(query) yn_function(query, idqchars, 'q', idqdescs)
 
-#define yn_query_ex(a, c, title, query) yn_function_ex(YN_STYLE_GENERAL, a, c, NO_GLYPH, title, query, ynchars, 'n', yndescs, (const char*)0, 0UL)
-#define ynq_ex(a, c, title, query) yn_function_ex(YN_STYLE_GENERAL, a, c, NO_GLYPH, title, query, ynqchars, 'q', ynqdescs, (const char*)0, 0UL)
-#define yn_function_es(s, a, c, title, query, chars, resp, descs, introline) yn_function_ex(s, a, c, NO_GLYPH, title, query, chars, resp, descs, introline, 0UL)
+#define yn_query_ex(a, c, title, query) yn_function_core(YN_STYLE_GENERAL, a, c, NO_GLYPH, title, query, ynchars, 'n', yndescs, (const char*)0, 0UL)
+#define ynq_ex(a, c, title, query) yn_function_core(YN_STYLE_GENERAL, a, c, NO_GLYPH, title, query, ynqchars, 'q', ynqdescs, (const char*)0, 0UL)
+#define yn_function_es(s, a, c, title, query, chars, resp, descs, introline) yn_function_core(s, a, c, NO_GLYPH, title, query, chars, resp, descs, introline, 0UL)
 
 /* Macros for scatter */
 #define VIS_EFFECTS 0x01 /* display visual effects */
@@ -649,6 +650,12 @@ enum bodypart_types {
 #define SET_IN_WIZGAME 5  /* may be set set in the game if wizmode */
 #define SET__IS_VALUE_VALID(s) ((s < SET_IN_SYS) || (s > SET_IN_WIZGAME))
 
+#if GNH_MOBILE
+#define SET_IN_GAME_IF_GNH SET_IN_GAME  /* may be set via extern program or set in the game */
+#else
+#define SET_IN_GAME_IF_GNH SET_IN_SYS  /* may be set via extern program or set in the game */
+#endif
+
 #define FEATURE_NOTICE_VER(major, minor, patch)                    \
     (((uint64_t) major << 24) | ((uint64_t) minor << 16) \
      | ((uint64_t) patch << 8) | ((uint64_t) 0))
@@ -666,6 +673,7 @@ enum bodypart_types {
 #define min(x, y) ((x) < (y) ? (x) : (y))
 #endif
 #define plur(x) (((x) == 1) ? "" : "s")
+#define plur_es(x) (((x) == 1) ? "" : "es")
 
 #define ARM_AC_BONUS(obj, ptr) \
     ((int)(((obj)->oclass == ARMOR_CLASS || (objects[(obj)->otyp].oc_flags & O1_IS_ARMOR_WHEN_WIELDED) || has_obj_mythic_defense(obj)) ? \
@@ -827,6 +835,8 @@ extern struct objclass saved_objects[NUM_OBJECTS];
 #define m_unpaid_item_no_pickup(m, o) m_unpaid_item_no_pickup_at_location(m, o, (o)->ox, (o)->oy)
 
 #define is_knight_bounty(ptr) ((u.ualign.type == A_LAWFUL ? is_demon(ptr) || (ptr)->mlet == S_IMP : u.ualign.type == A_CHAOTIC ? is_angel(ptr) : is_undead(ptr)) || (is_dragon(ptr) && u.ualign.type * (ptr)->maligntyp < 0))
+#define has_mon_need_for_unicorn_horn(m) (is_confused(m) || is_stunned(m) || is_blinded(m) || is_hallucinating(m) || is_sick(m) || is_food_poisoned(m) || is_mummy_rotted(m) || has_vomiting(m))
+
 
 #if defined(BSD) || defined(ULTRIX)
 #define readLenType int
@@ -839,5 +849,7 @@ extern void FDECL(gnollhack_exit, (int)) NORETURN;
 #else
 #define gnollhack_exit exit
 #endif
+
+#define debugprint_pos() debugprint("Line %d in %s", __LINE__, basefilename(__FILE__))
 
 #endif /* HACK_H */

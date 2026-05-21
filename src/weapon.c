@@ -268,7 +268,7 @@ struct obj* launcher;
 
     int baserange = 0, range = 0;
     boolean is_you = (mtmp == &youmonst);
-    boolean curstr = M_ACURRSTR(mtmp);
+    short curstr = M_ACURRSTR(mtmp);
 
     /* Ammunition range */
     if (!ammo && launcher && is_launcher(launcher)) {
@@ -317,10 +317,11 @@ struct obj* launcher;
             range = baserange;
         else
         {
+            int64_t quan = max((int64_t)1, ammo->quan);
             if (objects[ammo->otyp].oc_flags & O1_THROWN_WEAPON_ONLY)
-                range = baserange - (int)(ammo->owt / 100);
+                range = baserange - (int)(((int64_t)ammo->owt / quan) / 100);
             else
-                range = baserange - (int)(ammo->owt / 40);
+                range = baserange - (int)(((int64_t)ammo->owt / quan) / 40);
         }
     }
 
@@ -622,7 +623,7 @@ int use_type; //OBSOLETE /* 0 = Melee weapon (full enchantment bonuses), 1 = thr
            this bonus so that effectively it's added after the doubling */
         if (bonus > 1 && otmp->oartifact)
         {
-            double sbonus = spec_dbon(otmp, mon, 25.0);
+            double sbonus = spec_dbon(otmp, mon, mattacker, 25.0);
             if (sbonus > 0)
             {
                 double bonmult =  1.0 / (sbonus / 25.0 + 1.0);
@@ -897,7 +898,8 @@ int64_t silverhit;
         really_l_ag = ((ltyp != STRANGE_OBJECT && uleft ? uleft->material == MAT_SILVER : objects[ltyp].oc_material == MAT_SILVER) && uleft && uleft->dknown),
         really_r_ag = ((rtyp != STRANGE_OBJECT && uright ? uright->material == MAT_SILVER : objects[rtyp].oc_material == MAT_SILVER) && uright && uright->dknown);
 
-    if ((silverhit & (W_RINGL | W_RINGR)) != 0L) {
+    if ((silverhit & (W_RINGL | W_RINGR)) != 0L) 
+    {
         /* plural if both the same type (so not multi_claw and both rings
            are non-Null) and either both known or neither known, or both
            silver (in case there is ever more than one type of silver ring)
@@ -917,7 +919,12 @@ int64_t silverhit;
 }
 
 STATIC_DCL struct obj *FDECL(oselect, (struct monst *, int));
+STATIC_DCL struct obj* FDECL(oselect_with_best_exceptionality, (struct monst*, int));
+STATIC_DCL struct obj* FDECL(oselect_with_best_bounded_exceptionality, (struct monst*, int, int, int));
+//STATIC_DCL struct obj* FDECL(oskillselect_with_best_exceptionality, (struct monst*, SCHAR_P));
+STATIC_DCL struct obj* FDECL(oskillselect_with_best_bounded_exceptionality, (struct monst*, SCHAR_P, int, int));
 STATIC_DCL struct obj* FDECL(oselect_with_exceptionality, (struct monst*, int, int));
+STATIC_DCL struct obj* FDECL(oskillselect_with_exceptionality, (struct monst*, SCHAR_P, int));
 #define Oselect(x)                      \
     if ((otmp = oselect(mtmp, x)) != 0) \
         return otmp;
@@ -941,18 +948,127 @@ int otyp, exceptionality;
 {
     struct obj *otmp;
 
-    for (otmp = mtmp->minvent; otmp; otmp = otmp->nobj) {
+    for (otmp = mtmp->minvent; otmp; otmp = otmp->nobj) 
+    {
         if (otmp->otyp == otyp && (exceptionality < 0 || otmp->exceptionality == (uchar)exceptionality)
             /* never select non-cockatrice corpses */
             && !((otyp == CORPSE || otyp == EGG)
                  && (otmp->corpsenm < LOW_PM || !touch_petrifies(&mons[otmp->corpsenm])))
             && (!otmp->oartifact || touch_artifact(otmp, mtmp))
+            && !(otmp->material == MAT_SILVER && mon_hates_silver(mtmp))
             && !inappropriate_exceptionality(mtmp, otmp)
             )
             return otmp;
     }
     return (struct obj *) 0;
 }
+
+STATIC_OVL struct obj*
+oskillselect_with_exceptionality(mtmp, oskill, exceptionality)
+struct monst* mtmp;
+schar oskill;
+int exceptionality;
+{
+    struct obj* otmp;
+
+    for (otmp = mtmp->minvent; otmp; otmp = otmp->nobj) 
+    {
+        if (objects[otmp->otyp].oc_skill == oskill && (exceptionality < 0 || otmp->exceptionality == (uchar)exceptionality)
+            && (!otmp->oartifact || touch_artifact(otmp, mtmp))
+            && !(otmp->material == MAT_SILVER && mon_hates_silver(mtmp))
+            && !inappropriate_exceptionality(mtmp, otmp)
+            )
+            return otmp;
+    }
+    return (struct obj*)0;
+}
+
+STATIC_OVL struct obj*
+oselect_with_best_bounded_exceptionality(mtmp, otyp, lowestexc, highestexc)
+struct monst* mtmp;
+int otyp, lowestexc, highestexc;
+{
+    if (!mtmp->minvent)
+        return (struct obj*)0;
+
+    struct obj* otmp;
+    int exc;
+    for (exc = highestexc; exc >= lowestexc; exc--)
+    {
+        otmp = oselect_with_exceptionality(mtmp, otyp, exc);
+        if (otmp)
+            return otmp;
+    }
+    return (struct obj*)0;
+}
+
+STATIC_OVL struct obj*
+oselect_with_best_exceptionality(mtmp, otyp)
+struct monst* mtmp;
+int otyp;
+{
+    if (!mtmp->minvent)
+        return (struct obj*)0;
+
+    int lowestexc = MAX_EXCEPTIONALITY_TYPES - 1;
+    int highestexc = 0;
+    struct obj* otmp;
+    for (otmp = mtmp->minvent; otmp; otmp = otmp->nobj)
+    {
+        if (otmp->otyp != otyp)
+            continue;
+        if (otmp->exceptionality < lowestexc)
+            lowestexc = otmp->exceptionality;
+        if (otmp->exceptionality > highestexc)
+            highestexc = otmp->exceptionality;
+    }
+    return oselect_with_best_bounded_exceptionality(mtmp, otyp, lowestexc, highestexc);
+}
+
+STATIC_OVL struct obj*
+oskillselect_with_best_bounded_exceptionality(mtmp, oskill, lowestexc, highestexc)
+struct monst* mtmp;
+schar oskill;
+int lowestexc, highestexc;
+{
+    if (!mtmp->minvent)
+        return (struct obj*)0;
+
+    struct obj* otmp;
+    int exc;
+    for (exc = highestexc; exc >= lowestexc; exc--)
+    {
+        otmp = oskillselect_with_exceptionality(mtmp, oskill, exc);
+        if (otmp)
+            return otmp;
+    }
+    return (struct obj*)0;
+}
+
+#if 0
+STATIC_OVL struct obj*
+oskillselect_with_best_exceptionality(mtmp, oskill)
+struct monst* mtmp;
+schar oskill;
+{
+    if (!mtmp->minvent)
+        return (struct obj*)0;
+
+    int lowestexc = MAX_EXCEPTIONALITY_TYPES - 1;
+    int highestexc = 0;
+    struct obj* otmp;
+    for (otmp = mtmp->minvent; otmp; otmp = otmp->nobj)
+    {
+        if (objects[otmp->otyp].oc_skill != oskill)
+            continue;
+        if (otmp->exceptionality < lowestexc)
+            lowestexc = otmp->exceptionality;
+        if (otmp->exceptionality > highestexc)
+            highestexc = otmp->exceptionality;
+    }
+    return oskillselect_with_best_bounded_exceptionality(mtmp, oskill, lowestexc, highestexc);
+}
+#endif
 
 /* TODO: have monsters use aklys' throw-and-return */
 STATIC_VAR NEARDATA const int rwep[] = {
@@ -1007,7 +1123,7 @@ register struct monst *mtmp;
         && couldsee(mtmp->mx, mtmp->my))
     {
         int exc;
-        for (exc = MAX_EXCEPTIONALITY_TYPES; exc >= 0; exc--)
+        for (exc = MAX_EXCEPTIONALITY_TYPES - 1; exc >= 0; exc--)
         {
             for (i = 0; i < SIZE(pwep); i++) 
             {
@@ -1015,11 +1131,8 @@ register struct monst *mtmp;
                  * Big weapon is basically the same as bimanual.
                  * All monsters can wield the remaining weapons.
                  */
-                if ((((strongmonst(mtmp->data) || mtmp->data->str >= 14)
-                      && (mtmp->worn_item_flags & W_ARMS) == 0)
-                     || !objects[pwep[i]].oc_bimanual)
-                    && (objects[pwep[i]].oc_material != MAT_SILVER
-                        || !mon_hates_silver(mtmp))) 
+                if (!objects[pwep[i]].oc_bimanual 
+                    || ((strongmonst(mtmp->data) || mtmp->data->str >= 10) && (mtmp->worn_item_flags & W_ARMS) == 0)) 
                 {
                     if ((otmp = oselect_with_exceptionality(mtmp, pwep[i], exc)) != 0
                         && (otmp == mwep || !mweponly)) 
@@ -1036,8 +1149,8 @@ register struct monst *mtmp;
      * other than these two specific cases, always select the
      * most potent ranged weapon to hand.
      */
-    int exc;
-    for (exc = MAX_EXCEPTIONALITY_TYPES; exc >= 0; exc--)
+    //int exc;
+    //for (exc = MAX_EXCEPTIONALITY_TYPES; exc >= 0; exc--)
     {
         for (i = 0; i < SIZE(rwep); i++)
         {
@@ -1046,7 +1159,9 @@ register struct monst *mtmp;
             /* shooting gems from slings; this goes just before the darts */
             /* (shooting rocks is already handled via the rwep[] ordering) */
             if (rwep[i] == DART && !likes_gems(mtmp->data)
-                && (otmp2 = m_carrying(mtmp, SLING)) != 0 && otmp2->exceptionality == (uchar)exc && !inappropriate_exceptionality(mtmp, otmp2)) { /* propellor */
+                && ((otmp2 = m_carrying_with_best_exceptionality(mtmp, SLING)) != 0 || (otmp2 = m_carrying_with_best_exceptionality(mtmp, STAFF_SLING)) != 0)
+                /*&& otmp2->exceptionality == (uchar)exc && !inappropriate_exceptionality(mtmp, otmp2) */) 
+            { /* propellor */
                 for (otmp = mtmp->minvent; otmp; otmp = otmp->nobj)
                     if (otmp->oclass == GEM_CLASS
                         && (!(objects[otmp->otyp].oc_flags & O1_CANNOT_BE_DROPPED_IF_CURSED) || !otmp->cursed))
@@ -1060,40 +1175,71 @@ register struct monst *mtmp;
             propellor = (struct obj*)&zeroobj;
 
             prop = objects[rwep[i]].oc_skill;
-            if (prop < 0) {
-                switch (-prop) {
+            if (prop < 0) 
+            {
+                int lowestexc = MAX_EXCEPTIONALITY_TYPES - 1;
+                int highestexc = 0;
+                for (otmp = mtmp->minvent; otmp; otmp = otmp->nobj)
+                {
+                    if (objects[otmp->otyp].oc_skill != (schar)(-prop))
+                        continue;
+                    if (otmp->exceptionality < lowestexc)
+                        lowestexc = otmp->exceptionality;
+                    if (otmp->exceptionality > highestexc)
+                        highestexc = otmp->exceptionality;
+                }
+                switch (-prop) 
+                {
                 case P_BOW:
-                    propellor = oselect_with_exceptionality(mtmp, GALADHRIM_BOW, exc);
-                    if (!propellor)
-                        propellor = oselect_with_exceptionality(mtmp, YUMI, exc);
-                    if (!propellor)
-                        propellor = oselect_with_exceptionality(mtmp, COMPOSITE_LONG_BOW, exc);
-                    if (!propellor)
-                        propellor = oselect_with_exceptionality(mtmp, ELVEN_LONG_BOW, exc);
-                    if (!propellor)
-                        propellor = oselect_with_exceptionality(mtmp, LONG_BOW, exc);
-                    if (!propellor)
-                        propellor = oselect_with_exceptionality(mtmp, COMPOSITE_SHORT_BOW, exc);
-                    if (!propellor)
-                        propellor = oselect_with_exceptionality(mtmp, SHORT_BOW, exc);
-                    if (!propellor)
-                        propellor = oselect_with_exceptionality(mtmp, ORCISH_SHORT_BOW, exc);
+                    propellor = oskillselect_with_best_bounded_exceptionality(mtmp, (schar)(-prop), lowestexc, highestexc);
+                    if (propellor && !propellor->exceptionality && highestexc > propellor->exceptionality)
+                    {
+                        struct obj* savedpropellor = propellor;
+                        propellor = oselect_with_best_bounded_exceptionality(mtmp, GALADHRIM_BOW, lowestexc, highestexc);
+                        if (!propellor)
+                            propellor = oselect_with_best_bounded_exceptionality(mtmp, YUMI, lowestexc, highestexc);
+                        if (!propellor)
+                            propellor = oselect_with_best_bounded_exceptionality(mtmp, COMPOSITE_LONG_BOW, lowestexc, highestexc);
+                        if (!propellor)
+                            propellor = oselect_with_best_bounded_exceptionality(mtmp, ELVEN_LONG_BOW, lowestexc, highestexc);
+                        if (!propellor)
+                            propellor = oselect_with_best_bounded_exceptionality(mtmp, LONG_BOW, lowestexc, highestexc);
+                        if (!propellor)
+                            propellor = oselect_with_best_bounded_exceptionality(mtmp, COMPOSITE_SHORT_BOW, lowestexc, highestexc);
+                        if (!propellor)
+                            propellor = oselect_with_best_bounded_exceptionality(mtmp, SHORT_BOW, lowestexc, highestexc);
+                        if (!propellor)
+                            propellor = oselect_with_best_bounded_exceptionality(mtmp, ORCISH_SHORT_BOW, lowestexc, highestexc);
+                        if (!propellor)
+                            propellor = oselect_with_best_bounded_exceptionality(mtmp, BOW, lowestexc, highestexc);
+                        if (!propellor)
+                            propellor = savedpropellor;
+                    }
                     break;
                 case P_SLING:
-                    propellor = oselect_with_exceptionality(mtmp, STAFF_SLING, exc);
+                    propellor = oselect_with_best_bounded_exceptionality(mtmp, STAFF_SLING, lowestexc, highestexc);
                     if (!propellor)
-                        propellor = oselect_with_exceptionality(mtmp, SLING, exc);
+                        propellor = oselect_with_best_bounded_exceptionality(mtmp, SLING, lowestexc, highestexc);
                     break;
                 case P_CROSSBOW:
-                    propellor = oselect_with_exceptionality(mtmp, REPEATING_HEAVY_CROSSBOW, exc);
+                    propellor = oselect_with_best_bounded_exceptionality(mtmp, REPEATING_HEAVY_CROSSBOW, lowestexc, highestexc);
                     if (!propellor)
-                        propellor = oselect_with_exceptionality(mtmp, HEAVY_CROSSBOW, exc);
+                        propellor = oselect_with_best_bounded_exceptionality(mtmp, REPEATING_CROSSBOW, lowestexc, highestexc);
                     if (!propellor)
-                        propellor = oselect_with_exceptionality(mtmp, REPEATING_CROSSBOW, exc);
-                    if (!propellor)
-                        propellor = oselect_with_exceptionality(mtmp, CROSSBOW, exc);
-                    if (!propellor)
-                        propellor = oselect_with_exceptionality(mtmp, HAND_CROSSBOW, exc);
+                    {
+                        propellor = oskillselect_with_best_bounded_exceptionality(mtmp, (schar)(-prop), lowestexc, highestexc);
+                        if (propellor && !propellor->exceptionality && highestexc > propellor->exceptionality)
+                        {
+                            struct obj* savedpropellor = propellor;
+                            propellor = oselect_with_best_bounded_exceptionality(mtmp, HEAVY_CROSSBOW, lowestexc, highestexc);
+                            if (!propellor)
+                                propellor = oselect_with_best_bounded_exceptionality(mtmp, CROSSBOW, lowestexc, highestexc);
+                            if (!propellor)
+                                propellor = oselect_with_best_bounded_exceptionality(mtmp, HAND_CROSSBOW, lowestexc, highestexc);
+                            if (!propellor)
+                                propellor = savedpropellor;
+                        }
+                    }
                 }
                 if ((otmp = MON_WEP(mtmp)) && mwelded(otmp, mtmp) && otmp != propellor
                     && mtmp->weapon_strategy == NO_WEAPON_WANTED)
@@ -1103,22 +1249,40 @@ register struct monst *mtmp;
              * propellor = &zeroobj, doesn't need a propellor
              * propellor = 0, needed one and didn't have one
              */
-            if (propellor != 0) {
+            if (propellor != 0) 
+            {
                 /* Note: cannot use m_carrying for loadstones, since it will
                  * always select the first object of a type, and maybe the
                  * monster is carrying two but only the first is unthrowable.
                  */
-                if (!(objects[rwep[i]].oc_flags & O1_CANNOT_BE_DROPPED_IF_CURSED)) {
+                if (!(objects[rwep[i]].oc_flags & O1_CANNOT_BE_DROPPED_IF_CURSED)) 
+                {
                     /* Don't throw a cursed weapon-in-hand or an artifact */
-                    if ((otmp = oselect_with_exceptionality(mtmp, rwep[i], exc)) && !otmp->oartifact
+                    if ((otmp = oselect_with_best_exceptionality(mtmp, rwep[i])) && !otmp->oartifact
                         && !(otmp == MON_WEP(mtmp) && mwelded(otmp, mtmp)))
                         return otmp;
                 }
                 else
-                    for (otmp = mtmp->minvent; otmp; otmp = otmp->nobj) {
-                        if ((objects[otmp->otyp].oc_flags & O1_CANNOT_BE_DROPPED_IF_CURSED) && !otmp->cursed && otmp->exceptionality == (uchar)exc && !inappropriate_exceptionality(mtmp, otmp))
-                            return otmp;
+                {
+                    int lowestexc = MAX_EXCEPTIONALITY_TYPES - 1;
+                    int highestexc = 0;
+                    for (otmp = mtmp->minvent; otmp; otmp = otmp->nobj)
+                    {
+                        if (otmp->exceptionality < lowestexc)
+                            lowestexc = otmp->exceptionality;
+                        if (otmp->exceptionality > highestexc)
+                            highestexc = otmp->exceptionality;
                     }
+                    int exc;
+                    for (exc = highestexc; exc >= lowestexc; exc--)
+                    {
+                        for (otmp = mtmp->minvent; otmp; otmp = otmp->nobj)
+                        {
+                            if ((objects[otmp->otyp].oc_flags & O1_CANNOT_BE_DROPPED_IF_CURSED) && !otmp->cursed && otmp->exceptionality == (uchar)exc && !inappropriate_exceptionality(mtmp, otmp))
+                                return otmp;
+                        }
+                    }
+                }
             }
         }
     }
@@ -1171,16 +1335,27 @@ xchar tx, ty;
 {
     register struct obj *otmp;
     register int i;
-    boolean strong = (strongmonst(mtmp->data) || mtmp->data->str >= 13);
+    boolean strong = (strongmonst(mtmp->data) || mtmp->data->str >= 10);
     boolean wearing_shield = (mtmp->worn_item_flags & W_ARMS) != 0;
 
     /* prefer artifacts to everything else */
-    for (otmp = mtmp->minvent; otmp; otmp = otmp->nobj) {
+    for (otmp = mtmp->minvent; otmp; otmp = otmp->nobj) 
+    {
         if (otmp->oclass == WEAPON_CLASS && otmp->oartifact
             && touch_artifact(otmp, mtmp)
             && ((strong && !wearing_shield)
                 || !objects[otmp->otyp].oc_bimanual))
             return otmp;
+    }
+
+    int lowestexc = MAX_EXCEPTIONALITY_TYPES - 1;
+    int highestexc = 0;
+    for (otmp = mtmp->minvent; otmp; otmp = otmp->nobj)
+    {
+        if (otmp->exceptionality < lowestexc)
+            lowestexc = otmp->exceptionality;
+        if (otmp->exceptionality > highestexc)
+            highestexc = otmp->exceptionality;
     }
 
 //    if (is_giant(mtmp->data)) /* giants just love to use clubs */
@@ -1190,9 +1365,10 @@ xchar tx, ty;
     /* big weapon is basically the same as bimanual */
     /* all monsters can wield the remaining weapons */
     int exc;
-    for (exc = MAX_EXCEPTIONALITY_TYPES - 1; exc >= 0; exc--)
+    for (exc = highestexc; exc >= lowestexc; exc--)
     {
-        for (i = 0; i < SIZE(hwep); i++) {
+        for (i = 0; i < SIZE(hwep); i++) 
+        {
             if (hwep[i] == CORPSE && !(mtmp->worn_item_flags & W_ARMG)
                 && !resists_ston(mtmp))
                 continue;
@@ -1206,15 +1382,14 @@ xchar tx, ty;
                     int min_range = 0, max_range = 1;
                     struct obj poledummy = { 0 };
                     poledummy.otyp = hwep[i];
+                    poledummy.oclass = objects[poledummy.otyp].oc_class;
                     get_pole_type_weapon_min_max_distances(&poledummy, mtmp, &min_range, &max_range);
                     boolean poletooclose = dist2(mtmp->mx, mtmp->my, tx, ty) < min_range * min_range;
                     if (poletooclose)
                         continue;
                 }
             }
-            if (((strong && !wearing_shield) || !objects[hwep[i]].oc_bimanual)
-                && (objects[hwep[i]].oc_material != MAT_SILVER
-                    || !mon_hates_silver(mtmp)))
+            if (!objects[hwep[i]].oc_bimanual || (strong && !wearing_shield))
                 Oselect_with_exceptionality(hwep[i], exc);
         }
     }
@@ -1247,13 +1422,15 @@ int handindex;
         weaponindex++; //Second hand is not free, previously returned MON_WEP
 
     //Is in hwep table, extra hands do not use two-handed weapons for simplicity (maybe too weak)
-    for (otmp = mtmp->minvent; otmp; otmp = otmp->nobj) {
+    for (otmp = mtmp->minvent; otmp; otmp = otmp->nobj) 
+    {
         if (otmp != MON_WEP(mtmp) && !objects[otmp->otyp].oc_bimanual
             && !(obj_counts_as_silver(otmp) && mon_hates_silver(mtmp)) && otmp->otyp != CORPSE)
         {
             //Suitable weapons are in hwep array
             int i;
-            for (i = 0; i < SIZE(hwep); i++) {
+            for (i = 0; i < SIZE(hwep); i++) 
+            {
                 if (otmp->otyp == hwep[i])
                 {
                     //Suitable weapon found
@@ -1284,22 +1461,26 @@ boolean polyspot;
     for (obj = mon->minvent; obj; obj = obj->nobj)
         if (obj == mw_tmp)
             break;
-    if (!obj) { /* The weapon was stolen or destroyed */
+    if (!obj) 
+    { /* The weapon was stolen or destroyed */
         MON_NOWEP(mon);
         mon->weapon_strategy = NEED_WEAPON;
         return;
     }
-    if (!attacktype(mon->data, AT_WEAP)) {
+    if (!attacktype(mon->data, AT_WEAP)) 
+    {
         setmnotwielded(mon, mw_tmp);
         mon->weapon_strategy = NO_WEAPON_WANTED;
-        Strcpy(debug_buf_2, "possibly_unwield");
+        debugprint("possibly_unwield");
         obj_extract_self(obj);
-        if (cansee(mon->mx, mon->my)) {
+        if (cansee(mon->mx, mon->my)) 
+        {
             pline("%s drops %s.", Monnam(mon), distant_name(obj, doname));
             newsym(mon->mx, mon->my);
         }
         /* might be dropping object into water or lava */
-        if (!flooreffects(obj, mon->mx, mon->my, "drop")) {
+        if (!flooreffects(obj, mon->mx, mon->my, "drop")) 
+        {
             if (polyspot)
                 bypass_obj(obj);
             place_object(obj, mon->mx, mon->my);
@@ -1348,7 +1529,8 @@ xchar tx, ty;
         return 0;
     }
 
-    switch (mon->weapon_strategy) {
+    switch (mon->weapon_strategy) 
+    {
     case NEED_HTH_WEAPON:
     case NEED_HTH_NO_POLE:
         obj = select_hwep(mon, mon->weapon_strategy == NEED_HTH_WEAPON, tx, ty);
@@ -1390,10 +1572,12 @@ xchar tx, ty;
                    mon_nam(mon));
         return 0;
     }
-    if (obj && obj != &zeroobj) {
+    if (obj && obj != &zeroobj) 
+    {
         struct obj *mw_tmp = MON_WEP(mon);
 
-        if (mw_tmp && mw_tmp->otyp == obj->otyp) {
+        if (mw_tmp && mw_tmp->otyp == obj->otyp) 
+        {
             /* already wielding it */
             if (verbose_fail)
                 pline("%s is already wielding %s.", Monnam(mon), 
@@ -1411,8 +1595,10 @@ xchar tx, ty;
          * can know it's cursed and needn't even bother trying.
          * Still....
          */
-        if (mw_tmp && mwelded(mw_tmp, mon)) {
-            if (canseemon(mon)) {
+        if (mw_tmp && mwelded(mw_tmp, mon)) 
+        {
+            if (canseemon(mon)) 
+            {
                 char welded_buf[BUFSZ];
                 const char *mon_hand = mbodypart(mon, HAND);
 
@@ -1421,12 +1607,15 @@ xchar tx, ty;
                 Sprintf(welded_buf, "%s welded to %s %s",
                         otense(mw_tmp, "are"), mhis(mon), mon_hand);
 
-                if (obj->otyp == PICK_AXE) {
+                if (obj->otyp == PICK_AXE) 
+                {
                     pline("Since %s weapon%s %s,", s_suffix(mon_nam(mon)),
                           plur(mw_tmp->quan), welded_buf);
                     pline("%s cannot wield that %s.", mon_nam(mon),
                           xname(obj));
-                } else {
+                }
+                else 
+                {
                     pline("%s tries to wield %s.", Monnam(mon), acxname(obj));
                     pline("%s %s!", Yname2(mw_tmp), welded_buf);
                 }
@@ -1438,16 +1627,19 @@ xchar tx, ty;
         mon->mw = obj; /* wield obj */
         setmnotwielded(mon, mw_tmp);
         mon->weapon_strategy = NEED_WEAPON;
-        if (canseemon(mon)) {
+        if (canseemon(mon)) 
+        {
             pline("%s wields %s!", Monnam(mon), acxname(obj));
-            if (mwelded(mw_tmp, mon)) {
+            if (mwelded(mw_tmp, mon)) 
+            {
                 pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s %s to %s %s!", Tobjnam(obj, "weld"),
                       is_plural(obj) ? "themselves" : "itself",
                       s_suffix(mon_nam(mon)), mbodypart(mon, HAND));
                 obj->bknown = 1;
             }
         }
-        if (obj && (artifact_light(obj) || has_obj_mythic_magical_light(obj) || (obj_shines_magical_light(obj) && !inappropriate_monster_character_type(mon, obj))) && !obj->lamplit) {
+        if (obj && (artifact_light(obj) || has_obj_mythic_magical_light(obj) || (obj_shines_magical_light(obj) && !inappropriate_monster_character_type(mon, obj))) && !obj->lamplit) 
+        {
             begin_burn(obj, FALSE);
             if (canseemon(mon))
                 pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s in %s %s!", Tobjnam(obj, "shine"),
@@ -2127,6 +2319,7 @@ int skill;
         strcpy_capitalized_for_title(abuf, ra_desc);
         achievement_gained(abuf);
         livelog_printf(LL_ACHIEVE, "%s", ra_desc);
+        issue_achievement(GUI_ACHIEVEMENT_COMPLETED_OPTIONAL_QUEST);
     }
 
     update_can_advance_any_skill();
@@ -4411,7 +4604,7 @@ register struct obj *obj;
         return;
 
     if ((artifact_light(obj) || has_obj_mythic_magical_light(obj) || obj_shines_magical_light(obj)) && obj->lamplit) {
-        Strcpy(debug_buf_3, "setmnotwielded");
+        debugprint("setmnotwielded");
         end_burn(obj, FALSE);
         if (canseemon(mon))
             pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s in %s %s %s shining.", The(xname(obj)),

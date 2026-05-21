@@ -311,6 +311,12 @@ STATIC_VAR const struct trobj KnightLeatherGloves[] = { { LEATHER_GLOVES, 0, ARM
                                 { 0, 0, 0, 0, 0, 0, 0, 0, MAT_NONE } };
 STATIC_VAR const struct trobj KnightSilverGauntlets[] = { { GAUNTLETS, 0, ARMOR_CLASS, 1, 0, 0, 0, 0, MAT_SILVER },
                                 { 0, 0, 0, 0, 0, 0, 0, 0, MAT_NONE } };
+STATIC_VAR const struct trobj KnightJumpingBoots[] = { { JUMPING_BOOTS, 0, ARMOR_CLASS, 1, 0, 0, 0, 0, MAT_NONE },
+                                { 0, 0, 0, 0, 0, 0, 0, 0, MAT_NONE } };
+STATIC_VAR const struct trobj KnightLowBoots[] = { { LOW_BOOTS, 0, ARMOR_CLASS, 1, 0, 0, 0, 0, MAT_NONE },
+                                { 0, 0, 0, 0, 0, 0, 0, 0, MAT_NONE } };
+STATIC_VAR const struct trobj KnightHighBoots[] = { { HIGH_BOOTS, 0, ARMOR_CLASS, 1, 0, 0, 0, 0, MAT_NONE },
+                                { 0, 0, 0, 0, 0, 0, 0, 0, MAT_NONE } };
 STATIC_VAR const struct trobj PriestSilverGauntlets[] = { { GAUNTLETS, 0, ARMOR_CLASS, 1, 0, 1, 0, 0, MAT_SILVER },
                                 { 0, 0, 0, 0, 0, 0, 0, 0, MAT_NONE } };
 STATIC_VAR const struct trobj ScrollOfIdentify[] = { { SCR_IDENTIFY, 0, SCROLL_CLASS, 1, 0, 0, 0, 0, MAT_NONE },
@@ -363,8 +369,8 @@ STATIC_VAR const struct inv_sub {
     { PM_DWARF, LONG_SWORD, DWARVISH_AXE },
     { PM_DWARF, HELMET, DWARVISH_HELM },
     { PM_DWARF, SMALL_SHIELD, DWARVISH_ROUNDSHIELD },
-    { PM_DWARF, APPLE, PENNY_BUN },
-    { PM_DWARF, CARROT, CHANTERELLE },
+    { PM_DWARF, APPLE, CHAMPIGNON },
+    { PM_DWARF, CARROT, PENNY_BUN },
     { PM_DWARF, ELVEN_WAYBREAD, CRAM_RATION },
     { PM_GNOLL, LONG_SWORD, FLAIL },
     { PM_GNOLL, SHORT_SWORD, FLAIL },
@@ -882,6 +888,7 @@ u_init()
 {
     register int i;
     struct u_roleplay tmpuroleplay = u.uroleplay; /* set by rcfile options */
+    debugprint("u_init");
 
     flags.female = flags.initgend;
     flags.beginner = 1;
@@ -1042,6 +1049,12 @@ u_init()
         else
             ini_inv(KnightLeatherGloves);
 
+        if (!rn2(3))
+            ini_inv(KnightJumpingBoots);
+        else if (!rn2(2))
+            ini_inv(KnightHighBoots);
+        else
+            ini_inv(KnightLowBoots);
         //knows_class(WEAPON_CLASS);
         //knows_class(ARMOR_CLASS);
         break;
@@ -1488,7 +1501,7 @@ add_school_specific_spellbooks(VOID_ARGS)
                 if (OBJ_DESCR(objects[otyp]))
                     knows_object(otyp);
                 initialspell(obj);
-                Sprintf(priority_debug_buf_2, "add_school_specific_spellbooks: %d", obj->otyp);
+                debugprint("add_school_specific_spellbooks: %d", obj->otyp);
                 useup(obj);
             }
         }
@@ -1806,16 +1819,23 @@ register const struct trobj * trop;
                         if (!rn2(2))
                             (void)mk_obj_in_container_known(obj, CRAM_RATION);
                         (void)mk_obj_in_container_known(obj, POT_FRUIT_JUICE);
-                        (void)mk_obj_in_container_known(obj, CHANTERELLE);
-                        (void)mk_obj_in_container_known(obj, CHANTERELLE);
+                        (void)mk_obj_in_container_known(obj, CHAMPIGNON);
+                        (void)mk_obj_in_container_known(obj, CHAMPIGNON);
                         if (!rn2(2))
+                            (void)mk_obj_in_container_known(obj, CHAMPIGNON);
+                        if (!rn2(2))
+                            (void)mk_obj_in_container_known(obj, CHAMPIGNON);
+                        if (!rn2(4))
+                        {
                             (void)mk_obj_in_container_known(obj, CHANTERELLE);
-                        (void)mk_obj_in_container_known(obj, PENNY_BUN);
-                        (void)mk_obj_in_container_known(obj, PENNY_BUN);
-                        if (!rn2(2))
+                            knows_object(CHANTERELLE);
+                        }
+                        if (!rn2(4))
+                        {
                             (void)mk_obj_in_container_known(obj, PENNY_BUN);
-                        knows_object(CHANTERELLE);
-                        knows_object(PENNY_BUN);
+                            knows_object(PENNY_BUN);
+                        }
+                        knows_object(CHAMPIGNON);
                         knows_object(POT_FRUIT_JUICE);
                         obj->owt = weight(obj);
                     }
@@ -1859,11 +1879,14 @@ register const struct trobj * trop;
                     /* Add some food */
                     for (i = 1; i <= 2; i++)
                     {
-                        otmp = mksobj(!rn2(3) ? CHANTERELLE : !rn2(2) ? CHAMPIGNON : PENNY_BUN, TRUE, FALSE, TRUE);
-                        knows_object(otmp->otyp);
-                        otmp->known = 1;
-                        otmp->dknown = otmp->bknown = otmp->rknown = otmp->nknown = 1;
-                        otmp = add_to_container(obj, otmp);
+                        otmp = mksobj(!rn2(5) ? CHANTERELLE : rn2(5) ? CHAMPIGNON : PENNY_BUN, TRUE, FALSE, TRUE);
+                        if (otmp)
+                        {
+                            knows_object(otmp->otyp);
+                            otmp->known = 1;
+                            otmp->dknown = otmp->bknown = otmp->rknown = otmp->nknown = 1;
+                            otmp = add_to_container(obj, otmp);
+                        }
                     }
 
                     otmp = mksobj(SLIME_MOLD, TRUE, FALSE, TRUE);
@@ -2066,7 +2089,7 @@ register const struct trobj * trop;
             if (obj->oclass == SPBOOK_CLASS && obj->otyp != SPE_BLANK_PAPER)
             {
                 initialspell(obj);
-                Sprintf(priority_debug_buf_2, "ini_inv: %d", obj->otyp);
+                debugprint("ini_inv: %d", obj->otyp);
                 useup(obj);
             }
             quan--; /* make a similar object */
@@ -2462,9 +2485,10 @@ struct monst* mon;
 int
 common_player_selection(VOID_ARGS)
 {
-    int i, k, n;
+    int i, j, k, n;
     char pick4u = 'n', thisch, lastch = 0;
     char pbuf[QBUFSZ], plbuf[QBUFSZ];
+    char buf[BUFSZ];
     winid win;
     anything any;
     menu_item* selected = 0;
@@ -2472,6 +2496,8 @@ common_player_selection(VOID_ARGS)
     boolean did_pick_role, did_pick_race, did_pick_gender;
     boolean picksomething = (flags.initrole == ROLE_NONE || flags.initrace == ROLE_NONE
         || flags.initgend == ROLE_NONE || flags.initalign == ROLE_NONE);
+    struct extended_menu_info btninfo = zeroextendedmenuinfo;
+    //btninfo.menu_flags |= MENU_FLAGS_BUTTON_STYLE;
 
 back_from_role:
     /* prevent an unnecessary prompt */
@@ -2530,6 +2556,7 @@ back_from_race:
             win = create_nhwindow(NHW_MENU);
             start_menu_ex(win, GHMENU_STYLE_CHOOSE_PLAYER);
             any = zeroany; /* zero out all bits */
+            boolean didUseRecommended = FALSE;
             for (i = 0; roles[i].name.m; i++)
             {
                 if (ok_role(i, flags.initrace, flags.initgend,
@@ -2558,36 +2585,56 @@ back_from_race:
                         else
                             Strcpy(rolenamebuf, roles[i].name.m);
                     }
+                    boolean usingSpecialSymbols = FALSE;
+                    char* anbuf = an(rolenamebuf);
+#ifdef GNH_MOBILE
+                    if ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0 && !wizard
+                        && (i == ROLE_BARBARIAN || i == ROLE_VALKYRIE))
+                    {
+                        Strcat(anbuf, " &rec;");
+                        usingSpecialSymbols = didUseRecommended = TRUE;
+                    }
+                    if (roles[i].desciption && *roles[i].desciption)
+                    {
+                        Sprintf(eos(anbuf), " (%s)", roles[i].desciption);
+                    }
+#endif
                     int player_glyph_index = player_to_glyph_index(i,
                         flags.initrace >= 0 ? flags.initrace : RACE_HUMAN,
                         flags.initgend >= 0 ? flags.initgend : GENDER_MALE,
                         flags.initalign >= 0 ? aligns[flags.initalign].value : A_NEUTRAL,
                         0);
                     int glyph = player_glyph_index + GLYPH_PLAYER_OFF;
-                    add_menu(win, glyph, &any, thisch, 0, ATR_NONE, NO_COLOR,
-                        an(rolenamebuf), MENU_UNSELECTED);
+                    struct extended_menu_info info = zeroextendedmenuinfo;
+                    if (usingSpecialSymbols)
+                        info.menu_flags |= MENU_FLAGS_USE_SPECIAL_SYMBOLS;
+                    add_extended_menu(win, glyph, &any, thisch, 0, ATR_NONE, NO_COLOR,
+                        anbuf, MENU_UNSELECTED, info);
                     lastch = thisch;
                 }
             }
             any.a_int = 0;
-            add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, "",
+            add_menu(win, NO_GLYPH, &any, 0, 0, ATR_HALF_SIZE, NO_COLOR, "",
                 MENU_UNSELECTED);
             any.a_int = pick_role(flags.initrace, flags.initgend,
                 flags.initalign, PICK_RANDOM) + 1;
             if (any.a_int == 0) /* must be non-zero */
                 any.a_int = randrole(FALSE) + 1;
-            add_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE, NO_COLOR, "Random",
-                MENU_UNSELECTED);
+            add_extended_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE, NO_COLOR, "Random",
+                MENU_UNSELECTED, btninfo);
             int back_int = i + 2;
             any.a_int = back_int; /* must be non-zero */
-            add_menu(win, NO_GLYPH, &any, '<', 0, ATR_NONE, NO_COLOR, "Back",
-                MENU_UNSELECTED);
+            add_extended_menu(win, NO_GLYPH, &any, '<', 0, ATR_NONE, NO_COLOR, "Back",
+                MENU_UNSELECTED, btninfo);
             int quit_int = i + 1;
             any.a_int = quit_int; /* must be non-zero */
-            add_menu(win, NO_GLYPH, &any, 'q', 0, ATR_NONE, NO_COLOR, "Quit",
-                MENU_UNSELECTED);
+            add_extended_menu(win, NO_GLYPH, &any, 'q', 0, ATR_NONE, NO_COLOR, "Quit",
+                MENU_UNSELECTED, btninfo);
             Sprintf(pbuf, "Pick a role for your %s", plbuf);
-            end_menu(win, pbuf);
+            if (didUseRecommended && (windowprocs.wincap2 & WC2_MENU_PROPER_SUBTITLE) != 0 && (windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0)
+                end_menu_ex(win, pbuf, "&rec;  Recommended for beginners");
+            else
+                end_menu(win, pbuf);
             n = select_menu(win, PICK_ONE, &selected);
             destroy_nhwindow(win);
             did_pick_role = TRUE;
@@ -2660,6 +2707,7 @@ back_from_gender:
                 win = create_nhwindow(NHW_MENU);
                 start_menu_ex(win, GHMENU_STYLE_CHOOSE_PLAYER);
                 any = zeroany; /* zero out all bits */
+                boolean didUseRecommended = FALSE;
                 for (i = 0; races[i].noun; i++)
                     if (ok_race(flags.initrole, i, flags.initgend,
                         flags.initalign))
@@ -2671,29 +2719,50 @@ back_from_gender:
                             flags.initalign >= 0 ? aligns[flags.initalign].value : A_NEUTRAL,
                             0);
                         int glyph = player_glyph_index + GLYPH_PLAYER_OFF;
-                        add_menu(win, glyph, &any, races[i].noun[0], 0,
-                            ATR_NONE, NO_COLOR, races[i].noun, MENU_UNSELECTED);
+                        Strcpy(buf, races[i].noun);
+                        *buf = highc(*buf);
+                        boolean usingSpecialSymbols = FALSE;
+#ifdef GNH_MOBILE
+                        if ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0 && !wizard && 
+                            (i == RACE_GNOLL || (flags.initrole == ROLE_VALKYRIE && i == RACE_DWARF)))
+                        {
+                            Strcat(buf, " &rec;");
+                            usingSpecialSymbols = didUseRecommended = TRUE;
+                        }
+                        if (races[i].desciption && *races[i].desciption)
+                        {
+                            Sprintf(eos(buf), " (%s)", races[i].desciption);
+                        }
+#endif
+                        struct extended_menu_info info = zeroextendedmenuinfo;
+                        if (usingSpecialSymbols)
+                            info.menu_flags |= MENU_FLAGS_USE_SPECIAL_SYMBOLS;
+                        add_extended_menu(win, glyph, &any, races[i].noun[0], 0,
+                            ATR_NONE, NO_COLOR, buf, MENU_UNSELECTED, info);
                     }
 
                 any.a_int = 0;
-                add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, "",
+                add_menu(win, NO_GLYPH, &any, 0, 0, ATR_HALF_SIZE, NO_COLOR, "",
                     MENU_UNSELECTED);
                 any.a_int = pick_race(flags.initrole, flags.initgend,
                     flags.initalign, PICK_RANDOM) + 1;
                 if (any.a_int == 0) /* must be non-zero */
                     any.a_int = randrace(flags.initrole) + 1;
-                add_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE, NO_COLOR, "Random",
-                    MENU_UNSELECTED);
+                add_extended_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE, NO_COLOR, "Random",
+                    MENU_UNSELECTED, btninfo);
                 int back_int = i + 2;
                 any.a_int = back_int; /* must be non-zero */
-                add_menu(win, NO_GLYPH, &any, '<', 0, ATR_NONE, NO_COLOR, "Back",
-                    MENU_UNSELECTED);
+                add_extended_menu(win, NO_GLYPH, &any, '<', 0, ATR_NONE, NO_COLOR, "Back",
+                    MENU_UNSELECTED, btninfo);
                 int quit_int = i + 1;
                 any.a_int = quit_int; /* must be non-zero */
-                add_menu(win, NO_GLYPH, &any, 'q', 0, ATR_NONE, NO_COLOR, "Quit",
-                    MENU_UNSELECTED);
+                add_extended_menu(win, NO_GLYPH, &any, 'q', 0, ATR_NONE, NO_COLOR, "Quit",
+                    MENU_UNSELECTED, btninfo);
                 Sprintf(pbuf, "Pick the race of your %s", plbuf);
-                end_menu(win, pbuf);
+                if (didUseRecommended && (windowprocs.wincap2 & WC2_MENU_PROPER_SUBTITLE) != 0 && (windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0)
+                    end_menu_ex(win, pbuf, "&rec;  Recommended for beginners");
+                else
+                    end_menu(win, pbuf);
                 n = select_menu(win, PICK_ONE, &selected);
                 destroy_nhwindow(win);
                 did_pick_race = TRUE;
@@ -2786,27 +2855,33 @@ back_from_align:
                             flags.initalign >= 0 ? aligns[flags.initalign].value : A_NEUTRAL,
                             0);
                         int glyph = player_glyph_index + GLYPH_PLAYER_OFF;
+                        Strcpy(buf, genders[i].adj);
+                        *buf = highc(*buf);
+                        if (genders[i].desciption && *genders[i].desciption)
+                        {
+                            Sprintf(eos(buf), " (%s)", genders[i].desciption);
+                        }
                         add_menu(win, glyph, &any, genders[i].adj[0], 0,
-                            ATR_NONE, NO_COLOR, genders[i].adj, MENU_UNSELECTED);
+                            ATR_NONE, NO_COLOR, buf, MENU_UNSELECTED);
                     }
 
                 any.a_int = 0;
-                add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, "",
+                add_menu(win, NO_GLYPH, &any, 0, 0, ATR_HALF_SIZE, NO_COLOR, "",
                     MENU_UNSELECTED);
                 any.a_int = pick_gend(flags.initrole, flags.initrace,
                     flags.initalign, PICK_RANDOM) + 1;
                 if (any.a_int == 0) /* must be non-zero */
                     any.a_int = randgend(flags.initrole, flags.initrace) + 1;
-                add_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE, NO_COLOR, "Random",
-                    MENU_UNSELECTED);
+                add_extended_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE, NO_COLOR, "Random",
+                    MENU_UNSELECTED, btninfo);
                 int back_int = i + 2;
                 any.a_int = back_int; /* must be non-zero */
-                add_menu(win, NO_GLYPH, &any, '<', 0, ATR_NONE, NO_COLOR, "Back",
-                    MENU_UNSELECTED);
+                add_extended_menu(win, NO_GLYPH, &any, '<', 0, ATR_NONE, NO_COLOR, "Back",
+                    MENU_UNSELECTED, btninfo);
                 int quit_int = i + 1;
                 any.a_int = quit_int; /* must be non-zero */
-                add_menu(win, NO_GLYPH, &any, 'q', 0, ATR_NONE, NO_COLOR, "Quit",
-                    MENU_UNSELECTED);
+                add_extended_menu(win, NO_GLYPH, &any, 'q', 0, ATR_NONE, NO_COLOR, "Quit",
+                    MENU_UNSELECTED, btninfo);
                 Sprintf(pbuf, "Pick the gender of your %s", plbuf);
                 end_menu(win, pbuf);
                 n = select_menu(win, PICK_ONE, &selected);
@@ -2905,27 +2980,33 @@ back_from_align:
                             aligns[i].value,
                             0);
                         int glyph = player_glyph_index + GLYPH_PLAYER_OFF;
+                        Strcpy(buf, aligns[i].adj);
+                        *buf = highc(*buf);
+                        if (aligns[i].desciption && *aligns[i].desciption)
+                        {
+                            Sprintf(eos(buf), " (%s)", aligns[i].desciption);
+                        }
                         add_menu(win, glyph, &any, aligns[i].adj[0], 0,
-                            ATR_NONE, NO_COLOR, aligns[i].adj, MENU_UNSELECTED);
+                            ATR_NONE, NO_COLOR, buf, MENU_UNSELECTED);
                     }
 
                 any.a_int = 0;
-                add_menu(win, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, "",
+                add_menu(win, NO_GLYPH, &any, 0, 0, ATR_HALF_SIZE, NO_COLOR, "",
                     MENU_UNSELECTED);
                 any.a_int = pick_align(flags.initrole, flags.initrace,
                     flags.initgend, PICK_RANDOM) + 1;
                 if (any.a_int == 0) /* must be non-zero */
                     any.a_int = randalign(flags.initrole, flags.initrace) + 1;
-                add_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE, NO_COLOR, "Random",
-                    MENU_UNSELECTED);
+                add_extended_menu(win, NO_GLYPH, &any, '*', 0, ATR_NONE, NO_COLOR, "Random",
+                    MENU_UNSELECTED, btninfo);
                 int back_int = i + 2;
                 any.a_int = back_int; /* must be non-zero */
-                add_menu(win, NO_GLYPH, &any, '<', 0, ATR_NONE, NO_COLOR, "Back",
-                    MENU_UNSELECTED);
+                add_extended_menu(win, NO_GLYPH, &any, '<', 0, ATR_NONE, NO_COLOR, "Back",
+                    MENU_UNSELECTED, btninfo);
                 int quit_int = i + 1;
                 any.a_int = quit_int; /* must be non-zero */
-                add_menu(win, NO_GLYPH, &any, 'q', 0, ATR_NONE, NO_COLOR, "Quit",
-                    MENU_UNSELECTED);
+                add_extended_menu(win, NO_GLYPH, &any, 'q', 0, ATR_NONE, NO_COLOR, "Quit",
+                    MENU_UNSELECTED, btninfo);
                 Sprintf(pbuf, "Pick the alignment of your %s", plbuf);
                 end_menu(win, pbuf);
                 n = select_menu(win, PICK_ONE, &selected);
@@ -2998,7 +3079,6 @@ back_from_align:
         add_menu(win, NO_GLYPH, &any, 0, 0, ATR_HALF_SIZE, NO_COLOR, " ",
             MENU_UNSELECTED);
 
-        char buf[BUFSZ];
         add_menu(win, NO_GLYPH, &any, 0, 0, iflags.menu_headings | ATR_TITLE, NO_COLOR, "Character Abilities",
             MENU_UNSELECTED);
 
@@ -3012,6 +3092,18 @@ back_from_align:
         }
         for (i = 0; i < MAX_TRAIT_DESCRIPTIONS && roles[flags.initrole].trait_descriptions[i] != 0 && *(roles[flags.initrole].trait_descriptions[i]) != 0; i++)
         {
+            boolean docontinue = FALSE;
+            for (j = 0; j < MAX_TRAIT_DESCRIPTIONS && races[flags.initrace].trait_descriptions[j] != 0 && *(races[flags.initrace].trait_descriptions[j]) != 0; j++)
+            {
+                if (!strcmp(races[flags.initrace].trait_descriptions[j], roles[flags.initrole].trait_descriptions[i]))
+                {
+                    docontinue = TRUE;
+                    break;
+                }
+            }
+            if (docontinue)
+                continue;
+
             Sprintf(buf, "%s", roles[flags.initrole].trait_descriptions[i]);
             add_menu(win, NO_GLYPH, &any, 0, 0, ATR_INDENT_AT_DASH, NO_COLOR, buf,
                 MENU_UNSELECTED);

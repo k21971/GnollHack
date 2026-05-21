@@ -12,7 +12,14 @@ namespace GnollHackX
         public bool Ctrl { get; private set; }
         public bool Meta { get; private set; }
         public int RawCommand { get; private set; }
+        public char MappedLetter { get => (char)GHUtils.UnMetaCtrl(MappedGHCommand); }
+        public bool MappedCtrl { get => GHUtils.IsCtrl(MappedGHCommand); }
+        public bool MappedMeta { get => GHUtils.IsMeta(MappedGHCommand); }
+        public int MappedRawCommand { get => GHApp.MapCommand(RawCommand); }
         public string ImageSourcePath { get; private set; }
+
+        public readonly int GHCommand;
+        public  int MappedGHCommand { get => GHApp.MapCommand(GHCommand); }
 
         public SelectableShortcutButton(string name, string label, char letter, bool ctrl, bool meta, int cmd, string imgsourcepath) 
         {
@@ -23,11 +30,12 @@ namespace GnollHackX
             Meta = meta;
             RawCommand = cmd;
             ImageSourcePath = imgsourcepath;
+            GHCommand = CalculateGHCommand();
         }
 
-        public int GetCommand()
+        private int CalculateGHCommand()
         {
-            if(RawCommand != 0)
+            if (RawCommand != 0)
                 return RawCommand;
             else if (Ctrl)
                 return GHUtils.Ctrl(Letter);

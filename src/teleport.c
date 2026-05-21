@@ -340,6 +340,7 @@ boolean allow_drag, keep_effect_glyphs;
             ball_active = TRUE;
             allow_drag = FALSE;
         }
+        debugprint_pos();
         docrt();
     }
     if (ball_active) {
@@ -373,6 +374,7 @@ boolean allow_drag, keep_effect_glyphs;
     see_monsters();
     vision_full_recalc = 1;
     nomul(0);
+    debugprint_pos();
     vision_recalc(0); /* vision before effects */
     update_hearing_array(0);
     /* if terrain type changes, levitation or flying might become blocked
@@ -705,7 +707,7 @@ struct monst* mtmp;
             if (otmp && !(ttmp->tflags & TRAPFLAGS_ACTIVATED))
             {
                 pline("%s%s has vanished!", otmp->quan > 1 ? "One of " : "", otmp->quan > 1 ? yname(otmp) : Yname2(otmp));
-                Sprintf(priority_debug_buf_2, "modronportaltele: %d", otmp->otyp);
+                debugprint("modronportaltele: %d", otmp->otyp);
                 if (mtmp == u.usteed)
                     m_useup(mtmp, otmp);
                 else
@@ -768,7 +770,7 @@ struct monst* mtmp;
                 if (otmp && !(ttmp->tflags & TRAPFLAGS_ACTIVATED))
                 {
                     pline("%s%s has vanished!", otmp->quan > 1 ? "One of " : "", otmp->quan > 1 ? yname(otmp) : Yname2(otmp));
-                    Sprintf(priority_debug_buf_2, "modronportaltele2: %d", otmp->otyp);
+                    debugprint("modronportaltele2: %d", otmp->otyp);
                     if(mtmp == u.usteed)
                         m_useup(mtmp, otmp);
                     else
@@ -996,7 +998,7 @@ boolean break_the_rules; /* True: wizard mode ^T */
             castit = (has_teleport_self_spell && !Confusion && !Stunned);
             if (castit && yn_query("Cast the 'teleport self' spell?") == 'y')
             {
-                return spelleffects(sp_no, FALSE, &youmonst);
+                return spelleffects(sp_no, FALSE, &youmonst, (boolean*)0);
             }
             else if (!castit) 
             {
@@ -1433,16 +1435,24 @@ register struct trap *ttmp;
         return;
     }
 
-    int portal_flags = (ttmp->ttyp == MODRON_PORTAL ? 
+    int portal_tele_type = (ttmp->ttyp == MODRON_PORTAL ? 
         ((ttmp->tflags & TRAPFLAGS_LEVEL_TELEPORT_NO_OTHER_END) != 0 ? 4 : 
-            (ttmp->tflags & TRAPFLAGS_LEVEL_TELEPORT_UP) != 0 ? 3 : 
-            (ttmp->tflags & TRAPFLAGS_LEVEL_TELEPORT_DOWN) != 0 ? 2 : 4) : 1);
+        (ttmp->tflags & TRAPFLAGS_LEVEL_TELEPORT_UP) != 0 ? 3 : 
+        (ttmp->tflags & TRAPFLAGS_LEVEL_TELEPORT_DOWN) != 0 ? 2 : 4) :
+        /* Not a modron portal */
+        (ttmp->tflags & TRAPFLAGS_LEVEL_TELEPORT_SSTAIRS_DOWN) != 0 ? MAGIC_PORTAL_TARGET_SSTAIRS_DOWN :
+        (ttmp->tflags & TRAPFLAGS_LEVEL_TELEPORT_SSTAIRS_UP) != 0 ? MAGIC_PORTAL_TARGET_SSTAIRS_UP :
+        (ttmp->tflags & TRAPFLAGS_LEVEL_TELEPORT_STAIRS_DOWN) != 0 ? MAGIC_PORTAL_TARGET_STAIRS_DOWN :
+        (ttmp->tflags & TRAPFLAGS_LEVEL_TELEPORT_STAIRS_UP) != 0 ? MAGIC_PORTAL_TARGET_STAIRS_UP :
+        (ttmp->tflags & TRAPFLAGS_LEVEL_TELEPORT_LADDER_DOWN) != 0 ? MAGIC_PORTAL_TARGET_LADDER_DOWN :
+        (ttmp->tflags & TRAPFLAGS_LEVEL_TELEPORT_LADDER_UP) != 0 ? MAGIC_PORTAL_TARGET_LADDER_UP :
+        1);
 
     target_level = ttmp->dst;
 
     level_teleport_effect_out(u.ux, u.uy);
 
-    schedule_goto(&target_level, FALSE, FALSE, TRUE, FALSE, portal_flags,
+    schedule_goto(&target_level, FALSE, FALSE, TRUE, FALSE, portal_tele_type,
                   "You feel dizzy for a moment, but the sensation passes.",
                   (char *) 0);
 }
@@ -1629,6 +1639,7 @@ register int x, y;
     }
 
     memset(mtmp->mtrack, 0, sizeof mtmp->mtrack);
+    debugprint_pos();
     place_monster(mtmp, x, y); /* put monster down */
     update_monster_region(mtmp);
 
@@ -1639,6 +1650,7 @@ register int x, y;
         if (u.uswallow) {
             u.ux = x;
             u.uy = y;
+            debugprint_pos();
             docrt();
         }
         else
@@ -1925,8 +1937,33 @@ int in_sight;
                     else
                         migrate_typ = MIGR_RANDOM;
                 }
+                else if (trap->tflags & TRAPFLAGS_LEVEL_TELEPORT_SSTAIRS_DOWN)
+                {
+                    migrate_typ = MIGR_SSTAIRS;
+                }
+                else if (trap->tflags & TRAPFLAGS_LEVEL_TELEPORT_SSTAIRS_UP)
+                {
+                    migrate_typ = MIGR_SSTAIRS;
+                }
+                else if (trap->tflags & TRAPFLAGS_LEVEL_TELEPORT_STAIRS_DOWN)
+                {
+                    migrate_typ = MIGR_STAIRS_DOWN;
+                }
+                else if (trap->tflags & TRAPFLAGS_LEVEL_TELEPORT_STAIRS_UP)
+                {
+                    migrate_typ = MIGR_STAIRS_UP;
+                }
+                else if (trap->tflags & TRAPFLAGS_LEVEL_TELEPORT_LADDER_DOWN)
+                {
+                    migrate_typ = MIGR_LADDER_DOWN;
+                }
+                else if (trap->tflags & TRAPFLAGS_LEVEL_TELEPORT_LADDER_UP)
+                {
+                    migrate_typ = MIGR_LADDER_UP;
+                }
                 else
                     migrate_typ = MIGR_PORTAL;
+
                 assign_level(&tolevel, &trap->dst);
             }
             if(cansee(mtmp->mx, mtmp->my))
@@ -2006,7 +2043,7 @@ register struct obj *obj;
     obj->speflags &= ~SPEFLAGS_CAUGHT_IN_LEAVES;
     obj_clear_found(obj);
 
-    Strcpy(debug_buf_2, "rloco");
+    debugprint("rloco");
     obj_extract_self(obj);
     otx = obj->ox;
     oty = obj->oy;

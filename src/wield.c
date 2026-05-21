@@ -130,7 +130,7 @@ boolean verbose;
     }
 
     if (uwep == obj && olduwep && (artifact_light(olduwep) || has_obj_mythic_magical_light(olduwep) || obj_shines_magical_light(olduwep)) && olduwep->lamplit) {
-        Strcpy(debug_buf_3, "setuwepcore");
+        debugprint("setuwepcore");
         end_burn(olduwep, FALSE);
         if (!Blind && verbose)
             pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s shining.", Tobjnam(olduwep, "stop"));
@@ -315,6 +315,7 @@ int64_t mask;
         {
             struct monst *this_shkp;
 
+            debugprint_pos();
             if ((this_shkp = shop_keeper(inside_shop(u.ux, u.uy)))
                 != (struct monst *) 0) {
                 pline("%s says \"You be careful with my %s!\"",
@@ -651,7 +652,13 @@ struct obj* wep;
         {
             /* Automate the unwield to assist the player */
             /* If weapon is bimanual and you have an unused secondardy weapon in hand, unwield it */
-            remove_worn_item(uarms, FALSE);
+            int saved_idx1 = add_to_obj_tracking(wep);
+            int saved_idx2 = add_to_obj_tracking(uarms);
+            (void)remove_worn_item(uarms, FALSE);
+            boolean isobjgone1 = finish_obj_tracking(saved_idx1);
+            boolean isobjgone2 = finish_obj_tracking(saved_idx2);
+            if (isobjgone1 || isobjgone2)
+                return 1;
         }
 
         /* Set your new primary weapon */
@@ -1066,7 +1073,19 @@ doswapweapon()
         if (oldwep2)
         {
             if (is_shield(oldwep2))
-                remove_worn_item(oldwep2, FALSE);
+            {
+                int saved_idx1 = add_to_obj_tracking(oldwep);
+                int saved_idx2 = add_to_obj_tracking(oldwep2);
+                int saved_idx3 = add_to_obj_tracking(oldswap);
+                int saved_idx4 = add_to_obj_tracking(oldswap2);
+                (void)remove_worn_item(oldwep2, FALSE);
+                boolean isobjgone1 = finish_obj_tracking(saved_idx1);
+                boolean isobjgone2 = finish_obj_tracking(saved_idx2);
+                boolean isobjgone3 = finish_obj_tracking(saved_idx3);
+                boolean isobjgone4 = finish_obj_tracking(saved_idx4);
+                if (isobjgone1 || isobjgone2 || isobjgone3 || isobjgone4)
+                    return 1;
+            }
             else
                 setuwep((struct obj*) 0, W_WEP2);
         }
@@ -1672,7 +1691,7 @@ drop_uswapwep()
     /* Avoid trashing makeplural's static buffer */
     Strcpy(str, makeplural(body_part(HAND)));
     pline("%s from your %s!", Yobjnam2(obj, "slip"), str);
-    dropxf(obj);
+    (void)dropxf(obj);
 }
 
 int
@@ -1718,7 +1737,7 @@ uwepgone()
 {
     if (uwep) {
         if ((artifact_light(uwep) || has_obj_mythic_magical_light(uwep) || obj_shines_magical_light(uwep)) && uwep->lamplit) {
-            Strcpy(debug_buf_3, "uwepgone");
+            debugprint("uwepgone");
             end_burn(uwep, FALSE);
             if (!Blind)
                 pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s shining.", Tobjnam(uwep, "stop"));
@@ -1735,7 +1754,7 @@ uwep2gone()
 {
     if (uarms) {
         if ((artifact_light(uarms) || has_obj_mythic_magical_light(uarms) || obj_shines_magical_light(uarms)) && uarms->lamplit) {
-            Strcpy(debug_buf_3, "uwep2gone");
+            debugprint("uwep2gone");
             end_burn(uarms, FALSE);
             if (!Blind)
                 pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s shining.", Tobjnam(uarms, "stop"));
@@ -1967,7 +1986,7 @@ boolean dopopup;
                 Sprintf(buf, "%s.", Yobjnam2(weapon, "evaporate"));
                 pline_ex1_popup(ATR_NONE, CLR_MSG_NEGATIVE, buf, "Evaporation", dopopup);
             }
-            Sprintf(priority_debug_buf_3, "enchant_weapon: %d", weapon->otyp);
+            debugprint("enchant_weapon: %d", weapon->otyp);
             useupall(weapon); /* let all of them disappear */
         }
         return 1;

@@ -400,6 +400,7 @@ int save_style;
         && !program_state.exiting && !program_state.freeing_dynamic_data
         && !saving && !restoring && !reseting && !check_pointing && !ignore_onsleep_autosave)
     {
+        issue_breadcrumb2("LibSaveAndRestoreSavedGame", save_style);
         switch (save_style)
         {
         case 2: /* Checkpoint only and no wait */
@@ -425,13 +426,12 @@ int save_style;
             save_currentstate(); /* In the case save fails */
 #endif
             int saveres = dosave0(TRUE);
+            issue_breadcrumb2("LibSaveAndRestoreSavedGame: Saved", saveres);
             issue_parametered_gui_command(GUI_CMD_WAIT_FOR_RESUME, saveres);
             if (saveres)
             {
-                exit_hack_code = 1; /* reload upon exit */
+                exit_hack_code = EXITHACK_RESTART_EXISTING; /* reload upon exit */
                 u.uhp = -1; /* universal game's over indicator */
-                /* make sure they see the Saving message */
-                display_nhwindow(WIN_MESSAGE, TRUE);
                 exit_nhwindows((char*)0);
                 nh_terminate(EXIT_SUCCESS);
             }
@@ -663,6 +663,12 @@ LibGetCharacterClickAction(VOID_ARGS)
 }
 
 DLLEXPORT void
+LibSetMetricSystem(int new_value)
+{
+    flags.metric_system = new_value != 0;
+}
+
+DLLEXPORT void
 LibSetGetPositionArrows(int new_value)
 {
     iflags.getpos_arrows = new_value != 0;
@@ -680,6 +686,36 @@ LibSetDiceAsRanges(int new_value)
     iflags.show_dice_as_ranges = new_value != 0;
 }
 
+DLLEXPORT int
+LibGetDiceAsRanges(VOID_ARGS)
+{
+    return (int)iflags.show_dice_as_ranges;
+}
+
+DLLEXPORT void
+LibSetWornShowsEquipment(int new_value)
+{
+    iflags.worn_shows_equipment = new_value != 0;
+}
+
+DLLEXPORT int
+LibGetWornShowsEquipment(VOID_ARGS)
+{
+    return (int)iflags.worn_shows_equipment;
+}
+
+DLLEXPORT void
+LibSetNoPetsPreference(int new_value)
+{
+    flags.pets_not_gifted = new_value != 0;
+}
+
+DLLEXPORT int
+LibGetNoPetsPreference(VOID_ARGS)
+{
+    return (int)flags.pets_not_gifted;
+}
+
 DLLEXPORT void
 LibSetAutoDig(int new_value)
 {
@@ -690,12 +726,6 @@ DLLEXPORT void
 LibSetIgnoreStopping(int new_value)
 {
     flags.ignore_stopping = new_value != 0;
-}
-
-DLLEXPORT int
-LibGetDiceAsRanges(VOID_ARGS)
-{
-    return (int)iflags.show_dice_as_ranges;
 }
 
 DLLEXPORT void
@@ -715,6 +745,25 @@ LibGetMouseCommand(int is_middle)
     else
         return flags.right_click_command;
 }
+
+DLLEXPORT void
+LibSetEngraveQuickText(const char* new_value)
+{
+    if (new_value && *new_value)
+    {
+        Strncpy(iflags.engrave_quicktext, new_value, PL_ESIZ);
+        iflags.engrave_quicktext[PL_ESIZ] = '\0';
+    }
+    else
+        *iflags.engrave_quicktext = '\0';
+}
+
+DLLEXPORT void
+LibSetEngraveQuickStyle(int new_value)
+{
+    iflags.engrave_quickstyle = (uchar)new_value;
+}
+
 
 DLLEXPORT const char*
 LibGetEventPathForGHSound(int ghsound)
@@ -741,10 +790,29 @@ LibSetExitHack(int newValue)
 }
 
 DLLEXPORT void
-LibExitGnhThread()
+LibExitGnhThread(int used_exit_hack_code)
 {
-    exit_hack_code = -1; // ExitHack does nothing
+    exit_hack_code = used_exit_hack_code;
+    issue_breadcrumb2("LibExitGnhThread", used_exit_hack_code);
     gnollhack_exit(EXIT_SUCCESS);
+}
+
+DLLEXPORT void
+LibTerminateGnollHack(int used_exit_hack_code)
+{
+    restoring = FALSE; /* just in case */
+    exit_hack_code = used_exit_hack_code;
+    u.uhp = -1; /* universal game's over indicator */
+    exit_nhwindows((char*)0);
+    nh_terminate(EXIT_SUCCESS);
+}
+
+DLLEXPORT void*
+LibGetCommandFunctionPointer(int cmd)
+{
+    if (cmd < 0 || cmd >= 256 || Cmd.commands[cmd] == 0)
+        return 0;
+    return (void*)Cmd.commands[cmd]->ef_funct;
 }
 
 DLLEXPORT int GnollHackStart(cmdlineargs)
@@ -806,8 +874,12 @@ extern struct callback_procs lib_callbacks;
 DLLEXPORT int RunGnollHack(
     char* gnhdir,
     char* cmdlineargs,
-    char* preset_player_name,
+    char* engrave_quicktext,
     char* last_used_player_name,
+    int right_mouse_button,
+    int middle_mouse_button,
+    int engrave_quickstyle,
+    int reserved_int,
     uint64_t runflags,
     uint64_t foundmanuals,
     uint64_t wincap1,
@@ -930,16 +1002,6 @@ DLLEXPORT int RunGnollHack(
             Strcat(cmdbuf, " ");
         Sprintf(eos(cmdbuf), "-D -u %s", "wizard");
     }
-    else if (preset_player_name && strcmp(preset_player_name, ""))
-    {
-        char plbuf[PL_NSIZ];
-        Strncpy(plbuf, preset_player_name, PL_NSIZ - 1);
-        plbuf[PL_NSIZ - 1] = '\0';
-
-        if (*cmdbuf)
-            Strcat(cmdbuf, " ");
-        Sprintf(eos(cmdbuf), "-u %s", plbuf);
-    }
     else if ((runflags & GHRUNFLAGS_FORCE_LAST_PLAYER_NAME) && last_used_player_name && strcmp(last_used_player_name, ""))
     {
         char plbuf[PL_NSIZ];
@@ -983,10 +1045,16 @@ DLLEXPORT int RunGnollHack(
     memset(&initial_flags, 0, sizeof(initial_flags));
     initial_flags.click_action_set = TRUE;
     initial_flags.click_action_value = (runflags & GHRUNFLAGS_CHARACTER_CLICK_ACTION) != 0;
+    initial_flags.metric_system_set = TRUE;
+    initial_flags.metric_system_value = (runflags & GHRUNFLAGS_METRIC_SYSTEM) != 0;
     initial_flags.getpos_arrows_set = TRUE;
     initial_flags.getpos_arrows_value = (runflags & GHRUNFLAGS_GETPOS_ARROWS) != 0;
     initial_flags.dice_as_ranges_set = TRUE;
     initial_flags.dice_as_ranges_value = (runflags & GHRUNFLAGS_DICE_AS_RANGES) != 0;
+    initial_flags.worn_shows_equipment_set = TRUE;
+    initial_flags.worn_shows_equipment_value = (runflags & GHRUNFLAGS_WORN_SHOWS_EQUIPMENT) != 0;
+    initial_flags.no_pets_preference_set = TRUE;
+    initial_flags.no_pets_preference_value = (runflags & GHRUNFLAGS_NO_PET) != 0;
     initial_flags.autodig_set = TRUE;
     initial_flags.autodig_value = (runflags & GHRUNFLAGS_AUTO_DIG) != 0;
     initial_flags.ignore_stopping_set = TRUE;
@@ -999,9 +1067,17 @@ DLLEXPORT int RunGnollHack(
     initial_flags.save_file_tracking_needed_value = (runflags & GHRUNFLAGS_SAVE_FILE_TRACKING_NEEDED) != 0;
     initial_flags.save_file_tracking_on_set = TRUE;
     initial_flags.save_file_tracking_on_value = (runflags & GHRUNFLAGS_SAVE_FILE_TRACKING_ON) != 0;
-    initial_flags.right_click_action = (uchar)((runflags & GHRUNFLAGS_RIGHT_MOUSE_BIT_MASK) >> GHRUNFLAGS_RIGHT_MOUSE_BIT_INDEX);
-    initial_flags.middle_click_action = (uchar)((runflags & GHRUNFLAGS_MIDDLE_MOUSE_BIT_MASK) >> GHRUNFLAGS_MIDDLE_MOUSE_BIT_INDEX);
+    initial_flags.right_click_action = (uchar)right_mouse_button; // (uchar)((runflags & GHRUNFLAGS_RIGHT_MOUSE_BIT_MASK) >> GHRUNFLAGS_RIGHT_MOUSE_BIT_INDEX);
+    initial_flags.middle_click_action = (uchar)middle_mouse_button; // (uchar)((runflags & GHRUNFLAGS_MIDDLE_MOUSE_BIT_MASK) >> GHRUNFLAGS_MIDDLE_MOUSE_BIT_INDEX);
     initial_flags.found_manuals = foundmanuals;
+    initial_flags.engrave_quick_set = TRUE;
+    initial_flags.engrave_quickstyle = (uchar)engrave_quickstyle;
+    *initial_flags.engrave_quicktext = 0;
+    if (engrave_quicktext && strcmp(engrave_quicktext, ""))
+    {
+        Strncpy(initial_flags.engrave_quicktext, engrave_quicktext, PL_ESIZ);
+        initial_flags.engrave_quicktext[PL_ESIZ] = '\0';
+    }
 
     if (runflags & GHRUNFLAGS_NO_PET)
     {

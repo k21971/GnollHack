@@ -1299,9 +1299,13 @@ update_monster_timeouts()
         /* must check non-moving monsters once/turn in case they managed
            to end up in water or lava; note: when not in liquid they regen,
            shape-shift, timeout temporary maladies just like other monsters */
-        if (mtmp->data->mmove == 0) {
+        if (mtmp->data->mmove == 0) 
+        {
             if (vision_full_recalc)
+            {
+                debugprint_pos();
                 vision_recalc(0);
+            }
             if (minliquid(mtmp))
                 continue;
         }
@@ -1520,6 +1524,7 @@ update_monster_timeouts()
                     case LAUGHING:
                         mtmp->mfrozen += 1;
                         mtmp->mcanmove = 0;
+                        refresh_m_tile_gui_info(mtmp, TRUE);
                         if (canseemon(mtmp))
                         {
                             char laughbuf[BUFSZ] = "";
@@ -1540,6 +1545,7 @@ update_monster_timeouts()
                     case FUMBLING:
                         mtmp->mfrozen += 2;
                         mtmp->mcanmove = 0;
+                        refresh_m_tile_gui_info(mtmp, TRUE);
                         if (canseemon(mtmp))
                         {
                             if (nolimbs(mtmp->data) || slithy(mtmp->data))
@@ -1572,9 +1578,9 @@ update_monster_timeouts()
 
 
         /* reduce basic stat timers */
-
+        boolean need_update = FALSE;
         if (mtmp->mfrozen && !--mtmp->mfrozen)
-            mtmp->mcanmove = 1;
+            mtmp->mcanmove = 1, need_update = TRUE;
         if (mtmp->mstaying && !--mtmp->mstaying)
             mtmp->mwantstomove = 1;
         if (mtmp->mcarrying && !--mtmp->mcarrying)
@@ -1612,6 +1618,8 @@ update_monster_timeouts()
 
         if (iflags.wc2_statuslines > 3 && is_tame(mtmp))
             context.botl = 1; /* Updates only if necessary */
+        if (need_update)
+            refresh_m_tile_gui_info(mtmp, TRUE);
     }
 }
 
@@ -1694,6 +1702,7 @@ movemon()
         /* Reset mx0 and my0 */
         reset_monster_origin_coordinates(mtmp);
 
+        debugprint_pos();
         if (vision_full_recalc)
             vision_recalc(0); /* vision! */
 
@@ -1851,6 +1860,9 @@ register struct monst *mtmp;
                         You_hear_ex(ATR_NONE, CLR_MSG_ATTENTION, "a screeching sound.");
                 }
                 mtmp->meating = otmp->owt / 2 + 1;
+                if (mtmp->meating < 1)
+                    mtmp->meating = 1;
+                refresh_m_tile_gui_info(mtmp, FALSE);
                 /* Heal up to the object's weight in hp */
                 if (mtmp->mhp < mtmp->mhpmax)
                 {
@@ -1861,7 +1873,7 @@ register struct monst *mtmp;
                 if (otmp == uball)
                 {
                     unpunish();
-                    Sprintf(priority_debug_buf_3, "meatmetal: %d", otmp->otyp);
+                    debugprint("meatmetal: %d", otmp->otyp);
                     delobj(otmp);
                 }
                 else if (otmp == uchain) 
@@ -1874,7 +1886,7 @@ register struct monst *mtmp;
                     grow = mlevelgain(otmp);
                     heal = mhealup(otmp);
                     mstone = mstoning(otmp);
-                    Sprintf(priority_debug_buf_3, "meatmetal2: %d", otmp->otyp);
+                    debugprint("meatmetal2: %d", otmp->otyp);
                     delobj(otmp);
                     ptr = mtmp->data;
                     if (poly) 
@@ -1968,6 +1980,9 @@ register struct monst* mtmp;
                     You_hear_ex(ATR_NONE, CLR_MSG_ATTENTION, "a crunching sound.");
             }
             mtmp->meating = otmp->owt / 2 + 1;
+            if (mtmp->meating < 1)
+                mtmp->meating = 1;
+            refresh_m_tile_gui_info(mtmp, FALSE);
             /* Heal up to the object's weight in hp */
             if (mtmp->mhp < mtmp->mhpmax)
             {
@@ -1978,7 +1993,7 @@ register struct monst* mtmp;
             if (otmp == uball)
             {
                 unpunish();
-                Sprintf(priority_debug_buf_3, "meatrock: %d", otmp->otyp);
+                debugprint("meatrock: %d", otmp->otyp);
                 delobj(otmp);
             }
             else if (otmp == uchain)
@@ -1993,7 +2008,7 @@ register struct monst* mtmp;
                 mstone = mstoning(otmp);
                 if (isstatue)
                     (void)pre_break_statue(otmp);
-                Sprintf(priority_debug_buf_3, "meatrock2: %d", otmp->otyp);
+                debugprint("meatrock2: %d", otmp->otyp);
                 delobj(otmp);
                 ptr = mtmp->data;
                 if (poly)
@@ -2113,7 +2128,7 @@ struct monst *mtmp;
                         distant_name(otmp, doname));
             else if (ecount == 2)
                 Sprintf(buf, "%s engulfs several objects.", Monnam(mtmp));
-            Strcpy(debug_buf_2, "meatobj1");
+            debugprint("meatobj1");
             obj_extract_self(otmp);
             (void) mpickobj(mtmp, otmp); /* slurp */
 
@@ -2151,7 +2166,7 @@ struct monst *mtmp;
 
                 /* contents of eaten containers become engulfed; this
                    is arbitrary, but otherwise g.cubes are too powerful */
-                Strcpy(debug_buf_2, "meatobj2");
+                debugprint("meatobj2");
                 while ((otmp3 = otmp->cobj) != 0)
                 {
                     obj_extract_self(otmp3);
@@ -2167,7 +2182,7 @@ struct monst *mtmp;
             grow = mlevelgain(otmp);
             heal = mhealup(otmp);
             eyes = (otmp->otyp == CARROT);
-            Sprintf(priority_debug_buf_3, "meatobj: %d", otmp->otyp);
+            debugprint("meatobj: %d", otmp->otyp);
             delobj(otmp); /* munch */
             ptr = mtmp->data;
             if (poly) 
@@ -2221,9 +2236,9 @@ register struct monst *mtmp;
         if (is_obj_no_pickup(gold))
             return;
         mat_idx = gold->material;
-        Strcpy(debug_buf_2, "mpickgold");
+        debugprint("mpickgold");
         obj_extract_self(gold);
-        add_to_minv(mtmp, gold);
+        (void)add_to_minv(mtmp, gold);
         if (cansee(mtmp->mx, mtmp->my)) 
         {
             if (flags.verbose && !mtmp->isgd)
@@ -2294,7 +2309,7 @@ register const char *str;
                         : distant_name(otmp3, doname));
             }
 
-            Strcpy(debug_buf_2, "mpickstuff");
+            debugprint("mpickstuff");
             obj_extract_self(otmp3);      /* remove from floor */
             (void) mpickobj(mtmp, otmp3); /* may merge and free otmp3 */
             m_dowear(mtmp, FALSE, FALSE);
@@ -2624,7 +2639,7 @@ nexttry: /* eels prefer the water, but if there is no water nearby,
                 if ((nx == u.ux && ny == u.uy)
                     || (nx == mon->mux && ny == mon->muy)) 
                 {
-                    if (nx == u.ux && ny == u.uy) 
+                    if ((nx == u.ux && ny == u.uy) || is_tame(mon)) /* Insurance */
                     {
                         /* If it's right next to you, it found you,
                          * displaced or no.  We must set mux and muy
@@ -2778,10 +2793,17 @@ mm_aggression(magr, mdef)
 struct monst *magr, /* monster that is currently deciding where to move */
              *mdef; /* another monster which is next to it */
 {
+    /* peaceful NPCs should not attack anyone; if they are attacked, they will retaliate */
+    if (is_peaceful(magr) && (magr->issmith || magr->ispriest || magr->isnpc || magr->isshk))
+        return 0L;
+
+    /* peaceful NPCs should not be attacked by anyone */
+    if (is_peaceful(mdef) && (mdef->issmith || mdef->ispriest || mdef->isnpc || mdef->isshk))
+        return 0L;
+
     /* supposedly purple worms are attracted to shrieking because they
        like to eat shriekers, so attack the latter when feasible */
-    if (magr->data == &mons[PM_PURPLE_WORM]
-        && mdef->data == &mons[PM_SHRIEKER])
+    if (is_purple_worm(magr->data) && mdef->data == &mons[PM_SHRIEKER])
         return ALLOW_M | ALLOW_TM;
     
     if (is_demon(magr->data) && is_angel(mdef->data))
@@ -2867,12 +2889,15 @@ dmonsfree()
 {
     struct monst **mtmp, *freetmp;
     int count = 0;
+    int lastfreemnum = NON_PM;
 
     for (mtmp = &fmon; *mtmp;) 
     {
         freetmp = *mtmp;
         if (DEADMONSTER(freetmp) && !freetmp->isgd) 
         {
+            lastfreemnum = freetmp->mnum; /* Debug */
+
             *mtmp = freetmp->nmon;
             freetmp->nmon = NULL;
             dealloc_monst(freetmp);
@@ -2883,8 +2908,8 @@ dmonsfree()
     }
 
     if (count != iflags.purge_monsters)
-        impossible("dmonsfree: %d removed doesn't match %d pending",
-                   count, iflags.purge_monsters);
+        impossible("dmonsfree: %d removed doesn't match %d pending (mnum1=%d, mnum2=%d, isspec2=%d)",
+                   count, iflags.purge_monsters, lastfreemnum, iflags.purge_debug_mnum, iflags.purge_debug_isspec);
     iflags.purge_monsters = 0;
 }
 
@@ -2907,6 +2932,7 @@ struct monst *mtmp, *mtmp2;
     relmon(mtmp, (struct monst **) 0);
 
     /* finish adding its replacement */
+    debugprint_pos();
     if (mtmp != u.usteed) /* don't place steed onto the map */
         place_monster(mtmp2, mtmp2->mx, mtmp2->my);
     if (mtmp2->wormno)      /* update level.monsters[wseg->wx][wseg->wy] */
@@ -2914,7 +2940,7 @@ struct monst *mtmp, *mtmp2;
 
     if (emitted_light_range(mtmp2->data)) 
     {
-        Strcpy(debug_buf_4, "replmon");
+        debugprint("replmon");
         /* since this is so rare, we don't have any `mon_move_light_source' */
         new_light_source(mtmp2->mx, mtmp2->my, emitted_light_range(mtmp2->data), LS_MONSTER, monst_to_any(mtmp2), 0);
         /* here we rely on fact that `mtmp' hasn't actually been deleted */
@@ -2939,6 +2965,7 @@ struct monst *mtmp, *mtmp2;
         replshk(mtmp, mtmp2);
 
     /* discard the old monster */
+    /* DEBUG */ mtmp->mon_flags |= MON_FLAGS_DEBUG_REPLMON;
     dealloc_monst(mtmp);
 }
 
@@ -3174,9 +3201,11 @@ struct monst *mon;
     }
     if (mon->mextra)
         dealloc_mextra(mon);
-    if(mon->timed)
+    if (mon->timed)
         mon_stop_timers(mon);
-
+    if (mon->isshk)
+        debugprint("deallocated shk: mnum=%d, m_id=%u", mon->mnum, mon->m_id);
+    /* DEBUG */ mon->mon_flags |= MON_FLAGS_DEBUG_DEALLOCATED;
     free((genericptr_t) mon);
 }
 
@@ -3189,7 +3218,9 @@ boolean is_mon_dead;
 {
     boolean onmap = (mtmp->mx > 0);
 
-    Strcpy(debug_buf_4, "m_detach");
+    debugprint("m_detach: mnum=%d, mid=%u", mtmp->mnum, mtmp->m_id);
+    issue_breadcrumb3("m_detach (mnum, mid)", mtmp->mnum, (int)mtmp->m_id);
+
     if (mtmp == context.polearm.hitmon)
         context.polearm.hitmon = 0;
     if (mtmp->mleashed)
@@ -3222,6 +3253,10 @@ boolean is_mon_dead;
     if (mtmp->wormno)
         wormgone(mtmp);
     iflags.purge_monsters++;
+
+    /* Some debug info */
+    iflags.purge_debug_isspec = (int)mtmp->isgd + 2 * (int)mtmp->isshk;
+    iflags.purge_debug_mnum = mtmp->mnum;
 }
 
 /* find the worn amulet of life saving which will save a monster */
@@ -3524,6 +3559,7 @@ uint64_t mondeadflags;
         nemdead();
     if (is_medusa(mtmp->data))
     {
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_MEDUSA);
         if (flags.showscore && !u.uachieve.killed_medusa)
             context.botl = 1;
         if (!u.uachieve.killed_medusa)
@@ -3535,6 +3571,7 @@ uint64_t mondeadflags;
     }
     else if (mtmp->data == &mons[PM_YACC])
     {
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_YACC);
         if (flags.showscore && !u.uachieve.killed_yacc)
             context.botl = 1;
         if (!u.uachieve.killed_yacc)
@@ -3546,6 +3583,7 @@ uint64_t mondeadflags;
     }
     else if (mtmp->data == &mons[PM_DEMOGORGON])
     {
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_DEMOGORGON);
         if (flags.showscore && !u.uachieve.killed_demogorgon)
             context.botl = 1;
         if (!u.uachieve.killed_demogorgon)
@@ -3557,7 +3595,8 @@ uint64_t mondeadflags;
     }
     else if (mtmp->data == &mons[PM_DEATH])
     {
-        switch (mvitals[tmp].died) 
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_DEATH);
+        switch (mvitals[tmp].died)
         {
         case 1:
             livelog_printf(LL_UMONST, "put %s down for a little nap",
@@ -3604,6 +3643,97 @@ uint64_t mondeadflags;
         }
     }
 
+    if (mtmp->data == &mons[PM_HIGH_PRIEST] && Is_sanctum(&u.uz)
+        && mtmp->ispriest && has_epri(mtmp) && EPRI(mtmp)->shralign == A_NONE)
+    {
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_HIGH_PRIEST_OF_MOLOCH);
+    }
+
+    switch (mtmp->mnum)
+    {
+    case PM_MODRON_PRIMUS:
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_MODRON_PRIMUS);
+        break;
+    case PM_VLAD_THE_IMPALER:
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_VLAD_THE_IMPALER);
+        break;
+    case PM_GARGANTUAN_MIMIC:
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_GARGANTUAN_MIMIC);
+        break;
+    case PM_FAMINE:
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_FAMINE);
+        break;
+    case PM_PESTILENCE:
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_PESTILENCE);
+        break;
+    case PM_CERBERUS:
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_CERBERUS);
+        break;
+    case PM_AMONKET:
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_AMONKET);
+        break;
+    case PM_CROESUS:
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_CROESUS);
+        break;
+    case PM_TARRASQUE:
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_TARRASQUE);
+        break;
+    case PM_JUBILEX:
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_JUBILEX);
+        break;
+    case PM_YEENAGHU:
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_YEENAGHU);
+        break;
+    case PM_BAPHOMET:
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_BAPHOMET);
+        break;
+    case PM_ORCUS:
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_ORCUS);
+        break;
+    case PM_DISPATER:
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_DISPATER);
+        break;
+    case PM_BAALZEBUB:
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_BAALZEBUB);
+        break;
+    case PM_GERYON:
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_GERYON);
+        break;
+    case PM_ASMODEUS:
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_ASMODEUS);
+        break;
+    case PM_XAN:
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_XAN);
+        break;
+    case PM_ARCH_LICH:
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_ARCH_LICH);
+        /* FALLTHRU */
+    case PM_MASTER_LICH:
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_MASTER_LICH);
+        /* FALLTHRU */
+    case PM_DEMILICH:
+    case PM_LICH:
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_LICH);
+        break;
+    case PM_ELDER_TENTACLED_ONE:
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_ELDER_TENTACLED_ONE);
+        /* FALLTHRU */
+    case PM_DEATH_FLAYER:
+    case PM_TENTACLED_ONE:
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_TENTACLED_ONE);
+        break;
+    case PM_ORC:
+        if (mtmp->mon_flags & MON_FLAGS_ORC_AND_A_PIE)
+            issue_achievement(GUI_ACHIEVEMENT_DEFEATED_ORC_AND_A_PIE);
+        break;
+    case PM_ORC_CAPTAIN:
+        if (mtmp->mon_flags & MON_FLAGS_ORC_AND_A_PIE)
+            issue_achievement(GUI_ACHIEVEMENT_DEFEATED_ORC_CAPTAIN_AND_A_PIE);
+        break;
+    default:
+        break;
+    }
+
     if (!u.uachieve.role_achievement &&
         (      (Role_if(PM_ARCHAEOLOGIST) && mtmp->mnum == PM_AMONKET)
             || (Role_if(PM_ROGUE) && mtmp->mnum == PM_CROESUS)
@@ -3617,6 +3747,7 @@ uint64_t mondeadflags;
         strcpy_capitalized_for_title(abuf, ra_desc);
         achievement_gained(abuf);
         livelog_printf(LL_ACHIEVE, "%s", ra_desc);
+        issue_achievement(GUI_ACHIEVEMENT_COMPLETED_OPTIONAL_QUEST);
     }
 
     if (glyph_is_invisible(levl[mtmp->mx][mtmp->my].hero_memory_layers.glyph))
@@ -3838,7 +3969,7 @@ struct monst *mdef;
         || !rn2(2 + ((int) (mdef->data->geno & G_FREQ) > 2))) {
         oldminvent = 0;
         /* some objects may end up outside the statue */
-        Strcpy(debug_buf_2, "monstone");
+        debugprint("monstone1");
         while ((obj = mdef->minvent) != 0) {
             obj_extract_self(obj);
             obj_no_longer_held(obj);
@@ -3862,7 +3993,7 @@ struct monst *mdef;
                     continue;
                 place_object(obj, x, y);
             } else {
-                Strcpy(debug_buf_3, "monstone");
+                debugprint("monstone3");
                 if (obj->lamplit)
                     end_burn(obj, TRUE);
                 if (obj->makingsound)
@@ -3880,7 +4011,7 @@ struct monst *mdef;
         while ((obj = oldminvent) != 0) {
             oldminvent = obj->nobj;
             obj->nobj = 0; /* avoid merged-> obfree-> dealloc_obj-> panic */
-            Sprintf(priority_debug_buf_2, "monstone2: %d, %d", otmp->otyp, obj->otyp);
+            debugprint("monstone2: %d, %d", otmp->otyp, obj->otyp);
             (void) add_to_container(otmp, obj);
         }
         /* Archaeologists should not break unique statues */
@@ -3890,7 +4021,7 @@ struct monst *mdef;
     } else
         otmp = mksobj_at(ROCK, x, y, TRUE, FALSE);
 
-    Sprintf(priority_debug_buf_2, "monstone: %d", otmp->otyp);
+    debugprint("monstone4: %d", otmp->otyp);
     stackobj(otmp);
     /* mondead() already does this, but we must do it before the newsym */
     if (glyph_is_invisible(levl[x][y].hero_memory_layers.glyph))
@@ -3957,6 +4088,7 @@ struct monst *mtmp;
             if (Punished && uchain && uchain->where == OBJ_FREE)
                 placebc();
             vision_full_recalc = 1;
+            debugprint_pos();
             docrt();
             /* prevent swallower (mtmp might have just poly'd into something
                without an engulf attack) from immediately re-engulfing */
@@ -4083,7 +4215,7 @@ int xkill_flags; /* 1: suppress message, 2: suppress corpse, 4: pacifist */
            stuff prior to lookhere/autopickup when hero is expelled
            below (as a side-effect, this missile has immunity from
            being consumed [for this shot/throw only]) */
-        mpickobj(mtmp, thrownobj);
+        (void) mpickobj(mtmp, thrownobj);
         /* let throwing code know that missile has been disposed of */
         thrownobj = 0;
     }
@@ -4149,7 +4281,7 @@ int xkill_flags; /* 1: suppress message, 2: suppress corpse, 4: pacifist */
                 /* oc_big is also oc_bimanual and oc_bulky */
                 && (otmp->owt > 30 || objects[otyp].oc_big))
             {
-                Sprintf(priority_debug_buf_3, "xkilled: %d", otmp->otyp);
+                debugprint("xkilled: %d", otmp->otyp);
                 delobj(otmp);
             }
             else if (!flooreffects(otmp, x, y, nomsg ? "" : "fall")) 
@@ -5867,6 +5999,7 @@ boolean msg;      /* "The oldmon turns into a newmon!" */
 
     if (mtmp->wormno) { /* throw tail away */
         wormgone(mtmp);
+        debugprint_pos();
         place_monster(mtmp, mtmp->mx, mtmp->my);
     }
     if (M_AP_TYPE(mtmp) && !is_mimic(mdat))
@@ -5904,7 +6037,7 @@ boolean msg;      /* "The oldmon turns into a newmon!" */
         mtmp->mhp = 1;
 
     if (emitted_light_range(olddata) != emitted_light_range(mtmp->data)) {
-        Strcpy(debug_buf_4, "newcham");
+        debugprint("newcham1");
         /* used to give light, now doesn't, or vice versa,
            or light's range has changed */
         if (emitted_light_range(olddata))
@@ -6021,7 +6154,7 @@ boolean msg;      /* "The oldmon turns into a newmon!" */
                    same zap that the monster that held it is polymorphed */
                 if (polyspot)
                     bypass_obj(otmp);
-                Strcpy(debug_buf_2, "newcham");
+                debugprint("newcham2");
                 obj_extract_self(otmp);
                 /* probably ought to give some "drop" message here */
                 if (flooreffects(otmp, mtmp->mx, mtmp->my, ""))
@@ -6829,6 +6962,7 @@ boolean override_mextra, polyspot, msg;
         {
             if (mtmp->wormno) { /* throw tail away */
                 wormgone(mtmp);
+                debugprint_pos();
                 place_monster(mtmp, mtmp->mx, mtmp->my);
             }
             if (M_AP_TYPE(mtmp) && !is_mimic(&mons[mtraits->mnum]))
@@ -6976,7 +7110,7 @@ boolean override_mextra, polyspot, msg;
 
     struct permonst* mdat = mtmp->data;
     if (emitted_light_range(olddata) != emitted_light_range(mtmp->data)) {
-        Strcpy(debug_buf_4, "revert_mon_polymorph");
+        debugprint("revert_mon_polymorph1");
         /* used to give light, now doesn't, or vice versa,
            or light's range has changed */
         if (emitted_light_range(olddata))
@@ -7093,7 +7227,7 @@ boolean override_mextra, polyspot, msg;
                    same zap that the monster that held it is polymorphed */
                 if (polyspot)
                     bypass_obj(otmp);
-                Strcpy(debug_buf_2, "revert_mon_polymorph");
+                debugprint("revert_mon_polymorph2");
                 obj_extract_self(otmp);
                 /* probably ought to give some "drop" message here */
                 if (flooreffects(otmp, mtmp->mx, mtmp->my, ""))

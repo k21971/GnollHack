@@ -10,6 +10,7 @@
 
 STATIC_VAR NEARDATA struct engr *head_engr;
 STATIC_DCL const char *NDECL(blengr);
+STATIC_DCL int FDECL(doengrave_core, (const char*, UCHAR_P));
 
 char *
 random_engraving(outbuf)
@@ -562,7 +563,27 @@ STATIC_VAR NEARDATA const char styluses[] = { ALL_CLASSES, ALLOW_NONE,
 
 /* return 1 if action took 1 (or more) moves, 0 if error or aborted */
 int
-doengrave()
+doengrave(VOID_ARGS)
+{
+    return doengrave_core((const char*)0, 0);
+}
+
+int
+doengravequick(VOID_ARGS)
+{
+    if (!*iflags.engrave_quicktext)
+    {
+        play_sfx_sound(SFX_GENERAL_CANNOT);
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "The text for quick engraving has not been set.");
+        return 0;
+    }
+    return doengrave_core(iflags.engrave_quicktext, iflags.engrave_quickstyle);
+}
+
+int
+doengrave_core(engrave_text, item_selection_style)
+const char* engrave_text;
+uchar item_selection_style;
 {
     boolean dengr = FALSE;    /* TRUE if we wipe out the current engraving */
     boolean doblind = FALSE;  /* TRUE if engraving blinds the player */
@@ -644,8 +665,35 @@ doengrave()
     /* One may write with finger, or weapon, or wand, or..., or...
      * Edited by GAN 10/20/86 so as not to change weapon wielded.
      */
+    boolean prompt_for_stylus = TRUE;
+    otmp = 0;
+    switch (item_selection_style)
+    {
+    default:
+    case 0:
+        break;
+    case 1:
+        otmp = (struct obj*) &zeroobj; /* Dropping the const qualifier here, so one needs to be careful below not to modify otmp anymore */
+        context.quick_engrave_obj_oid = 0;
+        prompt_for_stylus = FALSE;
+        break;
+    case 2:
+        if (context.quick_engrave_obj_oid > 0)
+        {
+            otmp = o_on_open_inventory(context.quick_engrave_obj_oid);
+            if (otmp)
+                prompt_for_stylus = FALSE;
+        }
+        break;
+    }
 
-    otmp = getobj(styluses, "write with", 0, "");
+    if (prompt_for_stylus)
+    {
+        otmp = getobj(styluses, "write with", 0, "");
+        if (otmp && otmp != &zeroobj && engrave_text) /* Mark as quick only if the command was quick engrave */
+            context.quick_engrave_obj_oid = otmp->o_id;
+    }
+
     if (!otmp) /* otmp == zeroobj if fingers */
         return 0;
 
@@ -698,7 +746,8 @@ doengrave()
     }
 
     /* SPFX for items */
-
+    int stylustyp = otmp->otyp;
+    int trackid = add_to_obj_tracking(otmp);
     switch (otmp->oclass) {
     default:
     case AMULET_CLASS:
@@ -757,6 +806,7 @@ doengrave()
             if (otmp->cursed && !rn2(WAND_BACKFIRE_CHANCE))
             {
                 wand_explode(otmp, 0);
+                (void)finish_obj_tracking(trackid);
                 return 1;
             }
             zapwand = TRUE;
@@ -969,6 +1019,7 @@ doengrave()
         if (otmp == ublindf) {
             pline(
                 "That is a bit difficult to engrave with, don't you think?");
+            (void) finish_obj_tracking(trackid);
             return 0;
         }
         switch (otmp->otyp) {
@@ -1047,9 +1098,13 @@ doengrave()
      * End of implement setup
      */
 
+    boolean obj_gone = finish_obj_tracking(trackid);
     /* Identify stylus */
     if (doknown) {
-        learnwand(otmp);
+        if (obj_gone)
+            makeknown(stylustyp);
+        else
+            learnwand(otmp);
         //if (objects[otmp->otyp].oc_name_known)
         //    more_experienced(0, 10);
     }
@@ -1079,7 +1134,7 @@ doengrave()
             You(
     "are not going to get anywhere trying to write in the %s with your dust.",
                 is_ice(u.ux, u.uy) ? "frost" : "dust");
-        Sprintf(priority_debug_buf_2, "doengrave: %d", otmp->otyp);
+        debugprint("doengrave: %d", otmp->otyp);
         useup(otmp);
         otmp = 0; /* wand is now gone */
         ptext = FALSE;
@@ -1184,10 +1239,18 @@ doengrave()
     else
         You("%s the %s with your %s.", everb, eloc, body_part(FINGERTIP));
 
-    /* Prompt for engraving! */
-    Sprintf(qbuf, "What do you want to %s the %s here?", everb, eloc);
-    getlin(qbuf, ebuf);
-    /* convert tabs to spaces and condense consecutive spaces to one */
+    if (engrave_text && *engrave_text)
+    {
+        Strncpy(ebuf, engrave_text, BUFSZ - 1);
+        ebuf[BUFSZ - 1] = '\0';
+    }
+    else
+    {
+        /* Prompt for engraving! */
+        Sprintf(qbuf, "What do you want to %s the %s here?", everb, eloc);
+        getlin(qbuf, ebuf);
+        /* convert tabs to spaces and condense consecutive spaces to one */
+    }
     mungspaces(ebuf);
 
     /* Count the actual # of chars engraved not including spaces */
@@ -1362,7 +1425,10 @@ doengrave()
     {
         u.uevent.elbereth_known = 1;
         if (!u.uconduct.elbereths++)
+        {
             livelog_printf(LL_CONDUCT, "engraved Elbereth for the first time");
+            issue_achievement(GUI_ACHIEVEMENT_ENGRAVED_ELBERETH);
+        }
     }
 
     if (post_engr_text[0])
@@ -1428,7 +1494,7 @@ int fd;
 {
     struct engr *ep;
     size_t lth;
-    Strcpy(debug_buf_4, "rest_engravings");
+    //debugprint("rest_engravings");
 
     head_engr = 0;
     while (1) {

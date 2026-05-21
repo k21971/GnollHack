@@ -50,7 +50,9 @@ public static class MauiProgram
 {
     public static MauiApp CreateMauiApp()
 	{
-		var builder = MauiApp.CreateBuilder();
+        GHApp.TryReadSecrets();
+
+        var builder = MauiApp.CreateBuilder();
 		builder
 			.UseMauiApp<App>()
             .UseSkiaSharp()
@@ -68,7 +70,7 @@ public static class MauiProgram
 #if SENTRY && !WINDOWS
             .UseSentry(options => {
                   // The DSN is the only required setting.
-                  options.Dsn = "https://c45d9f5d2540eae9538cb9aa78eb25cd@o4507617242906624.ingest.de.sentry.io/4507617248608336";
+                  options.Dsn = GHApp.CurrentUserSecrets?.DefaultSentryDNS ?? "";
 
                   // Use debug mode if you want to see what the SDK is doing.
                   // Debug messages are written to stdout with Console.Writeline,
@@ -94,7 +96,7 @@ public static class MauiProgram
             .UseSentry(options =>
             {
                 // The DSN is the only required setting.
-                options.Dsn = "https://c45d9f5d2540eae9538cb9aa78eb25cd@o4507617242906624.ingest.de.sentry.io/4507617248608336";
+                options.Dsn = GHApp.CurrentUserSecrets?.DefaultSentryDNS ?? "";
 
                 // Use debug mode if you want to see what the SDK is doing.
                 // Debug messages are written to stdout with Console.Writeline,
@@ -123,6 +125,34 @@ public static class MauiProgram
 
                 // Other Sentry options can be set here.
                 options.CaptureFailedRequests = false;
+
+                options.SetBeforeSend(@event =>
+                {
+                    var exception = @event.Exception;
+
+                    if (exception is InvalidOperationException ioe && ioe.Message != null &&
+                        (ioe.Message.Contains("already deactivated") 
+                        || ioe.Message.Contains("already activated")))
+                    {
+                        // Drop event entirely
+                        return null;
+                    }
+                    if (@event.SentryExceptions != null)
+                    {
+                        foreach (var ex in @event.SentryExceptions)
+                        {
+                            if (ex.Type == nameof(InvalidOperationException) &&
+                                ex.Value != null &&
+                                (ex.Value.Contains("already deactivated") ||
+                                    ex.Value.Contains("already activated")))
+                            {
+                                return null;
+                            }
+                        }
+                    }
+
+                    return @event;
+                });
             })
 #endif
 
@@ -181,11 +211,16 @@ public static class MauiProgram
                         {
                             if (GHApp.WindowsApp != null)
                             {
+                                GHApp.AddSentryBreadcrumb("Closed: WindowsApp.Exit, Windowed Mode: " + GHApp.WindowedMode, GHConstants.SentryGnollHackGeneralCategoryName);
                                 GHApp.WindowsApp.Exit();
                                 GHApp.WindowsApp = null;
+                                Environment.Exit(0);
                             }
                             else
+                            {
+                                GHApp.AddSentryBreadcrumb("Closed: Environment.Exit, Windowed Mode: " + GHApp.WindowedMode, GHConstants.SentryGnollHackGeneralCategoryName);
                                 Environment.Exit(0);
+                            }
                         };
                         var handle = WinRT.Interop.WindowNative.GetWindowHandle(window);
                         var id = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(handle);
@@ -195,18 +230,67 @@ public static class MauiProgram
                         var appWindow = window.AppWindow;
                         appWindow.Closing += (s, e) =>
                         {
-                            if(GHApp.CurrentGamePage != null)
+                            try
                             {
-                                e.Cancel = true;
-                                GHApp.CurrentGamePage?.GenericButton_Clicked(s, EventArgs.Empty, GHUtils.Meta('s'));
+                                var curGamePage = GHApp.CurrentGamePage;
+                                bool winFocus = GHApp.WindowFocused;
+                                if (curGamePage != null && winFocus)
+                                {
+                                    GHApp.AddSentryBreadcrumb("AppWindow.Closing: Executing GenericButton_Clicked, Windowed Mode: " + GHApp.WindowedMode, GHConstants.SentryGnollHackGeneralCategoryName);
+                                    e.Cancel = true;
+                                    MainThread.InvokeOnMainThreadAsync(async () =>
+                                    {
+                                        try
+                                        {
+                                            Page topPage = GHApp.PageFromTopOfModalNavigationStack();
+                                            if (topPage is NamePage)
+                                            {
+                                                await ((NamePage)topPage).DoPressCancel();
+                                            }
+                                            else
+                                            {
+                                                await GHApp.PopAllModalPagesAboveGamePageAsync();
+                                                curGamePage?.CloseMoreCommands();
+                                                curGamePage?.PressCharForSaving();
+                                            }
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            Debug.WriteLine(ex.Message);
+                                        }
+                                    });
+                                }
+                                else
+                                {
+                                    GHApp.AddSentryBreadcrumb("AppWindow.Closing: Closing window, Windowed Mode: " + GHApp.WindowedMode, GHConstants.SentryGnollHackGeneralCategoryName);
+                                    var curMainPage = GHApp.CurrentMainPage;
+                                    if (curMainPage != null && winFocus)
+                                    {
+                                        e.Cancel = true;
+                                        GHApp.SaveWindowPosition();
+                                        MainThread.InvokeOnMainThreadAsync(async () =>
+                                        {
+                                            try
+                                            {
+                                                await curMainPage.CheckPendingOrPressOk();
+                                            }
+                                            catch (Exception ex)
+                                            {
+                                                Debug.WriteLine(ex.Message);
+                                            }
+                                        });
+                                    }
+                                    else
+                                    {
+                                        GHGame curGame = GHApp.CurrentGHGame;
+                                        curGame?.ResponseQueue.Enqueue(new GHResponse(curGame, GHRequestType.StopAllGameSounds));
+                                        GHApp.FmodService?.StopAllUISounds();
+                                    }
+                                }
                             }
-                            else
+                            catch (Exception ex)
                             {
-                                GHApp.SaveWindowPosition();
-                                //GHApp.FmodService?.StopAllGameSounds((uint)StopSoundFlags.All, 0U);
-                                GHGame curGame = GHApp.CurrentGHGame;
-                                curGame?.ResponseQueue.Enqueue(new GHResponse(curGame, GHRequestType.StopAllGameSounds));
-                                GHApp.FmodService?.StopAllUISounds();
+                                Debug.WriteLine(ex.Message);
                             }
                         };
 
@@ -273,6 +357,7 @@ public static class MauiProgram
 
                             appWindow.Destroying += (sender, args) =>
                             {
+                                GHApp.AddSentryBreadcrumb("AppWindow.Destroying: Windowed Mode: " + GHApp.WindowedMode, GHConstants.SentryGnollHackGeneralCategoryName);
                                 KeyboardHook.Stop();
                                 if (sender != null && GHApp.WindowedMode)
                                 {
@@ -284,6 +369,7 @@ public static class MauiProgram
                                         {
                                             isMaximized = true;
                                         }
+                                        GHApp.AddSentryBreadcrumb("AppWindow.Destroying: OverlappedPresenterState: " + presenter.State.ToString(), GHConstants.SentryGnollHackGeneralCategoryName);
                                     }
                                     try
                                     {
@@ -317,14 +403,14 @@ public static class MauiProgram
                             // Focused
                             GHApp.WindowFocused = true;
                             GHApp.UnfocusedMuteMode = false;
-                            GHApp.MaybeWriteLowLevelGHLog("Window is focused.");
+                            GHApp.MaybeWriteLowLevelGHLog("OnActivated: Window is focused. WindowActivationState: " + args.WindowActivationState.ToString() + ", Windowed Mode: " + GHApp.WindowedMode, true, GHConstants.SentryGnollHackGeneralCategoryName);
                         }
                         else
                         {
                             // Not focused
                             GHApp.WindowFocused = false;
                             GHApp.UnfocusedMuteMode = true;
-                            GHApp.MaybeWriteLowLevelGHLog("Window is not focused.");
+                            GHApp.MaybeWriteLowLevelGHLog("OnActivated: Window is not focused. WindowActivationState: " + args.WindowActivationState.ToString() + ", Windowed Mode: " + GHApp.WindowedMode, true, GHConstants.SentryGnollHackGeneralCategoryName);
                         }
                     });
                 });
@@ -393,12 +479,21 @@ public static class MauiProgram
                     {
                         try
                         {
-                            GHApp.MaybeWriteGHLog("androidLifecycleBuilder: Paused 1");
-                            if (activity.IsFinishing || !activity.HasWindowFocus)
+                            GHApp.MaybeWriteGHLog("androidLifecycleBuilder: Paused 0", true, GHConstants.SentryGnollHackGeneralCategoryName);
+                            GHGame game = GHApp.CurrentGHGame;
+                            if (game != null && !game.PlayingReplay && (game.ActiveGamePage?.IsGameOn ?? false))
                             {
-                                GHApp.MaybeWriteGHLog("androidLifecycleBuilder: Paused 2");
-                                var intent = new Intent(Android.App.Application.Context, typeof(SaveGameService));
-                                AndroidX.Core.Content.ContextCompat.StartForegroundService(Android.App.Application.Context, intent);
+                                GHApp.MaybeWriteGHLog("androidLifecycleBuilder: Paused 1", true, GHConstants.SentryGnollHackGeneralCategoryName);
+                                if (SaveGameService.IsSaving)
+                                {
+                                    GHApp.MaybeWriteGHLog("androidLifecycleBuilder: Was saving already", true, GHConstants.SentryGnollHackGeneralCategoryName);
+                                }
+                                else if (activity.IsFinishing || !activity.HasWindowFocus)
+                                {
+                                    GHApp.MaybeWriteGHLog("androidLifecycleBuilder: Paused 2", true, GHConstants.SentryGnollHackGeneralCategoryName);
+                                    var intent = new Intent(Android.App.Application.Context, typeof(SaveGameService));
+                                    AndroidX.Core.Content.ContextCompat.StartForegroundService(Android.App.Application.Context, intent);
+                                }
                             }
                         }
                         catch (Exception ex)
@@ -413,22 +508,41 @@ public static class MauiProgram
             {
                 ios.OnResignActivation((app) =>
                 {
-                    GHApp.BackgroundTaskId = UIApplication.SharedApplication.BeginBackgroundTask("SaveGameTask", () =>
+                    GHApp.MaybeWriteGHLog("OnResignActivation: Start", true, GHConstants.SentryGnollHackGeneralCategoryName);
+                    GHGame game = GHApp.CurrentGHGame;
+                    if (game != null && !game.PlayingReplay && (game.ActiveGamePage?.IsGameOn ?? false))
                     {
-                        GHApp.EndBackgroundTask();
-                    });
+                        GHApp.MaybeWriteGHLog("OnResignActivation: Starting Background Task", true, GHConstants.SentryGnollHackGeneralCategoryName);
+                        IntPtr localTaskId = UIApplication.BackgroundTaskInvalid;
+                        localTaskId = UIApplication.SharedApplication.BeginBackgroundTask("SaveGameTask", () =>
+                        {
+                            GHApp.MaybeWriteGHLog("OnResignActivation: Background Task Timeout", true, GHConstants.SentryGnollHackGeneralCategoryName);
+                            GHApp.EndBackgroundTask(localTaskId);
+                        });
 
-                    Task.Run(async () =>
-                    {
-                        try
+                        Task.Run(async () =>
                         {
-                            await GHApp.SaveGameOnSleepAsync();
-                        }
-                        finally
-                        {
-                            GHApp.EndBackgroundTask();
-                        }
-                    });
+                            try
+                            {
+                                GHApp.MaybeWriteGHLog("OnResignActivation: Saving game", true, GHConstants.SentryGnollHackGeneralCategoryName);
+                                await GHApp.SaveGameOnSleepAsync();
+                            }
+                            catch (Exception ex)
+                            {
+                                GHApp.MaybeWriteGHLog("OnResignActivation: Save exception: " + ex.Message, true, GHConstants.SentryGnollHackGeneralCategoryName);
+                            }
+                            finally
+                            {
+                                GHApp.MaybeWriteGHLog("OnResignActivation: Save finished", true, GHConstants.SentryGnollHackGeneralCategoryName);
+                                GHApp.EndBackgroundTask(localTaskId);
+                            }
+                        });
+                    }
+                });
+                ios.OnActivated((app) =>
+                {
+                    GHApp.MaybeWriteGHLog("OnActivated: Start", true, GHConstants.SentryGnollHackGeneralCategoryName);
+                    GHApp.CheckResumeSavedGame();
                 });
             });
 #endif
@@ -876,7 +990,18 @@ public class KeyboardHook
                             break;
                     }
                 }
-                handled = GHApp.SendSpecialKeyPress(spkey, isCtrlDown, true, isShiftDown);
+                if (spkey != GHSpecialKey.None)
+                    handled = GHApp.SendSpecialKeyPress(spkey, isCtrlDown, true, isShiftDown);
+                else
+                {
+                    string character = VkCodeToUnicode(Convert.ToUInt32(vkCode));
+                    if (!string.IsNullOrEmpty(character) && character.Length > 0)
+                    {
+                        int key = character[0];
+                        handled = GHApp.SendKeyPress(key, GHApp.CtrlDown, true);
+                        GHApp.MaybeWriteLowLevelGHLog("HookCallback: Send Keypress SysKeyDown Fallback: '" + character + "', Handled: " + handled);
+                    }
+                }
                 if (handled)
                     return 1;
                 else
@@ -943,32 +1068,9 @@ public class SaveGameService : Service
         return null;
     }
 
-    const string CHANNEL_ID = "save_game_channel";
-
     public override void OnCreate()
     {
         base.OnCreate();
-
-        if (Build.VERSION.SdkInt >= BuildVersionCodes.O)
-        {
-            try
-            {
-                var channel = new NotificationChannel(
-                    CHANNEL_ID,
-                    "Game Save Progress",
-                    NotificationImportance.Low)
-                {
-                    Description = "Used while saving your game data."
-                };
-
-                var manager = (NotificationManager)GetSystemService(NotificationService);
-                manager.CreateNotificationChannel(channel);
-            }
-            catch (Exception ex)
-            {
-                GHApp.MaybeWriteGHLog(ex.Message);
-            }
-        }
     }
 
 
@@ -979,10 +1081,8 @@ public class SaveGameService : Service
     {
         try
         {
-            GHApp.MaybeWriteGHLog("SaveGameService: OnStartCommand!");
-
             // Create a foreground service notification (required on Android 8+)
-            var notification = new Notification.Builder(this, CHANNEL_ID)
+            var notification = new Notification.Builder(this, GHConstants.SAVE_GAME_NOTIFICATION_CHANNEL_ID)
                 .SetContentTitle("Saving Game")
                 .SetContentText("Please wait while your progress is saved.")
                 .SetSmallIcon(Android.Resource.Drawable.IcMenuSave)
@@ -991,28 +1091,37 @@ public class SaveGameService : Service
 
             StartForeground(1, notification);
 
-            if (IsSaving)
+            // Should come after StartForeground if takes time
+            GHApp.MaybeWriteGHLog("SaveGameService: OnStartCommand, StartId=" + startId, true, GHConstants.SentryGnollHackGeneralCategoryName);
+
+            if (Interlocked.CompareExchange(ref _isSaving, 1, 0) == 1) /* Sets IsSaving to true if it was false; if it was already true, stops this foreground service; effectively should never go here, since if IsSaving is true, a new foreground service should not be started */
             {
                 StopForeground(StopForegroundFlags.Remove);
-                StopSelf();
+                StopSelf(startId);
+                GHApp.MaybeWriteGHLog("SaveGameService: Was saving already, StartId=" + startId, true, GHConstants.SentryGnollHackGeneralCategoryName);
                 return StartCommandResult.NotSticky;
             }
 
-            IsSaving = true;
+            //IsSaving = true;
 
             // Do your save operation
             Task.Run(async () =>
             {
                 try
                 {
-                    GHApp.MaybeWriteGHLog("SaveGameService: SavingGame!");
+                    GHApp.MaybeWriteGHLog("SaveGameService: Saving game, StartId=" + startId, true, GHConstants.SentryGnollHackGeneralCategoryName);
                     await GHApp.SaveGameOnSleepAsync();
+                }
+                catch (Exception ex)
+                {
+                    GHApp.MaybeWriteGHLog("SaveGameService: StartId=" + startId + ", Exception: " + ex.Message, true, GHConstants.SentryGnollHackGeneralCategoryName);
                 }
                 finally
                 {
                     IsSaving = false;
                     StopForeground(StopForegroundFlags.Remove);
-                    StopSelf();
+                    StopSelf(startId);
+                    GHApp.MaybeWriteGHLog("SaveGameService: Saving finished, StartId=" + startId, true, GHConstants.SentryGnollHackGeneralCategoryName);
                 }
             });
         }

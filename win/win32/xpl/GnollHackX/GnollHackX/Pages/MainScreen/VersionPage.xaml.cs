@@ -61,14 +61,22 @@ namespace GnollHackX.Pages.MainScreen
             if (manufacturer?.Length > 0)
                 manufacturer = manufacturer.Substring(0, 1).ToUpper() + manufacturer.Substring(1);
 
-            ulong TotalMemInBytes = GHApp.PlatformService.GetDeviceMemoryInBytes();
+            ulong TotalMemInMB = GHApp.TotalMemory / (1024 * 1024);
             long UsedMemInBytes = GHApp.GetUsedMemoryInBytes();
             long UsedMemInMB = UsedMemInBytes == -1 ? -1 : UsedMemInBytes / (1024 * 1024);
-            ulong TotalMemInMB = (TotalMemInBytes / 1024) / 1024;
             ulong FreeDiskSpaceInBytes = GHApp.PlatformService.GetDeviceFreeDiskSpaceInBytes();
             ulong FreeDiskSpaceInGB = ((FreeDiskSpaceInBytes / 1024) / 1024) / 1024;
             ulong TotalDiskSpaceInBytes = GHApp.PlatformService.GetDeviceTotalDiskSpaceInBytes();
             ulong TotalDiskSpaceInGB = ((TotalDiskSpaceInBytes / 1024) / 1024) / 1024;
+            long UsedManagedMemInBytes = GHApp.GetUsedManagedMemoryInBytes(); // GC.GetTotalMemory(false);
+            long UsedManagedMemInMB = UsedManagedMemInBytes == -1 ? -1 : UsedManagedMemInBytes / (1024 * 1024);
+            int fmodMemCur = -1, fmodMemMax = -1;
+            var fmodService = GHApp.FmodService;
+            if (fmodService != null)
+                fmodService.GetStats(out fmodMemCur, out fmodMemMax);
+            long UsedSoundMemInMB = fmodMemCur == -1 ? -1 : fmodMemCur / (1024 * 1024);
+            ulong UsedBitmapMemInBytes = GHApp.UsedBitmapBytes;
+            long UsedBitmapMemInMB = (long)UsedBitmapMemInBytes / (1024 * 1024);
 
             long TotalPlayTime = GHApp.RealPlayTime;
             long TotalPlayHours = TotalPlayTime / 3600;
@@ -277,6 +285,10 @@ namespace GnollHackX.Pages.MainScreen
             DeviceLabel.Text = manufacturer + " " + DeviceInfo.Model;
             TotalMemoryLabel.Text = (UsedMemInMB >= 0 ? (UsedMemInMB+ " MB / ") : "") +  TotalMemInMB + " MB";
             DiskSpaceLabel.Text = FreeDiskSpaceInGB + " GB" + " / " + TotalDiskSpaceInGB + " GB";
+            MemoryDistributionLabel.Text = "M " + (UsedManagedMemInMB >= 0 ? UsedManagedMemInMB.ToString() : "?")
+                + ", S " + (UsedSoundMemInMB >= 0 ? UsedSoundMemInMB.ToString() : "?")
+                + ", B " + UsedBitmapMemInMB
+                + " MB";
             TotalPlayTimeLabel.Text = TotalPlayHours + " h " + TotalPlayMinutes + " min " + TotalPlaySeconds + " s";
             CurrentPlayTimeLabel.Text = CurrentPlayHours + " h " + CurrentPlayMinutes + " min " + CurrentPlaySeconds + " s";
             LongTitleLabel.Text = Environment.NewLine + "GnollHack Long Version Identifier:";
@@ -318,8 +330,7 @@ namespace GnollHackX.Pages.MainScreen
             _backPressed = true;
             if (playClickSound)
                 GHApp.PlayButtonClickedSound();
-            var page = await GHApp.Navigation.PopModalAsync();
-            GHApp.DisconnectIViewHandlers(page);
+            await GHApp.PopModalPageAsync();
         }
 
         private bool _backPressed = false;

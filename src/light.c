@@ -142,8 +142,22 @@ anything *id;
             return;
         }
     }
-    impossible("del_light_source: not found type=%d, id=%s, otyp=%d, where=%d, ox=%d, oy=%d, debug3=%s, debug4=%s", type,
-               fmt_ptr((genericptr_t) id->a_obj), id->a_obj->otyp, id->a_obj->where, id->a_obj->ox, id->a_obj->oy, debug_buf_3, debug_buf_4);
+    switch (type) {
+    case LS_OBJECT:
+        impossible("del_light_source: object not found: type=%d, id=%s, otyp=%d, where=%d, ox=%d, oy=%d", type,
+            fmt_ptr((genericptr_t)id->a_obj), id->a_obj->otyp, id->a_obj->where, id->a_obj->ox, id->a_obj->oy);
+        break;
+    case LS_MONSTER:
+        impossible("del_light_source: monster not found: type=%d, id=%s, mnum=%d, mx=%d, my=%d", type,
+            fmt_ptr((genericptr_t)id->a_monst), id->a_monst->mnum, id->a_monst->mx, id->a_monst->my);
+        break;
+    case LS_LOCATION:
+        impossible("del_light_source: location not found: type=%d, x=%d, y=%d", type, id->a_coord.x, id->a_coord.y);
+        break;
+    default:
+        impossible("del_light_source: unknown type not found: type=%d", type);
+        break;
+    }
 }
 
 /* Mark locations that are temporarily lit via mobile light sources. */
@@ -370,7 +384,7 @@ int fd;
 {
     int count;
     light_source *ls;
-    Strcpy(debug_buf_4, "restore_light_sources");
+    //debugprint("restore_light_sources");
 
     /* restore elements */
     mread(fd, (genericptr_t) &count, sizeof count);
@@ -649,7 +663,7 @@ int x, y;
                  */
                 if (artifact_light(obj))
                     continue;
-                Strcpy(debug_buf_3, "snuff_light_source");
+                debugprint("snuff_light_source1");
                 end_burn(obj, obj->otyp != MAGIC_LAMP && obj->otyp != MAGIC_CANDLE);
                 /*
                  * The current ls element has just been removed (and
@@ -663,7 +677,7 @@ int x, y;
         {
             if (levl[x][y].lamplit)
             {
-                Strcpy(debug_buf_4, "snuff_light_source");
+                debugprint("snuff_light_source2");
                 levl[x][y].lamplit = 0;
                 del_light_source(LS_LOCATION, xy_to_any(x, y));
                 newsym(x, y);
@@ -731,7 +745,7 @@ struct obj *src, *dest;
 {
     light_source *ls;
 
-    Strcpy(debug_buf_3, "obj_merge_light_sources");
+    debugprint("obj_merge_light_sources");
     /* src == dest implies adding to candelabrum */
     if (src != dest)
         end_burn(src, TRUE); /* extinguish candles */

@@ -539,6 +539,7 @@ toggle_blindness()
        (cited case was force bolt hitting an adjacent potion of blindness
        and then a secret door; hero was blinded by vapors but then got the
        message "a door appears in the wall" because wall spot was IN_SIGHT) */
+    debugprint_pos();
     vision_recalc(0);
     if (Blind_telepat || Unblind_telepat || Infravision || Warn_of_mon || Warning || Any_warning)
         see_monsters(); /* also counts EWarn_of_mon monsters */
@@ -712,13 +713,16 @@ ghost_from_bottle()
     }
     pline_ex(ATR_NONE, CLR_MSG_WARNING, "As you open the bottle, an enormous %s emerges!",
           Hallucination ? rndmonnam(NULL) : (const char *) "ghost");
-    if (flags.verbose)
-        You_ex(ATR_NONE, CLR_MSG_WARNING, "are frightened to death, and unable to move.");
-    nomul(-3);
-    multi_reason = "being frightened to death";
-    nomovemsg = "You regain your composure.";
-    nomovemsg_attr = ATR_NONE;
-    nomovemsg_color = NO_COLOR;
+    if (!Fear_resistance)
+    {
+        if (flags.verbose)
+            You_ex(ATR_NONE, CLR_MSG_WARNING, "are frightened to death, and unable to move.");
+        nomul(-3);
+        multi_reason = "being frightened to death";
+        nomovemsg = "You regain your composure.";
+        nomovemsg_attr = ATR_NONE;
+        nomovemsg_color = NO_COLOR;
+    }
 }
 
 /* "Quaffing is like drinking, except you spill more." - Terry Pratchett */
@@ -787,7 +791,7 @@ dodrink()
         }
     }
 
-    if (Race_if(PM_GNOLL))
+    if (maybe_polyd(is_gnoll(youmonst.data), Race_if(PM_GNOLL)) || Edibility_appraisal)
     {
         if (otmp->otyp == POT_SICKNESS || otmp->otyp == POT_POISON || otmp->otyp == POT_URINE)
         {
@@ -810,70 +814,76 @@ dodrink()
        that led to an "object lost" panic since subsequent useup()
        was no longer dealing with an inventory item.  Unwearing
        the current potion is intended to keep it in inventory.] */
-    if (otmp->quan > 1L) 
+    int res = 1;
+    struct monst* shkp = 0;
+    boolean billable_potion = FALSE;
+    boolean gone = FALSE;
+
+    if (otmp->quan > 1L)
     {
         otmp = splitobj(otmp, 1L);
         otmp->owornmask = 0L; /* rest of original stuck unaffected */
     }
     else if (otmp->owornmask) 
     {
-        remove_worn_item(otmp, FALSE);
+        gone = remove_worn_item(otmp, FALSE);
     }
-
-    otmp->in_use = TRUE; /* you've opened the stopper */
-
-    if (u_item_use_flags() & ACTION_ITEM_USE_FLAGS_POTION)
+    if (!gone)
     {
-        action_taken = TRUE;
-        update_u_action(ACTION_TILE_ITEM_USE);
-        u_wait_until_action();
+        otmp->in_use = TRUE; /* you've opened the stopper */
+
+        if (u_item_use_flags() & ACTION_ITEM_USE_FLAGS_POTION)
+        {
+            action_taken = TRUE;
+            update_u_action(ACTION_TILE_ITEM_USE);
+            u_wait_until_action();
+        }
+
+        if (otmp->unpaid && costly_spot(u.ux, u.uy))
+        {
+            debugprint_pos();
+            char* o_shop = in_rooms(u.ux, u.uy, SHOPBASE);
+            shkp = shop_keeper(*o_shop);
+            debugprint_pos();
+            if (shkp && inhishop(shkp) && is_obj_on_shk_bill(otmp, shkp))
+            {
+                billable_potion = TRUE;
+            }
+        }
+
+        potion_descr = OBJ_DESCR(objects[otmp->otyp]);
+        if (potion_descr)
+        {
+            if (!strcmp(potion_descr, "milky")
+                && !(mvitals[PM_GHOST].mvflags & MV_GONE)
+                && !rn2(POTION_OCCUPANT_CHANCE(mvitals[PM_GHOST].born)))
+            {
+                ghost_from_bottle();
+                debugprint("dodrink: %d", otmp->otyp);
+                useup(otmp);
+                gone = TRUE;
+                if (action_taken)
+                    update_u_action_revert(ACTION_TILE_NO_ACTION);
+                goto check_add_to_bill_here;
+
+            }
+            else if (!strcmp(potion_descr, "smoky")
+                && !(mvitals[PM_DJINNI].mvflags & MV_GONE)
+                && ((otmp->speflags & SPEFLAGS_CERTAIN_WISH) != 0 || !rn2(POTION_OCCUPANT_CHANCE(mvitals[PM_DJINNI].born))))
+            {
+                djinni_from_bottle(otmp);
+                debugprint("dodrink2: %d", otmp->otyp);
+                useup(otmp);
+                gone = TRUE;
+                if (action_taken)
+                    update_u_action_revert(ACTION_TILE_NO_ACTION);
+                goto check_add_to_bill_here;
+            }
+        }
+
+        res = dopotion(otmp);
     }
 
-    struct monst* shkp = 0;
-    boolean billable_potion = FALSE;
-    boolean gone = FALSE;
-
-    if (otmp->unpaid && costly_spot(u.ux, u.uy))
-    {
-        char* o_shop = in_rooms(u.ux, u.uy, SHOPBASE);
-        shkp = shop_keeper(*o_shop);
-        if (shkp && inhishop(shkp) && is_obj_on_shk_bill(otmp, shkp))
-        {
-            billable_potion = TRUE;
-        }
-    }
-
-    potion_descr = OBJ_DESCR(objects[otmp->otyp]);
-    if (potion_descr)
-    {
-        if (!strcmp(potion_descr, "milky")
-            && !(mvitals[PM_GHOST].mvflags & MV_GONE)
-            && !rn2(POTION_OCCUPANT_CHANCE(mvitals[PM_GHOST].born)))
-        {
-            ghost_from_bottle();
-            Sprintf(priority_debug_buf_2, "dodrink: %d", otmp->otyp);
-            useup(otmp);
-            gone = TRUE;
-            if (action_taken)
-                update_u_action_revert(ACTION_TILE_NO_ACTION);
-            goto check_add_to_bill_here;
-
-        }
-        else if (!strcmp(potion_descr, "smoky")
-                   && !(mvitals[PM_DJINNI].mvflags & MV_GONE)
-                   && ((otmp->speflags & SPEFLAGS_CERTAIN_WISH) != 0 || !rn2(POTION_OCCUPANT_CHANCE(mvitals[PM_DJINNI].born))))
-        {
-            djinni_from_bottle(otmp);
-            Sprintf(priority_debug_buf_2, "dodrink2: %d", otmp->otyp);
-            useup(otmp);
-            gone = TRUE;
-            if (action_taken)
-                update_u_action_revert(ACTION_TILE_NO_ACTION);
-            goto check_add_to_bill_here;
-        }
-    }
-
-    int res = dopotion(otmp);
     if (action_taken)
     {
         u_wait_until_end();
@@ -898,8 +908,10 @@ struct obj *otmp;
 
     if (otmp->unpaid && costly_spot(u.ux, u.uy))
     {
+        debugprint_pos();
         char* o_shop = in_rooms(u.ux, u.uy, SHOPBASE);
         shkp = shop_keeper(*o_shop);
+        debugprint_pos();
         if (shkp && inhishop(shkp) && is_obj_on_shk_bill(otmp, shkp))
         {
             billable_potion = TRUE;
@@ -910,9 +922,12 @@ struct obj *otmp;
 
     otmp->in_use = TRUE;
     nothing = unkn = 0;
-    if ((retval = peffects(otmp)) >= 0)
+    int trackidx = add_to_obj_tracking(otmp);
+    retval = peffects(otmp);
+    gone = finish_obj_tracking(trackidx);
+    if (retval >= 0 || gone)
     {
-        if (retval == 1)
+        if (retval == 1 || gone)
         {
             gone = TRUE;
             goto check_billable_potion_here;
@@ -939,7 +954,7 @@ struct obj *otmp;
             docall(otmp, (char*)0);
     }
 
-    Sprintf(priority_debug_buf_2, "dopotion: %d", otmp->otyp);
+    debugprint("dopotion: %d", otmp->otyp);
     useup(otmp);
     gone = TRUE;
 
@@ -2138,16 +2153,18 @@ boolean dopopup;
 
     if (obj->unpaid && costly_spot(u.ux, u.uy))
     {
+        debugprint_pos();
         char* o_shop = in_rooms(u.ux, u.uy, SHOPBASE);
         struct monst* shkp = 0;
         shkp = shop_keeper(*o_shop);
+        debugprint_pos();
         if (shkp && inhishop(shkp) && is_obj_on_shk_bill(obj, shkp) && !Deaf && !muteshk(shkp))
         {
             play_voice_shopkeeper_simple_line(shkp, SHOPKEEPER_LINE_ILL_ADD_THAT_TO_YOUR_BILL);
         }
     }
 
-    Sprintf(priority_debug_buf_2, "strange_feeling: %d", obj->otyp);
+    debugprint("strange_feeling: %d", obj->otyp);
     useup(obj);
 }
 
@@ -2685,7 +2702,9 @@ do_illness: /* Pestilence's potion of healing effect */
              && !objects[obj->otyp].oc_uname && cansee(tx, ty))
         docall(obj, dcbuf);
 
-    if (*u.ushops && obj->unpaid) {
+    if (*u.ushops && obj->unpaid) 
+    {
+        debugprint_pos();
         struct monst *shkp = shop_keeper(*in_rooms(u.ux, u.uy, SHOPBASE));
 
         /* neither of the first two cases should be able to happen;
@@ -2696,10 +2715,9 @@ do_illness: /* Pestilence's potion of healing effect */
         else if (context.mon_moving) /* obj thrown by monster */
             subfrombill(obj, shkp);
         else /* obj thrown by hero */
-            (void) stolen_value(obj, u.ux, u.uy, is_peaceful(shkp),
-                                FALSE);
+            (void) stolen_value(obj, u.ux, u.uy, is_peaceful(shkp), FALSE);
     }
-    Sprintf(priority_debug_buf_4, "potionhit: %d", obj->otyp);
+    debugprint("potionhit: %d", obj->otyp);
     obfree(obj, (struct obj *) 0);
     *obj_ptr = (struct obj *)0;
 
@@ -3734,7 +3752,7 @@ dodip()
                 {
                     delay_output_milliseconds(1000);
                 }
-                Sprintf(priority_debug_buf_2, "dodip: %d", obj->otyp);
+                debugprint("dodip8: %d", obj->otyp);
                 if (obj->otyp == POT_ACID)
                     obj->in_use = 1;
                 if (water_damage(obj, 0, TRUE) != ER_DESTROYED && obj->in_use)
@@ -3768,7 +3786,7 @@ dodip()
             } 
             else 
             {
-                Sprintf(priority_debug_buf_2, "dodip2: %d", obj->otyp);
+                debugprint("dodip11: %d", obj->otyp);
                 if (obj->otyp == POT_ACID)
                     obj->in_use = 1;
                 if (water_damage(obj, 0, TRUE) != ER_DESTROYED && obj->in_use)
@@ -3789,7 +3807,12 @@ dodip()
         pline_ex(ATR_NONE, CLR_MSG_FAIL, "That is a potion bottle, not a Klein bottle!");
         return 0;
     }
-    potion->in_use = TRUE; /* assume it will be used up */
+
+    boolean useupliquidonly = otyp_expends_charges_when_dipped_into(potion->otyp) && potion->charges > 0;
+    boolean neutralizingliquid = !!(objects[potion->otyp].oc_flags5 & O5_MIXTURE_CLEARS);
+    if (!useupliquidonly && !potion->oartifact && !is_obj_indestructible(potion))
+        potion->in_use = TRUE; /* assume it will be used up */
+
     if (potion->otyp == POT_WATER)
     {
         boolean useeit = !Blind || (obj == ublindf && Blind_because_of_blindfold_only);
@@ -3802,14 +3825,13 @@ dodip()
     {
         /* some objects can't be polymorphed */
         if (obj->otyp == potion->otyp /* both POT_POLY */
-            || obj->otyp == WAN_POLYMORPH || obj->otyp == SPE_POLYMORPH
             || obj == uball || obj == uskin
-            || obj_resists(obj->otyp == POT_POLYMORPH ? potion : obj,
-                           5, 95))
+            || !is_polymorphable(obj->otyp == POT_POLYMORPH ? potion : obj)
+            || obj_resists(obj->otyp == POT_POLYMORPH ? potion : obj, 5, 95))
         {
             pline1(nothing_happens);
         } 
-        else 
+        else if (potion->otyp == POT_POLYMORPH)
         {
             short save_otyp = obj->otyp;
 
@@ -3827,12 +3849,13 @@ dodip()
             if (!obj)
             {
                 makeknown(POT_POLYMORPH);
+                potion->in_use = FALSE; /* didn't go poof */
                 return 1;
             } 
             else if (obj->otyp != save_otyp) 
             {
                 makeknown(POT_POLYMORPH);
-                Sprintf(priority_debug_buf_2, "dodip3: %d", potion->otyp);
+                debugprint("dodip3: %d", potion->otyp);
                 useup(potion);
                 prinv((char *) 0, obj, 0L);
                 return 1;
@@ -3842,6 +3865,49 @@ dodip()
                 pline("Nothing seems to happen.");
                 goto poof;
             }
+        }
+        else if (obj->otyp == POT_POLYMORPH) /* Just in case instead of else */
+        {
+            short save_otyp = potion->otyp;
+
+            /* KMH, conduct */
+            if (!u.uconduct.polypiles++)
+                livelog_printf(LL_CONDUCT, "polymorphed %s first item", uhis());
+
+            potion->in_use = FALSE; /* didn't go poof, it's being polymorphed */
+            potion = poly_obj(potion, STRANGE_OBJECT);
+
+            /*
+             * potion might be gone
+             */
+            if (!potion)
+            {
+                makeknown(POT_POLYMORPH);
+                return 1;
+            }
+            else if (potion->otyp != save_otyp)
+            {
+                makeknown(POT_POLYMORPH);
+                debugprint("dodip3b: %d", obj->otyp);
+                useup(obj);
+                prinv((char*)0, potion, 0L);
+                return 1;
+            }
+            else
+            {
+                pline("Nothing seems to happen.");
+                obj->in_use = TRUE; /* goes poof instead */
+                if (!objects[obj->otyp].oc_name_known && !objects[obj->otyp].oc_uname)
+                    docall(obj, (char*)0);
+                debugprint("dodip7b: %d", obj->otyp);
+                useup(obj);
+                return 1;
+            }
+        }
+        else
+        {
+            /* Should not go here */
+            pline1(nothing_happens);
         }
         potion->in_use = FALSE; /* didn't go poof */
         return 1;
@@ -3854,11 +3920,14 @@ dodip()
             obj->known = 1;
         if (obj->where == OBJ_INVENT)
             update_inventory();
+        potion->in_use = FALSE; /* didn't go poof */
         return 1;
     }
     else if (obj->oclass == POTION_CLASS && potion->oclass != POTION_CLASS
         && !obj_currently_allows_object_to_be_dipped_into_it(potion))
     {
+        potion->in_use = FALSE; /* didn't go poof */
+
         /* Dipping a potion into an empty Holy Grail, an empty jar, or into a lamp etc. */
         if (obj->otyp == POT_OIL && is_refillable_with_oil(potion))
         {
@@ -3889,8 +3958,6 @@ dodip()
         int amt = (int) obj->quan;
         boolean magic;
         char dcbuf[BUFSZ] = "";
-        boolean useupliquidonly = otyp_expends_charges_when_dipped_into(potion->otyp) && potion->charges > 0;
-        boolean neutralizingliquid = !!(objects[potion->otyp].oc_flags5 & O5_MIXTURE_CLEARS);
 
         mixture = mixtype(obj, potion);
         if (mixture == obj->otyp) /* Can happen with a potion of extra healing and a jar of extra healing salve, for example */
@@ -3938,11 +4005,14 @@ dodip()
                KMH, balance patch -- acid is particularly unstable */
             if (obj->cursed || obj->otyp == POT_ACID || !rn2(10))
             {
-                Sprintf(priority_debug_buf_2, "dodip4: %d", potion->otyp);
+                debugprint("dodip4: %d", potion->otyp);
                 if (useupliquidonly)
                     potion->charges = 0;
+                
                 if (!potion->oartifact && !is_obj_indestructible(potion))
                     useup(potion); /* now gone */
+                else
+                    potion->in_use = FALSE; /* didn't go poof */
 
                 char dcbuf2[IBUFSZ] = "";
                 char dcbuf3[IBUFSZ] = "";
@@ -3960,17 +4030,19 @@ dodip()
                 exercise(A_STR, FALSE);
                 if (!has_innate_breathless(youmonst.data) || haseyes(youmonst.data))
                     potionbreathe(obj, dcbuf3);
-                Sprintf(priority_debug_buf_3, "dodip: %d", obj->otyp);
+                debugprint("dodip9: %d", obj->otyp);
                 useupall(obj);
                 losehp(adjust_damage(amt + rnd(9), (struct monst*)0, &youmonst, AD_MAGM, ADFLAGS_NONE), /* not physical damage */
                     "alchemic blast", KILLED_BY_AN);
                 return 1;
             }
 
-            Sprintf(priority_debug_buf_2, "dodip5: %d", potion->otyp);
+            debugprint("dodip5: %d", potion->otyp);
             /* get rid of 'dippee' before potential perm_invent updates */
             if (!useupliquidonly && !potion->oartifact && !is_obj_indestructible(potion))
                 useup(potion); /* now gone */
+            else
+                potion->in_use = FALSE;
 
             obj->blessed = obj->cursed = obj->bknown = 0;
             if (Blind || Hallucination)
@@ -3996,14 +4068,14 @@ dodip()
                 case 4: {
                     struct obj* otmp = mkobj(POTION_CLASS, FALSE, FALSE);
                     obj->otyp = otmp->otyp;
-                    Sprintf(priority_debug_buf_4, "dodip: %d", otmp->otyp);
+                    debugprint("dodip10: %d", otmp->otyp);
                     obfree(otmp, (struct obj*)0);
                     if(neutralizingliquid && (obj->otyp == POT_SICKNESS || obj->otyp == POT_POISON))
                         obj->otyp = POT_WATER;
                     break;
                 }
                 default:
-                    Sprintf(priority_debug_buf_3, "dodip2: %d", obj->otyp);
+                    debugprint("dodip2: %d", obj->otyp);
                     useupall(obj);
                     if (!Blind)
                     {
@@ -4075,15 +4147,23 @@ dodip()
         } 
         else if (obj->opoisoned && (potion->otyp == POT_HEALING
                                       || potion->otyp == POT_EXTRA_HEALING || potion->otyp == POT_GREATER_HEALING
-                                      || potion->otyp == POT_FULL_HEALING  || potion->otyp == JAR_OF_EXTRA_HEALING_SALVE
+                                      || potion->otyp == POT_FULL_HEALING  || 
+                                      (potion->charges > 0 && (potion->otyp == JAR_OF_EXTRA_HEALING_SALVE
                                       || potion->otyp == JAR_OF_GREATER_HEALING_SALVE || potion->otyp == JAR_OF_PRODIGIOUS_HEALING_SALVE
-                                      || potion->otyp == JAR_OF_MEDICINAL_SALVE
+                                      || potion->otyp == JAR_OF_MEDICINAL_SALVE))
             ))
         {
             play_sfx_sound(SFX_POISON_DISSOLVES);
             pline_ex(ATR_NONE, CLR_MSG_WARNING, "A coating wears off %s.", the(xname(obj)));
             obj->opoisoned = 0;
-            goto poof;
+            if (!useupliquidonly)
+                goto poof;
+            else
+            {
+                potion->in_use = FALSE; /* didn't go poof */
+                potion->charges--;
+                update_inventory();
+            }
         }
     }
 
@@ -4138,7 +4218,7 @@ dodip()
         }
         exercise(A_WIS, wisx);
         makeknown(potion->otyp);
-        Sprintf(priority_debug_buf_2, "dodip6: %d", potion->otyp);
+        debugprint("dodip6: %d", potion->otyp);
         useup(potion);
         return 1;
     }
@@ -4152,7 +4232,14 @@ dodip()
     }
     else if (potion->otyp == JAR_OF_BASILISK_BLOOD)
     {
-        return stone_to_flesh_obj(obj);
+        potion->in_use = FALSE;
+        if (potion->charges > 0)
+        {
+            potion->charges--;
+            int res = stone_to_flesh_obj(obj);
+            update_inventory();
+            return res;
+        }
     }
 
     potion->in_use = FALSE; /* didn't go poof */
@@ -4204,7 +4291,7 @@ dodip()
                 docall(&fakeobj, (char*)0);
             }
         }
-        Strcpy(debug_buf_2, "dodip");
+        debugprint("dodip");
         obj_extract_self(singlepotion);
         singlepotion = hold_another_object(singlepotion,
                                            "You juggle and drop %s!",
@@ -4223,7 +4310,7 @@ dodip()
     if (!objects[potion->otyp].oc_name_known
         && !objects[potion->otyp].oc_uname)
         docall(potion, (char*)0);
-    Sprintf(priority_debug_buf_2, "dodip7: %d", potion->otyp);
+    debugprint("dodip7: %d", potion->otyp);
     useup(potion);
     return 1;
 }
@@ -4232,14 +4319,19 @@ int
 refill_obj_with_oil(obj, potion)
 struct obj* obj, * potion;
 {
-    if (!obj || !potion || !is_refillable_with_oil(obj))
+    if (!potion)
         return 0;
+    if (!obj || !is_refillable_with_oil(obj))
+    {
+        potion->in_use = FALSE;
+        return 0;
+    }
 
     /* Turn off engine before fueling, turn off fuel too :-)  */
     if (obj->lamplit || potion->lamplit)
     {
         pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s fire!", Tobjnam(potion, "catch"));
-        Sprintf(priority_debug_buf_2, "refill_obj_with_oil: %d", potion->otyp);
+        debugprint("refill_obj_with_oil: %d", potion->otyp);
         useup(potion);
         explode(u.ux, u.uy, 11, &youmonst, 6, 6, 0, obj->otyp, 0, EXPL_FIERY);
         exercise(A_WIS, FALSE);
@@ -4268,7 +4360,7 @@ struct obj* obj, * potion;
         obj->age += (!potion->odiluted ? 4L : 3L) * potion->age / 2L;
         if (obj->age > 1500L)
             obj->age = 1500L;
-        Sprintf(priority_debug_buf_2, "refill_obj_with_oil2: %d", potion->otyp);
+        debugprint("refill_obj_with_oil2: %d", potion->otyp);
         useup(potion);
         exercise(A_WIS, TRUE);
     }

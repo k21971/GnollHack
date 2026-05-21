@@ -128,6 +128,7 @@ char *outbuf;
                               ? ansimpleoname(otmp)
                               : an(obj_descr[STRANGE_OBJECT].oc_name));
             if (fakeobj && otmp) {
+                debugprint("mhidden_description");
                 otmp->where = OBJ_FREE; /* object_from_map set to OBJ_FLOOR */
                 dealloc_obj(otmp);
             }
@@ -311,6 +312,7 @@ int x, y, glyph;
 
         if (fakeobj) 
         {
+            debugprint("look_at_object");
             otmp->where = OBJ_FREE; /* object_from_map set it to OBJ_FLOOR */
             dealloc_obj(otmp), otmp = 0;
         }
@@ -448,8 +450,15 @@ int x, y;
             }
             if (how_seen & MONSEEN_XRAYVIS) {
                 /* Eyes of the Overworld */
-                Strcat(extrabuf, "astral vision");
+                Strcat(extrabuf, "X-ray vision");
                 how_seen &= ~MONSEEN_XRAYVIS;
+                if (how_seen)
+                    Strcat(extrabuf, ", ");
+            }
+            if (how_seen & MONSEEN_ASTRALVIS) {
+                /* Eyes of the Overworld */
+                Strcat(extrabuf, "astral vision");
+                how_seen &= ~MONSEEN_ASTRALVIS;
                 if (how_seen)
                     Strcat(extrabuf, ", ");
             }
@@ -1615,8 +1624,8 @@ coord *click_cc;
             char invlet;
             struct obj *invobj;
 
-            invlet = display_inventory((const char *) 0, TRUE, SHOWWEIGHTS_INVENTORY);
-            if (!invlet || invlet == '\033')
+            invlet = display_inventory((const char *) 0, TRUE, SHOWWEIGHTS_INVENTORY, TRUE);
+            if (!invlet || invlet == CANCEL_LET || invlet == SWAP_LET)
                 return 0;
             *out_str = '\0';
             for (invobj = invent; invobj; invobj = invobj->nobj)

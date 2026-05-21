@@ -29,7 +29,7 @@ NEARDATA int nroom = 0;
 NEARDATA int nsubroom = 0;
 NEARDATA int occtime = 0;
 
-int exit_hack_code = 0;
+int exit_hack_code = EXITHACK_NORMAL;
 
 /* maze limits must be even; masking off lowest bit guarantees that */
 int x_maze_max = (COLNO - 1) & ~1, y_maze_max = (ROWNO - 1) & ~1;
@@ -202,7 +202,7 @@ NEARDATA struct obj
     *uball = (struct obj *) 0;
 /* some objects need special handling during destruction or placement */
 NEARDATA struct obj
-    *current_wand = 0,  /* wand currently zapped/applied */
+    *current_wand = 0,  /* wand currently zapped/applied; various effects may skip this object to avoid creating a dangling pointer, and also it gets set to zero in destroy_one_item */
     *thrownobj = 0,     /* object in flight due to throwing */
     *kickedobj = 0;     /* object in flight due to kicking */
     
@@ -294,6 +294,7 @@ NEARDATA const struct replacement_info zeroreplacementinfo = DUMMY;
 NEARDATA const struct extended_menu_info zeroextendedmenuinfo = DUMMY;
 NEARDATA const struct extended_create_window_info zerocreatewindowinfo = DUMMY;
 NEARDATA const struct d_level zerodlevel = DUMMY;
+NEARDATA const coord zerocoord = DUMMY;
 
 #ifdef GNH_MOBILE
 NEARDATA int gnh_has_rogue_level = 0;
@@ -370,6 +371,8 @@ NEARDATA const char getobj_favorites[] = {
     ROCK_CLASS,      BALL_CLASS,   CHAIN_CLASS,  SPBOOK_CLASS, 0
 };
 
+NEARDATA const char getobj_quick_bags[] = { TOOL_CLASS, 0 };
+NEARDATA const char getobj_quick_pickaxes[] = { ALL_CLASSES, WEAPON_CLASS, TOOL_CLASS, 0 };
 NEARDATA const char getobj_enchant_weapon_objects[] = { ALL_CLASSES, WEAPON_CLASS, TOOL_CLASS, 0 };
 NEARDATA const char getobj_enchant_armor_objects[] = { ALL_CLASSES, ARMOR_CLASS, 0 };
 NEARDATA const char getobj_enchant_accessory_objects[] = { ALL_CLASSES, RING_CLASS, MISCELLANEOUS_CLASS, 0 };
@@ -588,15 +591,9 @@ NEARDATA const char* const hofe_titles[3] = { "the Hand of Elbereth",
                                             "the Envoy of Balance",
                                             "the Glory of Arioch" };
 
-NEARDATA char debug_buf_1[BUFSZ * 2] = "";
-NEARDATA char debug_buf_2[BUFSZ * 2] = "";
-NEARDATA char debug_buf_3[BUFSZ * 2] = "";
-NEARDATA char debug_buf_4[BUFSZ * 2] = "";
-
-NEARDATA char priority_debug_buf_1[BUFSZ * 2] = "";
-NEARDATA char priority_debug_buf_2[BUFSZ * 2] = "";
-NEARDATA char priority_debug_buf_3[BUFSZ * 2] = "";
-NEARDATA char priority_debug_buf_4[BUFSZ * 2] = "";
+NEARDATA char debug_buf_array[NUM_DEBUGBUFS][DEBUGBUFSIZ] = { 0 };
+NEARDATA int debug_buf_count = 0;
+NEARDATA int debug_buf_start = 0;
 
 /* dummy routine used to force linkage */
 void

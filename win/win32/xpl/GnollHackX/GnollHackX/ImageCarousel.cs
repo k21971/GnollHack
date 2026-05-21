@@ -67,6 +67,8 @@ namespace GnollHackX
                         SKBitmap res = SKBitmap.Decode(stream);
                         res.SetImmutable();
                         _caruselBitmaps[i].Bitmap = SKImage.FromBitmap(res);
+                        if (_caruselBitmaps[i].Bitmap != null)
+                            GHApp.AddUsedBitmapBytes(_caruselBitmaps[i].Bitmap.Info.BytesSize64);
                     }
                 }
             }
@@ -83,6 +85,7 @@ namespace GnollHackX
                 {
                     if (_caruselBitmaps[i].Bitmap != null)
                     {
+                        GHApp.AddUsedBitmapBytes(-1L * _caruselBitmaps[i].Bitmap.Info.BytesSize64);
                         _caruselBitmaps[i].Bitmap.Dispose();
                         _caruselBitmaps[i].Bitmap = null;
                     }
@@ -203,8 +206,8 @@ namespace GnollHackX
                     int idx = GetFirstBitmapIndex();
                     if(_caruselBitmaps[idx].Bitmap != null)
                     {
-                        source_width = (float)_caruselBitmaps[idx].Bitmap.Width;
-                        source_height = (float)_caruselBitmaps[idx].Bitmap.Height;
+                        source_width = (float)Math.Max(1, _caruselBitmaps[idx].Bitmap.Width);
+                        source_height = (float)Math.Max(1, _caruselBitmaps[idx].Bitmap.Height);
                         sourceRect = new SKRect(0, 0, source_width, source_height);
                         scale_x = canvaswidth / source_width;
                         scale_y = canvasheight / source_height;
@@ -250,8 +253,8 @@ namespace GnollHackX
                                 int idx2 = GetSecondBitmapIndex();
                                 if (_caruselBitmaps[idx2].Bitmap != null)
                                 {
-                                    source_width = (float)_caruselBitmaps[idx2].Bitmap.Width;
-                                    source_height = (float)_caruselBitmaps[idx2].Bitmap.Height;
+                                    source_width = (float)Math.Max(1, _caruselBitmaps[idx2].Bitmap.Width);
+                                    source_height = (float)Math.Max(1, _caruselBitmaps[idx2].Bitmap.Height);
                                     sourceRect = new SKRect(0, 0, source_width, source_height);
                                     scale_x = canvaswidth / source_width;
                                     scale_y = canvasheight / source_height;

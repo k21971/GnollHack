@@ -169,15 +169,20 @@ boolean quietly;
     for (otmp = invent; otmp; otmp = otmp2) 
     {
         otmp2 = otmp->nobj;
-        if (otmp->in_use) 
+        otmp->item_flags &= ~ITEM_FLAGS_LAVA_EFFECTS_SKIP;
+        if (Is_proper_container(otmp))
+            unmark_unpaid_container_contents(otmp);
+        if (otmp->in_use)
         {
             if (otmp->otyp == AMULET_OF_YENDOR
                 || otmp->otyp == CANDELABRUM_OF_INVOCATION
                 || otmp->otyp == BELL_OF_OPENING
                 || otmp->otyp == SPE_BOOK_OF_THE_DEAD
-                || is_quest_artifact(otmp)
-                || otmp->oartifact > 0
-                || Is_proper_container(otmp)
+                || (!quietly && ( /* Prevent finishing only if done non-quietly (not in end but in restore) */
+                       is_quest_artifact(otmp)
+                    || otmp->oartifact > 0
+                    || Is_proper_container(otmp)
+                    ))
                 )
             {
                 otmp->in_use = 0; /* Likely memory corruption; prevent destruction of any critical items */
@@ -191,9 +196,7 @@ boolean quietly;
             {
                 if (!quietly)
                     pline("Finishing off %s...", xname(otmp));
-                Sprintf(priority_debug_buf_2, "inven_inuse: %d", otmp->otyp);
-                Strcpy(priority_debug_buf_3, "inven_inuse");
-                Strcpy(priority_debug_buf_4, "inven_inuse");
+                debugprint("inven_inuse: %d", otmp->otyp);
                 useup(otmp);
             }
         }
@@ -206,7 +209,7 @@ register int fd;
 {
     int cnt;
     s_level *tmplev, *x;
-    Strcpy(debug_buf_4, "restlevchn");
+    //debugprint("restlevchn");
 
     sp_levchn = (s_level *) 0;
     mread(fd, (genericptr_t) &cnt, sizeof(int));
@@ -234,7 +237,7 @@ boolean ghostly;
 {
     int counter;
     struct damage *tmp_dam;
-    Strcpy(debug_buf_4, "restdamage");
+    //debugprint("restdamage");
 
     mread(fd, (genericptr_t) &counter, sizeof(counter));
     if (!counter)
@@ -254,6 +257,7 @@ boolean ghostly;
              * shop_keeper().  just wait and process the damage on
              * the second pass.
              */
+            debugprint_pos();
             for (shp = damaged_shops; *shp; shp++) {
                 struct monst *shkp = shop_keeper(*shp);
 
@@ -278,7 +282,7 @@ int fd;
 struct obj *otmp;
 {
     size_t buflen;
-    Strcpy(debug_buf_4, "restobj");
+    //debugprint("restobj");
 
     mread(fd, (genericptr_t) otmp, sizeof(struct obj));
 
@@ -341,8 +345,7 @@ boolean ghostly, frozen;
     register struct obj *otmp, *otmp2 = 0;
     register struct obj *first = (struct obj *) 0;
     size_t buflen;
-    Strcpy(debug_buf_3, "restobjchn");
-    Strcpy(debug_buf_4, "restobjchn");
+    //debugprint("restobjchn");
 
     while (1) {
         mread(fd, (genericptr_t) &buflen, sizeof buflen);
@@ -435,7 +438,7 @@ int fd;
 struct monst *mtmp;
 {
     size_t buflen;
-    Strcpy(debug_buf_4, "restmon");
+    //debugprint("restmon");
 
     mread(fd, (genericptr_t) mtmp, sizeof(struct monst));
 
@@ -528,8 +531,7 @@ boolean ghostly;
     register struct monst *mtmp, *mtmp2 = 0;
     register struct monst *first = (struct monst *) 0;
     size_t buflen;
-    Strcpy(debug_buf_3, "restmonchn");
-    Strcpy(debug_buf_4, "restmonchn");
+    //debugprint("restmonchn");
 
     while (1) {
         mread(fd, (genericptr_t) &buflen, sizeof(buflen));
@@ -606,7 +608,7 @@ loadfruitchn(fd)
 int fd;
 {
     register struct fruit *flist, *fnext;
-    Strcpy(debug_buf_4, "loadfruitchn");
+    //debugprint("loadfruitchn");
 
     flist = 0;
     while (fnext = newfruit(), mread(fd, (genericptr_t) fnext, sizeof *fnext), fnext->fid != 0)
@@ -674,9 +676,7 @@ unsigned int *stuckid, *steedid;
     char timebuf[15];
     uint64_t uid;
     boolean defer_perm_invent;
-    Strcpy(debug_buf_2, "restgamestate1");
-    Strcpy(debug_buf_3, "restgamestate");
-    Strcpy(debug_buf_4, "restgamestate");
+    //debugprint("restgamestate1");
 
     mread(fd, (genericptr_t) &uid, sizeof uid);
     if (SYSOPT_CHECK_SAVE_UID
@@ -784,12 +784,12 @@ unsigned int *stuckid, *steedid;
     restore_timers(fd, RANGE_GLOBAL, FALSE, 0L);
     restore_light_sources(fd);
     restore_sound_sources(fd);
-    Strcpy(debug_buf_2, "restgamestate2");
+    //debugprint("restgamestate2");
     invent = restobjchn(fd, FALSE, FALSE);
     /* tmp_bc only gets set here if the ball & chain were orphaned
        because you were swallowed; otherwise they will be on the floor
        or in your inventory */
-    Strcpy(debug_buf_2, "restgamestate3");
+    //debugprint("restgamestate3");
     tmp_bc = restobjchn(fd, FALSE, FALSE);
     if (tmp_bc) {
         for (otmp = tmp_bc; otmp; otmp = otmp->nobj) {
@@ -800,13 +800,13 @@ unsigned int *stuckid, *steedid;
             impossible("restgamestate: lost ball & chain");
     }
 
-    Strcpy(debug_buf_2, "restgamestate4");
+    //debugprint("restgamestate4");
     magic_objs = restobjchn(fd, FALSE, FALSE);
-    Strcpy(debug_buf_2, "restgamestate5");
+    //debugprint("restgamestate5");
     migrating_objs = restobjchn(fd, FALSE, FALSE);
-    Strcpy(debug_buf_2, "restgamestate6");
+    //debugprint("restgamestate6");
     migrating_mons = restmonchn(fd, FALSE);
-    Strcpy(debug_buf_2, "restgamestate7");
+    //debugprint("restgamestate7");
     mread(fd, (genericptr_t) mvitals, sizeof(mvitals));
 
     /*
@@ -885,7 +885,8 @@ unsigned int stuckid, steedid;
                 break;
         if (!mtmp)
         {
-            panic("Cannot find the monster ustuck.");
+            program_state.panic_handling = 3; /* Safe to do a full game reset and ok to replace the save file with backup */
+            panic("Cannot find the monster ustuck: stuckid=%u", stuckid);
             return;
         }
         u.ustuck = mtmp;
@@ -896,7 +897,8 @@ unsigned int stuckid, steedid;
                 break;
         if (!mtmp)
         {
-            panic("Cannot find the monster usteed.");
+            program_state.panic_handling = 3; /* Safe to do a full game reset and ok to replace the save file with backup */
+            panic("Cannot find the monster usteed: steedid=%u", steedid);
             return;
         }
         u.usteed = mtmp;
@@ -957,7 +959,7 @@ xchar ltmp;
         nh_terminate(EXIT_SUCCESS);
     }
 #endif /* MFLOPPY */
-    Sprintf(priority_debug_buf_4, "restlevelfile (fd=%d)", nfd);
+    //debugprint("restlevelfile (fd=%d)", nfd);
     bufon(nfd);
     savelev(nfd, ltmp, WRITE_SAVE | FREE_SAVE);
     bclose(nfd);
@@ -1009,10 +1011,8 @@ register int fd;
     struct save_game_stats game_stats = { 0 };
     struct save_game_stats dummy_stats = { 0 };
     boolean was_corrupted = FALSE;
-    Strcpy(debug_buf_1, "dorestore0");
-    Strcpy(debug_buf_2, "dorestore0");
-    Strcpy(debug_buf_3, "dorestore0");
-    Strcpy(debug_buf_4, "dorestore0");
+    debugprint("dorestore0");
+    issue_breadcrumb("Start dorestore0");
 
     restoring = TRUE;
     boolean readok = get_plname_from_file(fd, plname, sizeof(plname));
@@ -1050,7 +1050,7 @@ register int fd;
 #ifdef INSURANCE
     savestateinlock();
 #endif
-    Sprintf(priority_debug_buf_3, "dorestore0A (fd=%d, ltmp=%d)", fd, (int)ledger_no(&u.uz));
+    debugprint("dorestore0A (fd=%d, ltmp=%d)", fd, (int)ledger_no(&u.uz));
     rtmp = restlevelfile(fd, ledger_no(&u.uz));
     if (rtmp < 2)
         return rtmp; /* dorestore called recursively */
@@ -1106,7 +1106,7 @@ register int fd;
         }
         mark_synch();
 #endif
-        Sprintf(priority_debug_buf_3, "dorestore0B (fd=%d, ltmp=%d)", fd, (int)ltmp);
+        //debugprint("dorestore0B (fd=%d, ltmp=%d)", fd, (int)ltmp);
         rtmp = restlevelfile(fd, ltmp);
         if (rtmp < 2)
             return rtmp; /* dorestore called recursively */
@@ -1186,6 +1186,7 @@ register int fd;
 
     vision_reset();
     vision_full_recalc = 1; /* recompute vision (not saved) */
+    debugprint_pos();
     docrt();
     clear_nhwindow(WIN_MESSAGE);
     status_reassess();
@@ -1201,6 +1202,7 @@ register int fd;
         (void)delete_tmp_backup_savefile();
 
     post_restore_to_forum(restored_realtime);
+    issue_breadcrumb("Finish dorestore0");
     return 1;
 }
 
@@ -1288,7 +1290,7 @@ struct cemetery **cemeteryaddr;
 {
     struct cemetery *bonesinfo, **bonesaddr;
     int flag;
-    Strcpy(debug_buf_4, "restcemetery");
+    //debugprint("restcemetery");
 
     mread(fd, (genericptr_t) &flag, sizeof flag);
     if (flag == 0) {
@@ -1339,7 +1341,7 @@ boolean rlecomp;
 #else /* !RLECOMP */
     nhUse(rlecomp);
 #endif /* ?RLECOMP */
-    Strcpy(debug_buf_4, "rest_levl");
+    //debugprint("rest_levl");
     mread(fd, (genericptr_t) levl, sizeof levl);
 }
 
@@ -1370,9 +1372,7 @@ boolean ghostly;
 #ifdef TOS
     short tlev;
 #endif
-    Sprintf(debug_buf_2, "getlev1: %d", lev);
-    Sprintf(debug_buf_3, "getlev: %d", lev);
-    Sprintf(debug_buf_4, "getlev: %d", lev);
+    //debugprint("getlev1: %d", lev);
 
     if (ghostly)
         clear_id_mapping();
@@ -1434,7 +1434,7 @@ boolean ghostly;
     restore_timers(fd, RANGE_LEVEL, ghostly, elapsed);
     restore_light_sources(fd);
     restore_sound_sources(fd);
-    Sprintf(debug_buf_2, "getlev2: %d", lev);
+    //debugprint("getlev2: %d", lev);
     fmon = restmonchn(fd, ghostly);
 
     rest_worm(fd); /* restore worm information */
@@ -1446,20 +1446,21 @@ boolean ghostly;
         ftrap = trap;
     }
     dealloc_trap(trap);
-    Sprintf(debug_buf_2, "getlev3: %d", lev);
+    //debugprint("getlev3: %d", lev);
     fobj = restobjchn(fd, ghostly, FALSE);
     find_lev_obj();
     /* restobjchn()'s `frozen' argument probably ought to be a callback
        routine so that we can check for objects being buried under ice */
-    Sprintf(debug_buf_2, "getlev4: %d", lev);
+    //debugprint("getlev4: %d", lev);
     level.buriedobjlist = restobjchn(fd, ghostly, FALSE);
-    Sprintf(debug_buf_2, "getlev5: %d", lev);
+    //debugprint("getlev5: %d", lev);
     billobjs = restobjchn(fd, ghostly, FALSE);
-    Sprintf(debug_buf_2, "getlev6: %d", lev);
+    //debugprint("getlev6: %d", lev);
     memoryobjs = restobjchn(fd, ghostly, FALSE);
-    Sprintf(debug_buf_2, "getlev7: %d", lev);
+    //debugprint("getlev7: %d", lev);
     find_memory_obj();
     rest_engravings(fd);
+    //debugprint_pos();
 
     /* reset level.monsters for new level */
     for (x = 0; x < COLNO; x++)
@@ -1500,12 +1501,14 @@ boolean ghostly;
     restdamage(fd, ghostly);
     rest_regions(fd, ghostly);
 
-    if (ghostly) {
+    if (ghostly) 
+    {
         /* Now get rid of all the temp fruits... */
         freefruitchn(oldfruit), oldfruit = 0;
 
         if (lev > ledger_no(&medusa_level)
-            && lev < ledger_no(&stronghold_level) && xdnstair == 0) {
+            && lev < ledger_no(&stronghold_level) && xdnstair == 0)
+        {
             coord cc;
 
             mazexy(&cc);
@@ -1515,7 +1518,8 @@ boolean ghostly;
         }
 
         br = Is_branchlev(&u.uz);
-        if (br && u.uz.dlevel == 1) {
+        if (br && u.uz.dlevel == 1) 
+        {
             d_level ltmp;
 
             if (on_level(&u.uz, &br->end1))
@@ -1523,7 +1527,8 @@ boolean ghostly;
             else
                 assign_level(&ltmp, &br->end1);
 
-            switch (br->type) {
+            switch (br->type) 
+            {
             case BR_STAIR:
             case BR_NO_END1:
             case BR_NO_END2: /* OK to assign to sstairs if it's not used */
@@ -1541,14 +1546,20 @@ boolean ghostly;
                 assign_level(&trap->dst, &ltmp);
                 break;
             }
-        } else if (!br) {
+        } 
+        else if (!br) 
+        {
             struct trap *ttmp = 0;
 
             /* Remove any dangling portals. */
-            for (trap = ftrap; trap; trap = ttmp) {
+            for (trap = ftrap; trap; trap = ttmp) 
+            {
                 ttmp = trap->ntrap;
                 if (trap->ttyp == MAGIC_PORTAL)
+                {
                     deltrap(trap);
+                    issue_breadcrumb("Dangling portal deleted.");
+                }
             }
         }
     }
@@ -1594,7 +1605,7 @@ register int fd;
     int slen = 0;
     struct gamelog_line tmp;
     char* tmpstr = 0;
-    Strcpy(debug_buf_4, "restore_gamelog");
+    //debugprint("restore_gamelog");
 
     while (1) {
         mread(fd, &slen, sizeof slen);
@@ -1618,7 +1629,7 @@ register int fd;
     char msg[BUFSZ];
     char attrs[BUFSZ];
     char colors[BUFSZ];
-    Strcpy(debug_buf_4, "restore_msghistory");
+    //debugprint("restore_msghistory");
 
     while (1) {
         mread(fd, (genericptr_t) &msgsize, sizeof(msgsize));
@@ -2594,7 +2605,7 @@ register size_t len;
                 error("Error restoring old game.");
             }
             /* No need for panic handling, since it is mostly relevant only in restoring and ask_delete_invalid_savefile handles backups above */
-            panic("Error reading level file: buf1=%s, buf2=%s, buf3=%s, buf4=%s", debug_buf_1, debug_buf_2, debug_buf_3, debug_buf_4);
+            panic("Error reading level file");
             return;
         }
     }

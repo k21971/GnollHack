@@ -259,7 +259,7 @@ struct context_info
     boolean quick_cast_spell_set;
     boolean reserved_boolA; // suppress_container_deletion_warning;
     boolean save_checkpoint;
-    boolean reserved_boolC;
+    boolean is_click_looking; // if so, do not clip
     boolean reserved_boolD;
     boolean reserved_boolE;
     boolean reserved_boolF;
@@ -272,10 +272,11 @@ struct context_info
     int64_t reserved_int64_4;
     
     int yeenaghu_wishes;
+    unsigned quick_engrave_obj_oid;
+    unsigned quick_pickaxe_obj_oid;
+    unsigned quick_bag_obj_oid;
+    /* Note: out of emergency ints now */
 
-    int reserved_int2;
-    int reserved_int3;
-    int reserved_int4;
     short reserved_short1;
     short reserved_short2;
     short reserved_short3;

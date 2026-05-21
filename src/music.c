@@ -369,7 +369,7 @@ int force;
                                                            : "");
                         if (mtmp)
                             mtmp->mtrapped = 0;
-                        Strcpy(debug_buf_2, "do_earthquake");
+                        debugprint("do_earthquake");
                         obj_extract_self(otmp);
                         (void) flooreffects(otmp, x, y, "");
                         break;
@@ -533,6 +533,7 @@ struct obj *instr;
     if (!instr)
         return 0;
 
+    int otyp = instr->otyp;
     double damage = 0;
     int mode, do_spec = !(Stunned || Confusion);
     struct obj itmp;
@@ -645,7 +646,7 @@ struct obj *instr;
             buzz(objects[instr->otyp].oc_dir_subtype, instr, &youmonst, 0, 0, 0,
                  u.ux, u.uy, u.dx, u.dy);
         }
-        makeknown(instr->otyp);
+        makeknown(otyp);
         break;
     case HORN_OF_CHAOS:
     {
@@ -696,7 +697,7 @@ struct obj *instr;
         You_ex(ATR_NONE, CLR_MSG_ATTENTION, "produce a %sgrave sound.", is_scary ? "frightful, " : "");
         awaken_monsters(u.ulevel * 30 * (1 + (int)min(4, instr->exceptionality)), is_scary);
         exercise(A_WIS, FALSE);
-        makeknown(instr->otyp);
+        makeknown(otyp);
         break;
     }
     case BUGLE: /* Awaken & attract soldiers */
@@ -925,6 +926,7 @@ struct obj *instr;
                                 {
                                     achievement_gained("Solved Castle Drawbridge Tune");
                                     u.uachieve.learned_castle_tune = 1;
+                                    issue_achievement(GUI_ACHIEVEMENT_SOLVED_CASTLE_TUNE);
                                 }
 
                                 return 1;

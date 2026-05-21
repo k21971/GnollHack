@@ -144,7 +144,7 @@ void
 restore_artifacts(fd)
 int fd;
 {
-    Strcpy(debug_buf_4, "restore_artifacts");
+    //debugprint("restore_artifacts");
     mread(fd, (genericptr_t) artiexist, sizeof artiexist);
     mread(fd, (genericptr_t) artidisco, sizeof artidisco);
     hack_artifacts(); /* redo non-saved special cases */
@@ -1159,9 +1159,9 @@ struct monst *mon;
 
 /* special damage bonus */
 double
-spec_dbon(otmp, mon, damage)
+spec_dbon(otmp, mon, mattacker, damage)
 struct obj *otmp;
-struct monst *mon;
+struct monst *mon, *mattacker;
 double damage;
 {
     register const struct artifact *weap = get_artifact(otmp);
@@ -1176,7 +1176,7 @@ double damage;
     {
         double dbon = 0;
         if (weap->attk.damd > 0 && weap->attk.damn > 0)
-            dbon += adjust_damage(d(weap->attk.damn, weap->attk.damd) + weap->attk.damp, (struct monst*)0, mon, !weap ? AD_PHYS : weap->attk.adtyp, ADFLAGS_NONE);
+            dbon += adjust_damage(d(weap->attk.damn, weap->attk.damd) + weap->attk.damp, mattacker, mon, !weap ? AD_PHYS : weap->attk.adtyp, ADFLAGS_NONE);
         else if(weap->attk.damn < 0)
             dbon += max(-(((double)weap->attk.damn) / 20.0) * damage, 0);
 
@@ -1339,6 +1339,8 @@ char *hittee;              /* target's name: "you" or mon_nam(mdef) */
         attack_indx = MB_INDEX_CANCEL;
         *dmgptr += adjust_damage(rnd(4), magr, mdef, objects[mb->otyp].oc_damagetype, ADFLAGS_NONE); /* (4..6)d4 */
     }
+    if (attack_indx > MB_INDEX_PROBE)
+        display_gui_effect(do_stun ? GUI_EFFECT_STUN_HIT : GUI_EFFECT_MAGIC_HIT, 0, mdef->mx, mdef->my, 0, 0, 0UL);
 
     /* give the hit message prior to inflicting the effects */
     verb = mb_verb[!!Hallucination][attack_indx];
@@ -1527,7 +1529,7 @@ int dieroll; /* needed for Magicbane and vorpal blades */
      * the exception being for level draining, which is specially
      * handled.  Messages are done in this function, however.
      */
-    *dmgptr += spec_dbon(otmp, mdef, *dmgptr);
+    *dmgptr += spec_dbon(otmp, mdef, magr, *dmgptr);
 
     if (youattack && youdefend)
     {
@@ -1548,6 +1550,11 @@ int dieroll; /* needed for Magicbane and vorpal blades */
     /* the four basic attacks: fire, cold, shock and missiles */
     if (artifact_attack_type(AD_FIRE, otmp)) 
     {
+        if (spec_dbon_applies)
+        {
+            play_sfx_sound_at_location(SFX_MONSTER_ON_FIRE, mdef->mx, mdef->my);
+            display_gui_effect(GUI_EFFECT_FIRE, 0, mdef->mx, mdef->my, 0, 0, 0UL);
+        }
         if (realizes_damage)
         {
             pline_The_ex(ATR_NONE, HI_FIRE, "%s %s %s%c", artifact_hit_desc,
@@ -1570,6 +1577,11 @@ int dieroll; /* needed for Magicbane and vorpal blades */
     }
     if (artifact_attack_type(AD_COLD, otmp)) 
     {
+        if (spec_dbon_applies)
+        {
+            play_sfx_sound_at_location(SFX_MONSTER_COVERED_IN_FROST, mdef->mx, mdef->my);
+            display_gui_effect(GUI_EFFECT_FREEZE, 0, mdef->mx, mdef->my, 0, 0, 0UL);
+        }
         if (realizes_damage)
             pline_The_ex(ATR_NONE, HI_ICE, "%s %s %s%c", artifact_hit_desc,
                       !spec_dbon_applies ? "hits" : "freezes", hittee,
@@ -1581,7 +1593,10 @@ int dieroll; /* needed for Magicbane and vorpal blades */
     if (artifact_attack_type(AD_ELEC, otmp))
     {
         if (spec_dbon_applies)
+        {
             play_sfx_sound_at_location(SFX_LIGHTNING_STRIKES, mdef->mx, mdef->my);
+            display_gui_effect(GUI_EFFECT_LIGHTNING, 0, mdef->mx, mdef->my, 0, 0, 0UL);
+        }
 
         if (realizes_damage)
             pline_The_ex(ATR_NONE, HI_SHOCK, "%s hits%s %s%c", artifact_hit_desc,
@@ -1599,6 +1614,10 @@ int dieroll; /* needed for Magicbane and vorpal blades */
     }
     if (artifact_attack_type(AD_MAGM, otmp))
     {
+        if (spec_dbon_applies)
+        {
+            display_gui_effect(GUI_EFFECT_MAGIC_HIT, 0, mdef->mx, mdef->my, 0, 0, 0UL);
+        }
         if (realizes_damage)
             pline_The_ex(ATR_NONE, HI_ZAP, "%s hits%s %s%c", artifact_hit_desc,
                       !spec_dbon_applies
@@ -2789,6 +2808,8 @@ struct obj *obj;
             struct obj pseudo;
             pseudo = zeroobj; /* neither cursed nor blessed, zero oextra too */
             pseudo.otyp = SCR_TAMING;
+            pseudo.oclass = objects[pseudo.otyp].oc_class;
+            pseudo.quan = 20L;
             boolean effect_happened = 0;
             (void) seffects(&pseudo, &effect_happened, &youmonst);
             break;
@@ -2926,6 +2947,7 @@ struct obj *obj;
         {
             struct obj pseudo = zeroobj;
             pseudo.otyp = SPE_ARROW_OF_DIANA;
+            pseudo.oclass = objects[pseudo.otyp].oc_class;
             pseudo.quan = 20L; /* do not let useup get it */
             double damage = 0;
 
@@ -2957,6 +2979,7 @@ struct obj *obj;
         {
             struct obj pseudo = zeroobj;
             pseudo.otyp = oart->inv_prop == ARTINVOKE_WAND_OF_DEATH ? WAN_DEATH : obj->special_quality == 0 ? WAN_COLD : obj->special_quality == 1 ? WAN_LIGHTNING : WAN_FIRE;
+            pseudo.oclass = objects[pseudo.otyp].oc_class;
             pseudo.quan = 1L; /* do not let useup get it */
             double damage = 0;
 
@@ -3510,7 +3533,7 @@ STATIC_VAR const struct abil2spfx_tag {
     { HALF_PHYSICAL_DAMAGE, SPFX_HPHDAM },
     { TELEPORT_CONTROL, SPFX_TCTRL },
     /* SPFX_LUCK not here */
-    { EXTENDED_XRAY_VISION, SPFX_EXRAY },
+    { ASTRAL_VISION, SPFX_ASTRAL },
     { REFLECTING, SPFX_REFLECT },
     { MAGICAL_PROTECTION, SPFX_PROTECT },
     { AGGRAVATE_MONSTER, SPFX_AGGRAVATE_MONSTER },
@@ -3932,10 +3955,13 @@ boolean loseit;    /* whether to drop it if hero can longer touch it */
     /* removing a worn item might result in loss of levitation,
        dropping the hero onto a polymorph trap or into water or
        lava and potentially dropping or destroying the item */
-    if (obj->owornmask) {
+    if (obj->owornmask) 
+    {
         struct obj *otmp;
 
-        remove_worn_item(obj, FALSE);
+        boolean ogone = remove_worn_item(obj, FALSE);
+        if (ogone)
+            return 0;
         for (otmp = invent; otmp; otmp = otmp->nobj)
             if (otmp == obj)
                 break;
@@ -3947,13 +3973,13 @@ boolean loseit;    /* whether to drop it if hero can longer touch it */
     if (loseit && obj) {
         if (Levitation) {
             freeinv(obj);
-            hitfloor(obj, TRUE);
+            (void)hitfloor(obj, TRUE);
         } else {
             /* dropx gives a message iff item lands on an altar */
             if (!IS_ALTAR(levl[u.ux][u.uy].typ))
                 pline("%s to the %s.", Tobjnam(obj, "fall"),
                       surface(u.ux, u.uy));
-            dropx(obj);
+            (void)dropx(obj);
         }
         *objp = obj = 0; /* no longer in inventory */
     }

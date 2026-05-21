@@ -527,8 +527,10 @@ int expltype;
                 idamnonres += adjust_damage(destroy_mitem(mtmp, WAND_CLASS, (int) adtyp), (struct monst*)0, mtmp, adtyp, ADFLAGS_NONE);
                 idamnonres += adjust_damage(destroy_mitem(mtmp, RING_CLASS, (int) adtyp), (struct monst*)0, mtmp, adtyp, ADFLAGS_NONE);
 
-                int ddami = objtype > 0 ? get_spell_damage(objtype, 0, origmonst, mtmp) : max(0, d(dmg_n, dmg_d) + dmg_p);
-                double ddam = adjust_damage(ddami, (struct monst*)0, mtmp, adtyp, ADFLAGS_NONE);
+                int ddami = objtype > 0 ? get_spell_damage(objtype, 0, origmonst, mtmp) : d(dmg_n, dmg_d) + dmg_p;
+                if (ddami < 0)
+                    ddami = 0;
+                double ddam = adjust_damage(ddami, origmonst, mtmp, adtyp, ADFLAGS_NONE);
 
                 if (explmask[i][j] == 1) 
                 {
@@ -694,6 +696,7 @@ int expltype;
         destroy_item(WAND_CLASS, (int) adtyp);
 
         item_destruction_hint((int)adtyp, FALSE);
+        clear_bypasses();
 
         ugolemeffects((int) adtyp, damu);
         if (uhurt == 2 && (damu > 0 || instadeath)) 
@@ -853,7 +856,7 @@ struct obj *obj; /* only scatter this obj        */
         {
             obj = (struct obj *) 0; /* all used */
         }
-        Strcpy(debug_buf_2, "scatter1");
+        debugprint("scatter1, otyp=%d", otmp->otyp);
         obj_extract_self(otmp);
         used_up = FALSE;
 
@@ -865,15 +868,15 @@ struct obj *obj; /* only scatter this obj        */
             if (otmp->otyp == BOULDER)
             {
                 if (cansee(sx, sy))
-                    pline("%s apart.", Tobjnam(otmp, "break"));
+                    pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s apart.", Tobjnam(otmp, "break"));
                 else
-                    You_hear("stone breaking.");
-                fracture_rock(otmp, TRUE);
-                place_object(otmp, sx, sy);
+                    You_hear_ex(ATR_NONE, CLR_MSG_WARNING, "stone breaking.");
+                if (!fracture_rock(otmp, TRUE))
+                    place_object(otmp, sx, sy);
                 if ((otmp = sobj_at(BOULDER, sx, sy)) != 0) 
                 {
                     /* another boulder here, restack it to the top */
-                    Strcpy(debug_buf_2, "scatter2");
+                    debugprint("scatter2: otyp=%d", otmp->otyp);
                     obj_extract_self(otmp);
                     place_object(otmp, sx, sy);
                 }
@@ -885,11 +888,14 @@ struct obj *obj; /* only scatter this obj        */
                 if ((trap = t_at(sx, sy)) && trap->ttyp == STATUE_TRAP)
                     deltrap(trap);
                 if (cansee(sx, sy))
-                    pline("%s.", Tobjnam(otmp, "crumble"));
+                    pline_ex(ATR_NONE, CLR_MSG_WARNING, "%s.", Tobjnam(otmp, "crumble"));
                 else
-                    You_hear("stone crumbling.");
+                    You_hear_ex(ATR_NONE, CLR_MSG_WARNING, "stone crumbling.");
+                int statuetrackid = add_to_obj_tracking(otmp);
                 (void) break_statue(otmp);
-                place_object(otmp, sx, sy); /* put fragments on floor */
+                boolean statuegone = finish_obj_tracking(statuetrackid);
+                if (!statuegone)
+                    place_object(otmp, sx, sy); /* put fragments on floor */
             }
             newsym(sx, sy); /* in case it's beyond radius of 'farthest' */
             used_up = TRUE;
@@ -936,60 +942,62 @@ struct obj *obj; /* only scatter this obj        */
             {
                 bhitpos.x = stmp->ox + stmp->dx;
                 bhitpos.y = stmp->oy + stmp->dy;
-                typ = levl[bhitpos.x][bhitpos.y].typ;
                 if (!isok(bhitpos.x, bhitpos.y)) 
                 {
                     bhitpos.x -= stmp->dx;
                     bhitpos.y -= stmp->dy;
                     stmp->stopped = TRUE;
-                } 
-                else if (!ZAP_POS(typ)
-                           || closed_door(bhitpos.x, bhitpos.y)) 
+                }
+                else
                 {
-                    bhitpos.x -= stmp->dx;
-                    bhitpos.y -= stmp->dy;
-                    stmp->stopped = TRUE;
-                } 
-                else if ((mtmp = m_at(bhitpos.x, bhitpos.y)) != 0) 
-                {
-                    if (scflags & MAY_HITMON) 
+                    typ = levl[bhitpos.x][bhitpos.y].typ;
+                    if (!ZAP_POS(typ) || closed_door(bhitpos.x, bhitpos.y))
                     {
-                        stmp->range--;
-                        if (ohitmon(mtmp, stmp->obj, 1, FALSE)) 
+                        bhitpos.x -= stmp->dx;
+                        bhitpos.y -= stmp->dy;
+                        stmp->stopped = TRUE;
+                    }
+                    else if ((mtmp = m_at(bhitpos.x, bhitpos.y)) != 0)
+                    {
+                        if (scflags & MAY_HITMON)
                         {
-                            stmp->obj = (struct obj *) 0;
-                            stmp->stopped = TRUE;
+                            stmp->range--;
+                            if (ohitmon(mtmp, stmp->obj, 1, FALSE))
+                            {
+                                stmp->obj = (struct obj*)0;
+                                stmp->stopped = TRUE;
+                            }
                         }
                     }
-                } 
-                else if (bhitpos.x == u.ux && bhitpos.y == u.uy) 
-                {
-                    if (scflags & MAY_HITYOU) 
+                    else if (bhitpos.x == u.ux && bhitpos.y == u.uy)
                     {
-                        int hitvalu, hitu;
+                        if (scflags & MAY_HITYOU)
+                        {
+                            int hitvalu, hitu;
 
-                        if (multi)
-                            nomul(0);
-                        hitvalu = 8 + stmp->obj->enchantment;
-                        if (bigmonst(youmonst.data))
-                            hitvalu++;
-                        hitu = thitu(hitvalu, weapon_total_dmg_value(stmp->obj, &youmonst, (struct monst*)0, 1),
-                                     &stmp->obj, (char *) 0, (struct monst*)0, "exploded");
-                        if (!stmp->obj)
-                            stmp->stopped = TRUE;
-                        if (hitu) 
-                        {
-                            stmp->range -= 3;
-                            stop_occupation();
+                            if (multi)
+                                nomul(0);
+                            hitvalu = 8 + stmp->obj->enchantment;
+                            if (bigmonst(youmonst.data))
+                                hitvalu++;
+                            hitu = thitu(hitvalu, weapon_total_dmg_value(stmp->obj, &youmonst, (struct monst*)0, 1),
+                                &stmp->obj, (char*)0, (struct monst*)0, "exploded");
+                            if (!stmp->obj)
+                                stmp->stopped = TRUE;
+                            if (hitu)
+                            {
+                                stmp->range -= 3;
+                                stop_occupation();
+                            }
                         }
                     }
-                } 
-                else 
-                {
-                    if (scflags & VIS_EFFECTS) 
+                    else
                     {
-                        /* tmp_at(bhitpos.x, bhitpos.y); */
-                        /* adjusted_delay_output(); */
+                        if (scflags & VIS_EFFECTS)
+                        {
+                            /* tmp_at(bhitpos.x, bhitpos.y); */
+                            /* adjusted_delay_output(); */
+                        }
                     }
                 }
                 stmp->ox = bhitpos.x;
@@ -1053,7 +1061,7 @@ int x, y;
 
     if (!obj->lamplit)
         impossible("exploding unlit oil");
-    Strcpy(debug_buf_3, "explode_oil");
+    debugprint("explode_oil");
     end_burn(obj, TRUE);
     splatter_burning_oil(x, y, diluted_oil);
 }

@@ -58,7 +58,8 @@ extern const char *enc_stat[]; /* encumbrance status from botl.c */
 #define CMD_CLICKFIRE (char) 0xE0 //(Meta-0x60)
 #define CMD_CLICKCAST (char) 0xDE //(Meta-0x5E)
 #define CMD_CLICKZAP (char) 0xDD //(Meta-0x5D)
- /* Meta-DB-DC available */
+#define CMD_CLICKPOLE (char) 0xDC //(Meta-0x5C)
+ /* Meta-DB available */
 
 #ifdef DEBUG
 extern int NDECL(wiz_debug_cmd_bury);
@@ -253,7 +254,7 @@ STATIC_DCL void FDECL(print_weapon_skill_line, (struct obj*, BOOLEAN_P, int));
 
 STATIC_VAR const char *readchar_queue = "";
 STATIC_VAR coord clicklook_cc;
-//STATIC_VAR coord clickfire_cc;
+STATIC_VAR coord clickpole_cc;
 STATIC_VAR boolean special_effect_shown = FALSE;
 
 STATIC_PTR int
@@ -861,8 +862,10 @@ doability(VOID_ARGS)
                 available_ability_list[abilitynum].name, MENU_UNSELECTED);
 
             abilitynum++;
+        }
 
-//#ifndef GNH_MOBILE
+        if (Upolyd || u.usteed)
+        {
             int monabilitynum = print_monster_abilities(WIN_ERR, 0); /* Count monster abilities */
             if (monabilitynum > 0)
             {
@@ -879,7 +882,6 @@ doability(VOID_ARGS)
 
                 abilitynum++;
             }
-//#endif
         }
 
 #ifndef GNH_MOBILE
@@ -1471,9 +1473,7 @@ int abilitynum;
 
 
     /* Your steed's abilities */
-    if (u.usteed &&
-        can_breathe(u.usteed->data)
-        )
+    if (u.usteed && can_breathe(u.usteed->data))
     {
         any = zeroany;
         glyph = abs(any_mon_to_glyph(u.usteed, rn2_on_display_rng));
@@ -1509,7 +1509,7 @@ int abilitynum;
             any = zeroany;
             if (u.usteed->mspec_used > 0)
             {
-                Sprintf(available_ability_list[abilitynum].name, "Breath weapon cooling down (%u round%s left)", u.usteed->mspec_used, plur(u.usteed->mspec_used));
+                Sprintf(available_ability_list[abilitynum].name, "Breath weapon cooling down (%u turn%s left)", u.usteed->mspec_used, plur(u.usteed->mspec_used));
                 mcolor = CLR_GRAY;
             }
             else
@@ -1522,7 +1522,7 @@ int abilitynum;
                 else
                     printdice(cooldownbuf, MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_DICE, MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_DIESIZE, MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_CONSTANT);
                 const char* steedbreathefmt = ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0) ?
-                    "%s (&cool; %s after use)" : "%s (%s round cooldown after use)";
+                    "%s (&cool; %s after use)" : "%s (%s turn cooldown after use)";
                 Sprintf(available_ability_list[abilitynum].name, steedbreathefmt, "Command the steed to use breath weapon", cooldownbuf);
                 any.a_int = abilitynum + 1;
                 mcolor = NO_COLOR;
@@ -1674,7 +1674,7 @@ wiz_identify(VOID_ARGS)
            display_pickinv() and xname() see override_ID as nonzero */
         if (!iflags.override_ID)
             iflags.override_ID = C('I');
-        (void) display_inventory((char *) 0, FALSE, SHOWWEIGHTS_NONE);
+        (void) display_inventory((char *) 0, FALSE, SHOWWEIGHTS_NONE, FALSE);
         iflags.override_ID = 0;
         update_inventory();
     } else
@@ -1756,6 +1756,7 @@ wiz_makemap(VOID_ARGS)
             unplacebc();
             placebc();
         }
+        debugprint_pos();
         docrt();
         flush_screen(1);
         deliver_splev_message(); /* level entry */
@@ -2040,6 +2041,7 @@ wiz_debug(VOID_ARGS)
                 {
                     struct obj pseudo = { 0 };
                     pseudo.otyp = FIRST_SPELL + i;
+                    pseudo.oclass = objects[pseudo.otyp].oc_class;
                     initialspell(&pseudo);
                 }
             }
@@ -2064,7 +2066,7 @@ wiz_deleteitem(VOID_ARGS)
         if (!obj)
             return 0;
         char* objname = upstart(thecxname(obj));
-        Sprintf(priority_debug_buf_3, "wiz_deleteitem: %d", obj->otyp);
+        debugprint("wiz_deleteitem: %d", obj->otyp);
         useupall(obj);
         pline("%s has been deleted.", objname);
     }
@@ -4627,7 +4629,7 @@ int final;
     if (Fear_resistance)
         you_are("immune to fear", from_what(FEAR_RESISTANCE));
     if (Mind_shielding)
-        you_are("mind-shielded", from_what(MIND_SHIELDING));
+        you_are("protected from mind control, ESP, and psionics", from_what(MIND_SHIELDING));
     if (Lycanthropy_resistance)
         you_are("immune to lycanthropy", from_what(LYCANTHROPY_RESISTANCE));
     if (Curse_resistance)
@@ -4672,8 +4674,16 @@ int final;
         enl_msg(You_, "resist", "resisted", " wounding", from_what(WOUNDING_RESISTANCE));
     if (Protection_from_armor_destruction)
         you_are("protected from armor destruction", from_what(PROTECTION_FROM_ARMOR_DESTRUCTION));
+    
     if (u.uedibility || maybe_polyd(is_gnoll(youmonst.data), Race_if(PM_GNOLL)))
         you_can("recognize detrimental food", "");
+    else if (Edibility_appraisal)
+        you_can("recognize detrimental food", from_what(EDIBILITY_APPRAISAL));
+    
+    if (maybe_polyd(is_gnoll(youmonst.data), Race_if(PM_GNOLL)) || Role_if(PM_HEALER))
+        you_can("recognize corpse properties", "");
+    else if (Corpse_property_appraisal)
+        you_can("recognize corpse properties", from_what(CORPSE_PROPERTY_APPRAISAL));
 
 
     /*** Vision and senses ***/
@@ -4698,11 +4708,11 @@ int final;
         you_are("telepathic", from_what(TELEPAT));
     if (Blind_telepat)
         you_are("telepathic when blind", from_what(BLIND_TELEPATHY));
-    if (Extended_XRay_vision)
-        you_have("Extended X-ray vision", from_what(EXTENDED_XRAY_VISION));
+    if (Astral_vision)
+        you_have("astral vision", from_what(ASTRAL_VISION));
     if (XRay_vision)
     {
-        if (Extended_XRay_vision)
+        if (Astral_vision)
             you_have("latently X-ray vision", from_what(XRAY_VISION));
         else
             you_have("X-ray vision", from_what(XRAY_VISION));
@@ -5307,7 +5317,7 @@ minimal_enlightenment()
     buf[0] = buf2[0] = '\0';
     tmpwin = create_nhwindow(NHW_MENU);
     start_menu(tmpwin);
-    add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR,
+    add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
              "Starting", FALSE, menu_heading_info());
 
     /* Starting name, race, role, gender */
@@ -5327,7 +5337,7 @@ minimal_enlightenment()
 
     /* Current name, race, role, gender */
     add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, "", FALSE);
-    add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR,
+    add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
              "Current", FALSE, menu_heading_info());
     Sprintf(buf, fmtstr, "race", Upolyd ? youmonst.data->mname : urace.noun);
     add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, buf, FALSE);
@@ -5357,7 +5367,7 @@ minimal_enlightenment()
 
     /* Deity list */
     add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE, NO_COLOR, "", FALSE);
-    add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR,
+    add_extended_menu(tmpwin, NO_GLYPH, &any, 0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
              "Deities", FALSE, menu_heading_info());
     Sprintf(buf2, deity_fmtstr, align_gname(A_CHAOTIC),
             (u.ualignbase[A_ORIGINAL] == u.ualign.type
@@ -5394,12 +5404,14 @@ minimal_enlightenment()
 STATIC_PTR int
 dopolyformstatistics(VOID_ARGS)
 {
+    issue_breadcrumb("dopolyformstatistics");
     return monsterdescription(&youmonst);
 }
 
 STATIC_PTR int
 doviewpetstatistics(struct monst* mon)
 {
+    issue_breadcrumb("doviewpetstatistics");
     return monsterdescription(mon);
 }
 
@@ -6155,6 +6167,10 @@ int final;
         struct item_score_count_result artifacts2 = count_artifacts(magic_objs);
         struct item_score_count_result statues = count_historic_statues(invent);
         struct item_score_count_result statues2 = count_historic_statues(magic_objs);
+        struct item_score_count_result sarcophaguses = count_sarcophaguses(invent);
+        struct item_score_count_result sarcophaguses2 = count_sarcophaguses(magic_objs); /* Should not fit in, but let's check anyway */
+        struct item_score_count_result wrappings = count_mummy_wrappings(invent);
+        struct item_score_count_result wrappings2 = count_mummy_wrappings(magic_objs);
         struct item_score_count_result artobjects = count_valuable_art_objects(invent);
         struct item_score_count_result artobjects2 = count_valuable_art_objects(magic_objs);
         int64_t score_percentage = ((artifacts.score + artifacts2.score + statues.score + statues2.score + (artobjects.score + artobjects2.score) * ARCHAEOLOGIST_ART_OBJECT_SCORE_MULTIPLIER + (int64_t)u.uachieve.role_achievement * ARCHAEOLOGIST_ROLE_ACHIEVEMENT_SCORE) * 100) / MAXIMUM_ROLE_SCORE;
@@ -6163,10 +6179,21 @@ int final;
         you_have(goalbuf, "");
         Sprintf(goalbuf, "%lld %sartifact%s in your %s", (long long)artifacts2.quantity, program_state.gameover ? "" : "known ", plur(artifacts2.quantity), chest_name);
         you_have(goalbuf, "");
+        Sprintf(goalbuf, "%lld mummy wrapping%s with you", (long long)wrappings.quantity, plur(wrappings.quantity));
+        you_have(goalbuf, "");
+        Sprintf(goalbuf, "%lld mummy wrapping%s in your %s", (long long)wrappings2.quantity, plur(wrappings2.quantity), chest_name);
+        you_have(goalbuf, "");
         Sprintf(goalbuf, "%lld historic statue%s with you", (long long)statues.quantity, plur(statues.quantity));
         you_have(goalbuf, "");
         Sprintf(goalbuf, "%lld historic statue%s in your %s", (long long)statues2.quantity, plur(statues2.quantity), chest_name);
         you_have(goalbuf, "");
+        Sprintf(goalbuf, "%lld sarcophagus%s with you", (long long)sarcophaguses.quantity, plur_es(sarcophaguses.quantity));
+        you_have(goalbuf, "");
+        if (sarcophaguses2.quantity > 0)
+        {
+            Sprintf(goalbuf, "%lld sarcophagus%s in your %s", (long long)sarcophaguses2.quantity, plur_es(sarcophaguses2.quantity), chest_name);
+            you_have(goalbuf, "");
+        }
         Sprintf(goalbuf, "%lld %s worth of art objects with you", (long long)artobjects.score, currency(artobjects.score));
         you_have(goalbuf, "");
         Sprintf(goalbuf, "%lld %s worth of art objects in your %s", (long long)artobjects2.score, currency(artobjects2.score), chest_name);
@@ -6369,6 +6396,7 @@ struct ext_func_tab extcmdlist[] = {
     { 'D', "droptype", "drop specific item types", doddrop },
     { 'e', "eat", "eat something", doeat, SINGLE_OBJ_CMD_SPECIFIC, ATR_NONE, NO_COLOR, 0, getobj_allobj, "eat" },
     { 'E', "engrave", "engrave writing on the floor", doengrave, SINGLE_OBJ_CMD_SPECIFIC, ATR_NONE, NO_COLOR, 0, getobj_styluses, "write with" },
+    { M('E'), "engravequick", "engrave the preset writing on the floor", doengravequick },
     { '\0', "enhance", "advance or check weapon and spell skills", enhance_weapon_skill, IFBURIED | AUTOCOMPLETE },
     { M('x'), "examine", "describe an item", 
         doitemdescriptions, IFBURIED | AUTOCOMPLETE | SINGLE_OBJ_CMD_INFO | ALLOW_RETURN_TO_INVENTORY | ALLOW_RETURN_TO_CMD_MENU | CMD_MENU_AUTO_CLICK_OK, ATR_NONE, NO_COLOR, 0,
@@ -6433,12 +6461,14 @@ struct ext_func_tab extcmdlist[] = {
     { '\0', "panic", "test panic routine (fatal to game)", wiz_panic, IFBURIED },
 #endif
     { 'p', "pay", "pay your shopping bill", dopay },
+    { M('X'), "pickaxequick", "apply a pick-axe or another cutting tool", dopickaxe, AUTOCOMPLETE },
     { ';', "pickstash", "pick up things at the current location and stash them into a container", doput2bag },
     { ',', "pickup", "pick up things at the current location", dopickup },
+    { M('P'), "pole", "strike with a polearm or lance", dopolearm, AUTOCOMPLETE },
     { M(1), "polyself", "polymorph self", wiz_polyself, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
     { M('p'), "pray", "pray to the gods for help", dopray, IFBURIED | AUTOCOMPLETE | INCMDMENU },
     { C('p'), "prevmsg", "view recent game messages", doprev_message, IFBURIED | GENERALCMD },
-    { M('P'), "prevwep", "wield a previously wielded weapon", dowieldprevwep}, /* For wielding back weapons that were wielded before wielding a pick-axe or a saw */
+    { M('W'), "prevwep", "wield a previously wielded weapon", dowieldprevwep}, /* For wielding back weapons that were wielded before wielding a pick-axe or a saw */
     { 'P', "puton", "put on an accessory (ring, amulet, etc)", doputon, SINGLE_OBJ_CMD_SPECIFIC, ATR_NONE, NO_COLOR, 0, getobj_accessories, "put on", "put on" },
     { 'q', "quaff", "quaff (drink) something", dodrink, SINGLE_OBJ_CMD_SPECIFIC, ATR_NONE, NO_COLOR, 0, getobj_beverages, "drink", "drink" },
     { M('q'), "quit", "exit without saving current game", done2, IFBURIED | AUTOCOMPLETE | GENERALCMD },
@@ -6463,13 +6493,19 @@ struct ext_func_tab extcmdlist[] = {
     { '^', "seetrap", "show the type of adjacent trap", doidtrap, IFBURIED },
     { WEAPON_SYM, "seeweapon", "show the weapon currently wielded", doprwep, IFBURIED },
     { ILLOBJ_SYM, "seeworn", "show the currently worn items", doseeworn, IFBURIED },
+    { '\0', "setquickbag", "set as quick bag",
+        dosetquickbag, IFBURIED | SINGLE_OBJ_CMD_GENERAL, ATR_NONE, NO_COLOR, 0,
+        getobj_quick_bags, "set as quick bag", "set as quick bag" },
+    { '\0', "setquickengrave", "set as quick engrave item",
+        dosetquickengraveitem, IFBURIED | SINGLE_OBJ_CMD_GENERAL | SPECIAL_SHOW_CONDITIONS, ATR_NONE, NO_COLOR, 0,
+        getobj_styluses, "set as quick engrave item", "set as quick engrave item" },
+    { '\0', "setquickpickaxe", "set as quick pick-axe",
+        dosetquickpickaxeitem, IFBURIED | SINGLE_OBJ_CMD_GENERAL | SPECIAL_SHOW_CONDITIONS, ATR_NONE, NO_COLOR, 0,
+        getobj_quick_pickaxes, "set as quick pick-axe", "set as quick pick-axe" },
     { M(4), "setquickspell", "set quick spell", dosetquickspell, IFBURIED | AUTOCOMPLETE | INSPELLMENU },
-    { '\0', "setquickwand", "set quick wand", 
+    { '\0', "setquickwand", "set quick wand",
         dosetquickwand, IFBURIED | SINGLE_OBJ_CMD_SPECIFIC, ATR_NONE, NO_COLOR, 0,
         getobj_zap_syms, "set as quick wand", "set as quick wand" },
-    { '\0', "unsetquickwand", "unset quick wand", 
-        dounsetquickwand, IFBURIED | SINGLE_OBJ_CMD_SPECIFIC, ATR_NONE, NO_COLOR, 0,
-        getobj_zap_syms, "unset as quick wand", "unset as quick wand" },
     { '!', "shell", "do a shell escape", dosh_core, IFBURIED | GENERALCMD
 #ifndef SHELL
                        | CMD_NOT_AVAILABLE
@@ -6478,7 +6514,7 @@ struct ext_func_tab extcmdlist[] = {
     { C('s'), "sit", "sit down", dosit, AUTOCOMPLETE | INCMDMENU },
     { 'S', "skill", "view and advance skills", doskill, IFBURIED | AUTOCOMPLETE },
 #if defined (DUMPLOG) || defined (DUMPHTML)
-    { M(28), "snapshot", "save a snapshot log", dosnapshot, IFBURIED
+    { M(29), "snapshot", "save a snapshot log", dosnapshot, IFBURIED
 #if defined (ALLOW_SNAPSHOT)
         | AUTOCOMPLETE
 #endif
@@ -6517,6 +6553,18 @@ struct ext_func_tab extcmdlist[] = {
 #if defined (USE_TILES) && !defined(GNH_MOBILE)
     { M(':'), "umark", "toggle tile player mark graphics on/off", dotoggleumark, IFBURIED | AUTOCOMPLETE },
 #endif
+    { '\0', "unsetquickbag", "unset as quick bag",
+        dounsetquickbag, IFBURIED | SINGLE_OBJ_CMD_GENERAL, ATR_NONE, NO_COLOR, 0,
+        getobj_quick_bags, "unset as quick bag", "unset as quick bag" },
+    { '\0', "unsetquickengrave", "unset as quick engrave item",
+        dounsetquickengraveitem, IFBURIED | SINGLE_OBJ_CMD_GENERAL, ATR_NONE, NO_COLOR, 0,
+        getobj_styluses, "unset as quick engrave item", "unset as quick engrave item" },
+    { '\0', "unsetquickpickaxe", "unset as quick pick-axe",
+        dounsetquickpickaxeitem, IFBURIED | SINGLE_OBJ_CMD_GENERAL, ATR_NONE, NO_COLOR, 0,
+        getobj_quick_pickaxes, "unset as quick pick-axe", "unset as quick pick-axe" },
+    { '\0', "unsetquickwand", "unset quick wand",
+        dounsetquickwand, IFBURIED | SINGLE_OBJ_CMD_SPECIFIC, ATR_NONE, NO_COLOR, 0,
+        getobj_zap_syms, "unset as quick wand", "unset as quick wand" },
     { M('u'), "untrap", "untrap something", dountrap, AUTOCOMPLETE },
     { '<', "up", "go up a staircase", doup },
     { '\0', "vanquished", "list vanquished monsters", dovanquished, IFBURIED | AUTOCOMPLETE | WIZMODECMD },
@@ -6661,6 +6709,9 @@ bind_key(key, command)
 uchar key;
 const char *command;
 {
+    if (!command)
+        return FALSE;
+
     struct ext_func_tab *extcmd;
 
     /* special case: "nothing" is reserved for unbinding */
@@ -6708,11 +6759,10 @@ commands_init(VOID_ARGS)
     (void) bind_key('k',    "kick"); /* if number_pad is on */
     (void) bind_key('l',    "loot"); /* if number_pad is on */
     (void) bind_key(C('n'), "annotate"); /* if number_pad is on */
-    (void) bind_key(M('n'), "name");
     (void) bind_key(M('N'), "name");
     (void) bind_key('u',    "untrap"); /* if number_pad is on */
     (void) bind_key(M('y'), "yell"); /* if number_pad is on */
-
+    
 //#ifdef USE_TILES
 //    (void) bind_key(C('0'), "zoommini");
 //    (void) bind_key(C('1'), "zoomnormal");
@@ -6734,15 +6784,19 @@ commands_init(VOID_ARGS)
     (void)bind_key(M('B'), "break"); /* backup for C('b') */
     (void)bind_key(M('C'), "lootin"); /* backup for 'Y' */
     (void)bind_key(M('D'), "lootout"); /* backup for 'y' */
-    (void)bind_key(M('E'), "itemsin"); /* backup for 'B' */
-    (void)bind_key(M('F'), "itemsout"); /* backup for 'b' */
+    /* M('E') is engrave quick */
+    (void)bind_key(M('F'), "itemsin"); /* backup for 'B' */
+    (void)bind_key(M('G'), "itemsout"); /* backup for 'b' */
     (void)bind_key(M('I'), "light"); /* backup for C('l') */
     /* M('M') is monster ability */
     /* M('N') is name */
     /* M('O') is overview */
-    /* M('P') is previous weapon */
+    /* M('P') is apply a polearm */
     /* M('R') is ride nearby */
+    /* M('X') is apply a pickaxe */
     /* M('Y') is toggle buff timers */
+    /* M('W') is previous weapon */
+    /* M('<') is last item */
 
     update_bindings_list();
 }
@@ -7452,12 +7506,14 @@ struct {
     { NHKF_CLICKLOOK,        CMD_CLICKLOOK, (char *) 0 }, /* no binding */
     { NHKF_CLICKCAST,        CMD_CLICKCAST, (char*)0 }, /* no binding */
     { NHKF_CLICKZAP,         CMD_CLICKZAP, (char*)0 }, /* no binding */
+    { NHKF_CLICKPOLE,        CMD_CLICKPOLE, (char*)0 }, /* no binding */
     { NHKF_REDRAW,           C('r'), "redraw" },
     { NHKF_REDRAW2,          C('l'), "redraw.numpad" },
     { NHKF_GETDIR_SELF,      '.', "getdir.self" },
     { NHKF_GETDIR_SELF2,     's', "getdir.self2" },
     { NHKF_GETDIR_HELP,      '?', "getdir.help" },
     { NHKF_COUNT,            'n', "count" },
+    { NHKF_COUNT2,           M('n'), "count2" },
     { NHKF_GETPOS_SELF,      '@', "getpos.self" },
     { NHKF_GETPOS_PICK,      '.', "getpos.pick" },
     { NHKF_GETPOS_PICK_Q,    ',', "getpos.pick.quick" },
@@ -7485,9 +7541,12 @@ struct {
 
 boolean
 bind_specialkey(key, command)
-uchar key;
+char key;
 const char *command;
 {
+    if (!command)
+        return FALSE;
+
     int i;
     for (i = 0; i < SIZE(spkeys_binds); i++) {
         if (!spkeys_binds[i].name || strcmp(command, spkeys_binds[i].name))
@@ -7504,6 +7563,9 @@ char
 txt2key(txt)
 char *txt;
 {
+    if (!txt)
+        return '\0';
+
     txt = trimspaces(txt);
     if (!*txt)
         return '\0';
@@ -7661,6 +7723,7 @@ boolean initial;
         timed_occ_fn = 0;
         readchar_queue = "";
         memset((genericptr_t)&clicklook_cc, 0, sizeof(clicklook_cc));
+        memset((genericptr_t)&clickpole_cc, 0, sizeof(clickpole_cc));
         //memset((genericptr_t)&clickfire_cc, 0, sizeof(clickfire_cc));
         struct ext_func_tab* efp;
         for (efp = extcmdlist; efp->ef_txt; efp++)
@@ -7917,6 +7980,7 @@ register char *cmd;
 #endif
     }
 
+    context.is_click_looking = FALSE;
     iflags.menu_requested = FALSE;
 #ifdef SAFERHANGUP
     if (program_state.done_hup)
@@ -7957,7 +8021,7 @@ register char *cmd;
     /* handle most movement commands */
     prefix_seen = FALSE;
     clear_run_and_travel();
-    spkey = ch2spkeys(*cmd, NHKF_RUN, NHKF_CLICKZAP);
+    spkey = ch2spkeys(*cmd, NHKF_RUN, NHKF_CLICKPOLE);
 
     if (flags.prefer_fast_move)
     {
@@ -8037,40 +8101,63 @@ register char *cmd;
     case NHKF_DOINV:
         if (!Cmd.num_pad)
             break;
-        (void) ddoinv(); /* a convenience borrowed from the PC */
-        context.move = FALSE;
+        if (!ddoinv()) /* a convenience borrowed from the PC */
+            context.move = FALSE;
         return;
     case NHKF_DOSEEWORN:
         if (!Cmd.num_pad)
             break;
-        (void)doseeworn();
-        context.move = FALSE;
+        if (!doseeworn())
+            context.move = FALSE;
         return;
     case NHKF_CLICKLOOK:
         context.move = FALSE;
+        context.is_click_looking = TRUE;
         do_look(2, &clicklook_cc);
         return;
+    case NHKF_CLICKPOLE:
+    {
+        if (!(uwep && is_appliable_pole_type_weapon(uwep)) && (uswapwep && is_appliable_pole_type_weapon(uswapwep)))
+            (void)doswapweapon();
+        if (uwep && is_appliable_pole_type_weapon(uwep))
+        {
+            if (!use_pole2(uwep, &clickpole_cc))
+            {
+                context.move = FALSE;
+                readchar_queue = ""; //Prevent movement if using polearm failed.
+            }
+        }
+        return;
+    }
     case NHKF_CLICKFIRE:
+    {
+        if (!(uwep && is_launcher(uwep)) && (uswapwep && is_launcher(uswapwep)))
+            (void)doswapweapon();
+        if (!dofire())
         {
-            int fireres = dofire();
-            if (!fireres)
-                readchar_queue = ""; //Prevent movement if firing failed.
+            context.move = FALSE;
+            readchar_queue = ""; //Prevent movement if firing failed.
         }
         return;
+    }
     case NHKF_CLICKCAST:
-        {
-            int castres = docastquick();
-            if (!castres)
-                readchar_queue = ""; //Prevent movement if casting failed.
-        }
+    {
+        boolean stop_readchar = FALSE;
+        if (!docastquick_core(&stop_readchar))
+            context.move = FALSE;
+        if (stop_readchar)
+            readchar_queue = ""; //Prevent movement if casting failed.
         return;
+    }
     case NHKF_CLICKZAP:
     {
-        int zapres = dozapquick();
-        if (!zapres)
-            readchar_queue = ""; //Prevent movement if casting failed.
+        boolean stop_readchar = FALSE;
+        if (!dozapquick_core(&stop_readchar))
+            context.move = FALSE;
+        if (stop_readchar)
+            readchar_queue = ""; //Prevent movement if zapping failed.
+        return;
     }
-    return;
     case NHKF_TRAVEL:
     case NHKF_TRAVEL_ATTACK:
     case NHKF_TRAVEL_WALK:
@@ -8376,7 +8463,15 @@ coord *cc;
 
 int
 getdir(s)
+const char* s;
+{
+    return getdir_ex(s, FALSE);
+}
+
+int
+getdir_ex(s, self_always_ok)
 const char *s;
+boolean self_always_ok;
 {
     char dirsym;
     int is_mov;
@@ -8396,6 +8491,7 @@ retry:
 
     if (redraw_cmd(dirsym)) 
     { /* ^R */
+        debugprint_pos();
         docrt();              /* redraw */
         goto retry;
     }
@@ -8434,8 +8530,12 @@ retry:
         create_context_menu(CREATE_CONTEXT_MENU_NORMAL);
         return 0;
     }
-    if (!u.dz && (Stunned || (Confusion && !rn2(5))))
-        confdir();
+
+    if (!self_always_ok || (u.dx || u.dy || u.dz)) /* if self_always_ok then not all of dx/dy/dz can be zero to apply confdir */
+    {
+        if (!u.dz && (Stunned || (Confusion && !rn2(5))))
+            confdir();
+    }
 
     create_context_menu(CREATE_CONTEXT_MENU_NORMAL);
     return 1;
@@ -8903,12 +9003,12 @@ boolean doit;
     struct obj* otmp = level.objects[u.ux][u.uy];
     if (otmp) 
     {
-        Sprintf(buf, "Pick up %s", otmp->nexthere ? "items" : doname_with_weight_last(otmp, objects[LOADSTONE].oc_name_known, FALSE));
+        Sprintf(buf, "Pick up %s", otmp->nexthere ? "items" : doname_with_weight_last(otmp, objects[LOADSTONE].oc_name_known, FALSE, 0));
         add_herecmd_menuitem(win, dopickup, buf);
 
         if (count_bags_for_stashing(invent, otmp, FALSE, TRUE) > 0)
         {
-            Sprintf(buf, "Pick up and auto-stash %s", otmp->nexthere ? "items" : doname_with_weight_last(otmp, objects[LOADSTONE].oc_name_known, FALSE));
+            Sprintf(buf, "Pick up and auto-stash %s", otmp->nexthere ? "items" : doname_with_weight_last(otmp, objects[LOADSTONE].oc_name_known, FALSE, 0));
             add_herecmd_menuitem(win, doput2bag, buf);
         }
         if (Is_container(otmp)) 
@@ -8968,6 +9068,10 @@ int x, y, mod;
     int target_y = y;
     memset(cmd, 0, sizeof(cmd));
 
+    char dbgbuf[BUFSZ];
+    Sprintf(dbgbuf, "click_to_cmd: x=%d, y=%d, mod=%d, ux=%d, uy=%d", x, y, mod, u.ux, u.uy);
+    issue_breadcrumb(dbgbuf);
+
     /* mod can be any value except CLICK_OFF */
     if (mod == CLICK_SECONDARY)
         mod = flags.right_click_command >= CLICK_OFF ? flags.right_click_command : iflags.clicklook ? CLICK_LOOK : CLICK_PRIMARY;
@@ -8987,6 +9091,15 @@ int x, y, mod;
         clicklook_cc.x = target_x;
         clicklook_cc.y = target_y;
         cmd[0] = Cmd.spkeys[NHKF_CLICKLOOK];
+        return cmd;
+    }
+
+    /* Polearm */
+    if (mod == CLICK_POLE)
+    {
+        clickpole_cc.x = target_x;
+        clickpole_cc.y = target_y;
+        cmd[0] = Cmd.spkeys[NHKF_CLICKPOLE];
         return cmd;
     }
 
@@ -9011,7 +9124,8 @@ int x, y, mod;
     /* Cast spell */
     if (mod == CLICK_CAST)
     {
-        if (!context.quick_cast_spell_set || context.quick_cast_spell_no < 0 || spl_book[context.quick_cast_spell_no].sp_id <= STRANGE_OBJECT)
+        if (!context.quick_cast_spell_set || context.quick_cast_spell_no < 0 || context.quick_cast_spell_no > MAXSPELL
+            || spl_book[context.quick_cast_spell_no].sp_id <= STRANGE_OBJECT || spl_book[context.quick_cast_spell_no].sp_id >= NUM_OBJECTS)
         {
             /* Quick cast handles error messaging */
             cmd[0] = Cmd.spkeys[NHKF_CLICKCAST];
@@ -9020,7 +9134,8 @@ int x, y, mod;
         }
         
         int targeting_type = objects[spl_book[context.quick_cast_spell_no].sp_id].oc_dir;
-        boolean is_directional = targeting_type > NODIR && targeting_type != TARGETED;
+        boolean is_directional = targeting_type > NODIR && targeting_type != TARGETED 
+            && spl_book[context.quick_cast_spell_no].sp_id != SPE_METEOR_SWARM; /* This last check to fix this for ongoing games; can be removed later */
         if (!is_directional)
         {
             cmd[0] = Cmd.spkeys[NHKF_CLICKCAST];
@@ -9117,7 +9232,7 @@ int x, y, mod;
     if (mod == CLICK_ZAP)
     {
         struct obj* obj;
-        if (!context.quick_zap_wand_oid || !(obj = o_on(context.quick_zap_wand_oid, invent)))
+        if (!context.quick_zap_wand_oid || !(obj = o_on_open_inventory(context.quick_zap_wand_oid)))
         {
             /* Quick zap handles error messaging */
             cmd[0] = Cmd.spkeys[NHKF_CLICKZAP];
@@ -9462,7 +9577,7 @@ int x, y, mod;
 
         dir = xytod(x, y);
 
-        if (!u.uswallow && !m_at(u.ux + x, u.uy + y)
+        if (!u.uswallow && isok(u.ux + x, u.uy + y) && !m_at(u.ux + x, u.uy + y)
             && !test_move(u.ux, u.uy, x, y, TEST_MOVE)) 
         {
             cmd[1] = Cmd.dirchars[dir];
@@ -9491,9 +9606,9 @@ int x, y, mod;
                 }
                 if (door->doormask & D_LOCKED)
                 {
-                    if (has_fitting_key || !door->click_kick_ok)
+                    if (has_fitting_key || !door->click_kick_ok || u.usteed)
                     {
-                        if (!door->click_kick_ok)
+                        if (!door->click_kick_ok && !u.usteed)
                             context.click_kick_query = 1;
 
                         cmd[0] = cmd_from_func(doopen);
@@ -9640,9 +9755,9 @@ parse(VOID_ARGS)
 #endif
     escape_sequence_key_start_allowed = 1;
 
-    if ((!Cmd.num_pad && !Cmd.gnh_layout) || ((foo = readchar()) == Cmd.spkeys[NHKF_COUNT])) {
+    if ((!Cmd.num_pad && !Cmd.gnh_layout) || ((foo = readchar()) != 0 && (foo == Cmd.spkeys[NHKF_COUNT] || foo == Cmd.spkeys[NHKF_COUNT2]))) 
+    {
         int64_t tmpmulti = (int64_t)multi;
-
         foo = get_count((char *) 0, '\0', LARGEST_INT, &tmpmulti, FALSE);
         last_multi = multi = (int)tmpmulti;
     }
@@ -9761,7 +9876,9 @@ end_of_input(VOID_ARGS)
 #endif
         if (program_state.something_worth_saving)
         {
-            (void)dosave0(TRUE);
+            issue_breadcrumb("end_of_input: Saving");
+            int saveres = dosave0(TRUE);
+            issue_breadcrumb2("end_of_input: Saved", saveres);
         }
     if (iflags.window_inited)
         exit_nhwindows((char *) 0);
@@ -9922,7 +10039,7 @@ dotravel(VOID_ARGS)
  *   window port causing a buffer overflow there.
  */
 char
-yn_function_ex(style, attr, color, glyph, title, query, resp, def, resp_desc, introline, ynflags)
+yn_function_core(style, attr, color, glyph, title, query, resp, def, resp_desc, introline, ynflags)
 int style, attr, color, glyph;
 const char *title, *query, *resp, *resp_desc, * introline;
 char def;
@@ -9936,10 +10053,13 @@ uint64_t ynflags; /* 1 means use upper side for half-sized tile */
     char dumplog_buf[QBUFSZ + 1 + 15]; /* [QBUFSZ+1+7] should suffice */
 #endif
 
+    issue_breadcrumb3(query ? query : "yn_function_core: no query", style, (int)def);
+
     iflags.last_msg = PLNMSG_UNKNOWN; /* most recent pline is clobbered */
 
     /* maximum acceptable length is QBUFSZ-1 */
-    if (strlen(query) >= QBUFSZ) {
+    if (query && strlen(query) >= QBUFSZ) 
+    {
         /* caller shouldn't have passed anything this long */
         paniclog("Query truncated: ", query);
         Strncpy(qbuf, query, QBUFSZ - 1 - 3);
@@ -9948,11 +10068,12 @@ uint64_t ynflags; /* 1 means use upper side for half-sized tile */
     }
     res = (*windowprocs.win_yn_function_ex)(style, attr, color, glyph, title, query, resp, def, resp_desc, introline, ynflags);
 #if defined(DUMPLOG) || defined(DUMPHTML)
-    if (idx == saved_pline_index) {
+    if (idx == saved_pline_index) 
+    {
         /* when idx is still the same as saved_pline_index, the interface
            didn't put the prompt into saved_plines[]; we put a simplified
            version in there now (without response choices or default) */
-        Sprintf(dumplog_buf, "%s ", query);
+        Sprintf(dumplog_buf, "%s ", query ? query : "null query");
         (void) key2txt((uchar) res, eos(dumplog_buf));
         dumplogmsg(dumplog_buf, (char*)0, (char*)0, attr, color);
     }
@@ -9965,7 +10086,7 @@ yn_function(query, resp, def, resp_desc)
 const char* query, *resp, *resp_desc;
 char def;
 {
-    return yn_function_ex(YN_STYLE_GENERAL, ATR_NONE, NO_COLOR, NO_GLYPH, (const char*)0, query, resp, def, resp_desc, (const char*)0, 0UL);
+    return yn_function_core(YN_STYLE_GENERAL, ATR_NONE, NO_COLOR, NO_GLYPH, (const char*)0, query, resp, def, resp_desc, (const char*)0, 0UL);
 }
 
 char
@@ -9973,7 +10094,7 @@ yn_function_end(query, resp, def, resp_desc)
 const char* query, * resp, * resp_desc;
 char def;
 {
-    return yn_function_ex(YN_STYLE_END, ATR_NONE, NO_COLOR, NO_GLYPH, (const char*)0, query, resp, def, resp_desc, (const char*)0, 0UL);
+    return yn_function_core(YN_STYLE_END, ATR_NONE, NO_COLOR, NO_GLYPH, (const char*)0, query, resp, def, resp_desc, (const char*)0, 0UL);
 }
 
 char
@@ -9990,7 +10111,7 @@ char def;
     char namebuf[BUFSZ];
     strcpy_capitalized_for_title(namebuf, Monnam(mtmp));
 
-    return yn_function_ex(YN_STYLE_MONSTER_QUESTION, ATR_NONE, NO_COLOR, glyph, namebuf, query, chars, def, descs, (const char*)0, 0UL);
+    return yn_function_core(YN_STYLE_MONSTER_QUESTION, ATR_NONE, NO_COLOR, glyph, namebuf, query, chars, def, descs, (const char*)0, 0UL);
 }
 
 char
@@ -10203,7 +10324,7 @@ dolight(VOID_ARGS)
             char ans = yn_query(qbuf);
             if (ans == 'y')
             {
-                Strcpy(debug_buf_4, "dolight1");
+                debugprint("dolight1");
                 levl[u.ux][u.uy].lamplit = FALSE;
                 del_light_source(LS_LOCATION, xy_to_any(u.ux, u.uy));
                 newsym(u.ux, u.uy);
@@ -10298,7 +10419,7 @@ dolight(VOID_ARGS)
         }
         else
         {
-            Strcpy(debug_buf_4, "dolight2");
+            debugprint("dolight2");
             levl[cc.x][cc.y].lamplit = FALSE;
             del_light_source(LS_LOCATION, xy_to_any(cc.x, cc.y));
             newsym(cc.x, cc.y);
@@ -10412,6 +10533,80 @@ enum create_context_menu_types menu_type;
         struct rm* lev = &levl[u.ux][u.uy];
         int levtyp = lev ? lev->typ : UNDEFINED_LOCATION;
         struct trap* t = t_at(u.ux, u.uy);
+
+        struct obj* otmp_here;
+        boolean showpickup = FALSE;
+        for (otmp_here = otmp; otmp_here; otmp_here = otmp_here->nexthere)
+            if (otmp_here != uchain)
+            {
+                showpickup = TRUE;
+                break;
+            }
+
+        if (showpickup)
+        {
+            add_context_menu(',', nondir_cmd_from_func(dopickup), CONTEXT_MENU_STYLE_GENERAL, otmp->gui_glyph, "Pick Up", cxname(otmp), 0, NO_COLOR);
+            if (count_bags_for_stashing(invent, otmp, FALSE, TRUE) > 0)
+                add_context_menu(';', nondir_cmd_from_func(doput2bag), CONTEXT_MENU_STYLE_GENERAL, otmp->gui_glyph, "Pick & Stash", cxname(otmp), 0, NO_COLOR);
+            boolean eat_added = FALSE;
+            boolean loot_added = FALSE;
+            boolean loot_out_added = FALSE;
+            boolean loot_in_added = FALSE;
+            for (otmp_here = otmp; otmp_here; otmp_here = otmp_here->nexthere)
+            {
+                if (!eat_added && is_obj_normally_edible(otmp_here))
+                {
+                    add_context_menu('e', nondir_cmd_from_func(doeat), CONTEXT_MENU_STYLE_GENERAL, otmp_here->gui_glyph, "Eat", cxname(otmp_here), 0, NO_COLOR);
+                    eat_added = TRUE;
+                }
+
+                if (Is_container(otmp_here))
+                {
+                    if (!loot_added)
+                    {
+                        add_context_menu('l', nondir_cmd_from_func(doloot), CONTEXT_MENU_STYLE_GENERAL, otmp_here->gui_glyph, "Loot", cxname(otmp_here), 0, NO_COLOR);
+                        loot_added = TRUE;
+                    }
+
+                    boolean is_known_improper = (objects[otmp_here->otyp].oc_name_known && !Is_proper_container(otmp_here));
+                    if (!loot_out_added && !is_known_improper)
+                    {
+                        boolean isknownempty = FALSE;
+                        if (otmp_here->cknown && (otmp_here->otyp == BAG_OF_TRICKS ? (otmp_here->charges == 0) : !Has_contained_contents(otmp_here)))
+                            isknownempty = TRUE;
+
+                        if (!isknownempty)
+                        {
+                            add_context_menu('b', nondir_cmd_from_func(dolootout), CONTEXT_MENU_STYLE_GENERAL, otmp_here->gui_glyph, "Take out", cxname(otmp_here), 0, NO_COLOR);
+                            loot_out_added = TRUE;
+                        }
+                    }
+
+                    if (!loot_in_added && invent && !is_known_improper)
+                    {
+                        add_context_menu('B', nondir_cmd_from_func(dolootin), CONTEXT_MENU_STYLE_GENERAL, otmp_here->gui_glyph, "Put in", cxname(otmp_here), 0, NO_COLOR);
+                        loot_in_added = TRUE;
+                    }
+                }
+            }
+        }
+
+        const char* dfeature = adjusted_dfeature_at(u.ux, u.uy);
+        struct engr* ep = engr_at(u.ux, u.uy);
+        int displ_style = here_window_display_style(dfeature, ep, otmp);
+
+        if (Blind || displ_style == 2)
+        {
+            add_context_menu(':', nondir_cmd_from_func(dolook), CONTEXT_MENU_STYLE_GENERAL, NO_GLYPH, "Look Here", "", 0, NO_COLOR);
+        }
+
+        if (context.last_picked_obj_oid > 0 && context.last_picked_obj_show_duration_left > 0)
+        {
+            struct obj* lpobj;
+            if ((lpobj = o_on_open_inventory(context.last_picked_obj_oid)) != 0)
+                add_context_menu(M('<'), nondir_cmd_from_func(dolastpickeditem), CONTEXT_MENU_STYLE_GENERAL, lpobj ? lpobj->gui_glyph : 0, "Last Item", lpobj ? cxname(lpobj) : "", 0, NO_COLOR);
+        }
+
         if (IS_ALTAR(levtyp))
         {
             add_context_menu(M('o'), nondir_cmd_from_func(dosacrifice), CONTEXT_MENU_STYLE_GENERAL, back_to_glyph(u.ux, u.uy), "Offer", 0, 0, NO_COLOR);
@@ -10544,78 +10739,6 @@ enum create_context_menu_types menu_type;
             add_context_menu('C', nondir_cmd_from_func(dotalksteed), CONTEXT_MENU_STYLE_GENERAL, any_mon_to_glyph(u.usteed, rn2_on_display_rng), "Steed", Monnam(u.usteed), 0, NO_COLOR);
         }
 
-        struct obj* otmp_here;
-        boolean showpickup = FALSE;
-        for (otmp_here = otmp; otmp_here; otmp_here = otmp_here->nexthere)
-            if (otmp_here != uchain)
-            {
-                showpickup = TRUE;
-                break;
-            }
-
-        if (showpickup)
-        {
-            add_context_menu(',', nondir_cmd_from_func(dopickup), CONTEXT_MENU_STYLE_GENERAL, otmp->gui_glyph, "Pick Up", cxname(otmp), 0, NO_COLOR);
-            if(count_bags_for_stashing(invent, otmp, FALSE, TRUE) > 0)
-                add_context_menu(';', nondir_cmd_from_func(doput2bag), CONTEXT_MENU_STYLE_GENERAL, otmp->gui_glyph, "Pick & Stash", cxname(otmp), 0, NO_COLOR);
-            boolean eat_added = FALSE;
-            boolean loot_added = FALSE;
-            boolean loot_out_added = FALSE;
-            boolean loot_in_added = FALSE;
-            for (otmp_here = otmp; otmp_here; otmp_here = otmp_here->nexthere)
-            {
-                if (!eat_added && is_edible(otmp_here))
-                {
-                    add_context_menu('e', nondir_cmd_from_func(doeat), CONTEXT_MENU_STYLE_GENERAL, otmp_here->gui_glyph, "Eat", cxname(otmp_here), 0, NO_COLOR);
-                    eat_added = TRUE;
-                }
-
-                if (Is_container(otmp_here))
-                {
-                    if (!loot_added)
-                    {
-                        add_context_menu('l', nondir_cmd_from_func(doloot), CONTEXT_MENU_STYLE_GENERAL, otmp_here->gui_glyph, "Loot", cxname(otmp_here), 0, NO_COLOR);
-                        loot_added = TRUE;
-                    }
-
-                    boolean is_known_improper = (objects[otmp_here->otyp].oc_name_known && !Is_proper_container(otmp_here));
-                    if (!loot_out_added && !is_known_improper)
-                    {
-                        boolean isknownempty = FALSE;
-                        if (otmp_here->cknown && (otmp_here->otyp == BAG_OF_TRICKS ? (otmp_here->charges == 0) : !Has_contained_contents(otmp_here)))
-                            isknownempty = TRUE;
-
-                        if (!isknownempty)
-                        {
-                            add_context_menu('b', nondir_cmd_from_func(dolootout), CONTEXT_MENU_STYLE_GENERAL, otmp_here->gui_glyph, "Take out", cxname(otmp_here), 0, NO_COLOR);
-                            loot_out_added = TRUE;
-                        }
-                    }
-
-                    if (!loot_in_added && invent && !is_known_improper)
-                    {
-                        add_context_menu('B', nondir_cmd_from_func(dolootin), CONTEXT_MENU_STYLE_GENERAL, otmp_here->gui_glyph, "Put in", cxname(otmp_here), 0, NO_COLOR);
-                        loot_in_added = TRUE;
-                    }
-                }
-            }
-        }
-
-        const char* dfeature = adjusted_dfeature_at(u.ux, u.uy);
-        struct engr* ep = engr_at(u.ux, u.uy);
-        int displ_style = here_window_display_style(dfeature, ep, otmp);
-
-        if (Blind || displ_style == 2)
-        {
-            add_context_menu(':', nondir_cmd_from_func(dolook), CONTEXT_MENU_STYLE_GENERAL, NO_GLYPH, "Look Here", "", 0, NO_COLOR);
-        }
-
-        if (context.last_picked_obj_oid > 0 && context.last_picked_obj_show_duration_left > 0)
-        {
-            struct obj* lpobj;
-            if ((lpobj = o_on(context.last_picked_obj_oid, invent)) != 0)
-                add_context_menu(M('<'), nondir_cmd_from_func(dolastpickeditem), CONTEXT_MENU_STYLE_GENERAL, lpobj ? lpobj->gui_glyph : 0, "Last Item", lpobj ? cxname(lpobj) : "", 0, NO_COLOR);
-        }
         break;
     }
     }
@@ -10668,6 +10791,185 @@ dounfavorite(VOID_ARGS)
     }
     return 0;
 }
+
+int
+dosetquickengraveitem(VOID_ARGS)
+{
+    struct obj* obj = getobj(getobj_styluses, "set as quick engrave item", 0, "");
+    if (!obj)
+    {
+        pline1(Never_mind);
+        return 0;
+    }
+
+    if (obj->o_id == context.quick_engrave_obj_oid)
+    {
+        pline("%s is already the quick engrave item.", The(cxname(obj)));
+    }
+    else
+    {
+        context.quick_engrave_obj_oid = obj->o_id;
+        pline("%s was marked as the quick engrave item.", The(cxname(obj)));
+        update_inventory();
+    }
+    return 0;
+}
+
+int
+dounsetquickengraveitem(VOID_ARGS)
+{
+    struct obj* obj = getobj(getobj_styluses, "unset as quick engrave item", 0, "");
+    if (!obj)
+    {
+        pline1(Never_mind);
+        return 0;
+    }
+
+    if (obj->o_id != context.quick_engrave_obj_oid)
+    {
+        pline("%s is not the quick engrave item.", The(cxname(obj)));
+    }
+    else
+    {
+        context.quick_engrave_obj_oid = 0;
+        pline("%s was unmarked as the quick engrave item.", The(cxname(obj)));
+        update_inventory();
+    }
+    return 0;
+}
+
+int
+dosetquickpickaxeitem(VOID_ARGS)
+{
+    struct obj* obj = getobj(getobj_quick_pickaxes, "set as quick pick-axe", 0, "");
+    if (!obj)
+    {
+        pline1(Never_mind);
+        return 0;
+    }
+
+    if (obj->o_id == context.quick_pickaxe_obj_oid)
+    {
+        pline("%s is already the quick pick-axe.", The(cxname(obj)));
+    }
+    else if (!(is_pick(obj) || is_saw(obj) || is_axe(obj)))
+    {
+        play_sfx_sound(SFX_GENERAL_CANNOT);
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s is not a digging or cutting tool.", The(cxname(obj)));
+    }
+    else
+    {
+        context.quick_pickaxe_obj_oid = obj->o_id;
+        pline("%s was marked as the quick pick-axe.", The(cxname(obj)));
+        update_inventory();
+    }
+    return 0;
+}
+
+int
+dounsetquickpickaxeitem(VOID_ARGS)
+{
+    struct obj* obj = getobj(getobj_quick_pickaxes, "unset as quick pick-axe", 0, "");
+    if (!obj)
+    {
+        pline1(Never_mind);
+        return 0;
+    }
+
+    if (obj->o_id != context.quick_pickaxe_obj_oid)
+    {
+        pline("%s is not the quick pick-axe.", The(cxname(obj)));
+    }
+    else
+    {
+        context.quick_pickaxe_obj_oid = 0;
+        pline("%s was unmarked as the quick pick-axe.", The(cxname(obj)));
+        update_inventory();
+    }
+    return 0;
+}
+
+int
+dosetquickbag(VOID_ARGS)
+{
+    struct obj* obj = getobj(getobj_quick_bags, "set as quick bag", 0, "");
+    if (!obj)
+    {
+        pline1(Never_mind);
+        return 0;
+    }
+
+    if (obj->o_id == context.quick_bag_obj_oid)
+    {
+        pline("%s is already the quick bag.", The(cxname(obj)));
+    }
+    else if (!Is_container(obj))
+    {
+        play_sfx_sound(SFX_GENERAL_CANNOT);
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s is not a container.", The(cxname(obj)));
+    }
+    else if (Is_box(obj) && !obj->lknown)
+    {
+        play_sfx_sound(SFX_GENERAL_CANNOT);
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s cannot be set as a quick bag without first knowing whether it is locked.", The(cxname(obj)));
+    }
+    else if (Is_box(obj) && obj->lknown && obj->olocked)
+    {
+        play_sfx_sound(SFX_GENERAL_CANNOT);
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s cannot be set as a quick bag; it is locked!", The(cxname(obj)));
+    }
+    else if (Is_specialized_container(obj))
+    {
+        play_sfx_sound(SFX_GENERAL_CANNOT);
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s cannot be set as a quick bag.", The(cxname(obj)));
+    }
+    else if (Is_container_with_closed_lid(obj))
+    {
+        play_sfx_sound(SFX_GENERAL_CANNOT);
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s cannot be set as a quick bag without opening its lid first.", The(cxname(obj)));
+    }
+    else if (!objects[obj->otyp].oc_name_known && !obj->cknown) /* This should prevent checking out which are non-containers */
+    {
+        play_sfx_sound(SFX_GENERAL_CANNOT);
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s cannot be set as a quick bag without investigating its contents or determining its nature first.", The(cxname(obj)));
+    }
+    else if (!Is_proper_container(obj)) /* Insurance */
+    {
+        play_sfx_sound(SFX_GENERAL_CANNOT);
+        pline_ex(ATR_NONE, CLR_MSG_FAIL, "%s is not a proper container.", The(cxname(obj)));
+    }
+    else
+    {
+        context.quick_bag_obj_oid = obj->o_id;
+        pline("%s was marked as the quick bag.", The(cxname(obj)));
+        update_inventory();
+    }
+    return 0;
+}
+
+int
+dounsetquickbag(VOID_ARGS)
+{
+    struct obj* obj = getobj(getobj_quick_bags, "unset as quick bag", 0, "");
+    if (!obj)
+    {
+        pline1(Never_mind);
+        return 0;
+    }
+
+    if (obj->o_id != context.quick_bag_obj_oid)
+    {
+        pline("%s is not the quick bag.", The(cxname(obj)));
+    }
+    else
+    {
+        context.quick_bag_obj_oid = 0;
+        pline("%s was unmarked as the quick bag.", The(cxname(obj)));
+        update_inventory();
+    }
+    return 0;
+}
+
 
 struct monst*
 spotted_linedup_monster_in_way(x1, y1, x2, y2)

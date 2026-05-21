@@ -86,6 +86,14 @@ typedef xchar boolean; /* 0 or 1 */
 #define FALSE 0 //((boolean) 0)
 #endif
 
+#ifdef GNH_MOBILE
+#define TRUE_IF_GNH TRUE
+#define FALSE_IF_GNH FALSE
+#else
+#define TRUE_IF_GNH FALSE
+#define FALSE_IF_GNH TRUE
+#endif
+
 #ifndef STRNCMPI
 #ifndef __SASC_60 /* SAS/C already shifts to stricmp */
 #define strcmpi(a, b) strncmpi((a), (b), -1)
@@ -298,6 +306,7 @@ typedef xchar boolean; /* 0 or 1 */
 #define Vprintf (void) vprintf
 #define Vfprintf (void) vfprintf
 #define Vsprintf (void) vsprintf
+#define Vsnprintf (void) vsnprintf
 #endif
 
 /* primitive memory leak debugging; see alloc.c */
@@ -374,6 +383,7 @@ struct savefile_info {
 #define PL_CSIZ 32 /* sizeof pl_character */
 #define PL_FSIZ 32 /* fruit name */
 #define PL_PSIZ 63 /* player-given names for pets, other monsters, objects */
+#define PL_ESIZ 95 /* maximum length for preset quick engraving text */ 
 
 #define BUFSZ 256  /* for getlin buffers */
 #define QBUFSZ 256 /* for building question text */

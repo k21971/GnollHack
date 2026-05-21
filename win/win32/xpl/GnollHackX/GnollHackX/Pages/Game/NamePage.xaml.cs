@@ -25,7 +25,7 @@ namespace GnollHackX.Pages.Game
 #endif
 {
     [XamlCompilation(XamlCompilationOptions.Compile)]
-    public partial class NamePage : ContentPage
+    public partial class NamePage : ContentPage, ICloseablePage, ISpecialKeyPressHandlingPage
     {
         public Regex ValidationExpression { get; set; }
         private GHGame _currentGame;
@@ -114,9 +114,8 @@ namespace GnollHackX.Pages.Game
                 return;
             }
 
-            var page = await _gamePage.Navigation.PopModalAsync();
+            await GHApp.PopModalPageAsync();
             _currentGame?.ResponseQueue.Enqueue(new GHResponse(_currentGame, GHRequestType.AskName, usedName));
-            GHApp.DisconnectIViewHandlers(page);
         }
 
         private void ReplayDoEnterName()
@@ -241,9 +240,8 @@ namespace GnollHackX.Pages.Game
             btnCancel.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
 
-            var page = await _gamePage.Navigation.PopModalAsync();
+            await GHApp.PopModalPageAsync();
             _currentGame?.ResponseQueue.Enqueue(new GHResponse(_currentGame, GHRequestType.AskName, ""));
-            GHApp.DisconnectIViewHandlers(page);
         }
 
         public bool HandleSpecialKeyPress(GHSpecialKey key, bool isCtrl, bool isMeta, bool isShift)
@@ -283,6 +281,11 @@ namespace GnollHackX.Pages.Game
                 System.Diagnostics.Debug.WriteLine(ex);
             }
             return handled;
+        }
+
+        public void ClosePage()
+        {
+            HandleSpecialKeyPress(GHSpecialKey.Escape, false, false, false);
         }
 
         private async void eName_Completed(object sender, EventArgs e)

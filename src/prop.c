@@ -20,7 +20,7 @@ const struct propname propertynames[] = {
     { SLIMED, "becoming slime", "transformation into slime" },
     { STRANGLED, "being strangled", "strangulation" },
     { SICK, "fatally sick", "fatal sickness" },
-    { STUNNED, "stunned", "stunning" },
+    { STUNNED, "stunned", "stun" },
     { CONFUSION, "confused", "confusion" },
     { HALLUC, "hallucinating", "hallucination" },
     { BLINDED, "blinded", "blindness" },
@@ -107,7 +107,7 @@ const struct propname propertynames[] = {
     { WARN_OGRE, "warned of ogres", "warning of ogres" },
     { WARN_OGRE, "warned of gnomes", "warning of gnomes" },
     { CHARM_RESISTANCE, "resistant to charm", "charm resistance" },
-    { MIND_SHIELDING, "mind shielded", "mind shielding" },
+    { MIND_SHIELDING, "protected from mind control, ESP, and psionics", "protection from mind control, ESP, and psionics" },
     { ODD_IDEAS, "having visionary ideas", "visionary ideas" },
     { MAGICAL_KICKING, "kicking magically", "magical kicking" },
     { BLOCKS_INVISIBILITY, "blocking invisibility", "blocks invisibility" },
@@ -187,8 +187,10 @@ const struct propname propertynames[] = {
     { TOTTERING, "shaking and tottering", "shaking and tottering" },
     { MARTIAL_PROWESS, "imbued with martial prowess", "martial prowess" },
     { POLYMORPH_RESISTANCE, "resistant to polymorph", "polymorph resistance" },
-    { EXTENDED_XRAY_VISION, "having extended X-ray vision", "extended X-ray vision" },
+    { ASTRAL_VISION, "having astral vision", "astral vision" },
     { PROTECTION_FROM_ARMOR_DESTRUCTION, "protected from armor destruction", "protection from armor destruction" },
+    { EDIBILITY_APPRAISAL, "recognizing detrimental food", "recognition of detrimental food" },
+    { CORPSE_PROPERTY_APPRAISAL, "recognizing corpse properties", "recognition of corpse properties" },
     {  0, 0, 0 },
 };
 
@@ -365,10 +367,10 @@ NEARDATA struct prop_info property_definitions[MAX_PROPS] =
     { "tottering",                    0, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_NONE },  /* TOTTERING = 168 */
     { "martial-prowess",              0, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_NONE },  /* MARTIAL_PROWESS = 169 */
     { "polymorph-resistance",         0, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_NONE },  /* POLYMORPH_RESISTANCE = 170 */
-    { "extended-xray-vision",         0, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_NONE },  /* EXTENDED_XRAY_VISION = 171 */
+    { "astral-vision",                0, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_NONE },  /* ASTRAL_VISION = 171 */
     { "protection-from-armor-destruction", 0, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_NONE },  /* PROTECTION_FROM_ARMOR_DESTRUCTION = 172 */
-    { "reserved-prop-4",              0, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_NONE },  /* RESERVED_PROP_X */
-    { "reserved-prop-5",              0, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_NONE },  /* RESERVED_PROP_X */
+    { "edibility-appraisal",          0, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_NONE },  /* EDIBILITY_APPRAISAL */
+    { "corpse-property-appraisal",    0, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_NONE },  /* CORPSE_PROPERTY_APPRAISAL */
     { "reserved-prop-6",              0, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_NONE },  /* RESERVED_PROP_X */
     { "reserved-prop-7",              0, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_NONE },  /* RESERVED_PROP_X */
     { "reserved-prop-8",              0, 0, 0,  0, 0,  PCLR_WHITE, PCLR_NONE, PROPFLAGS_NONE },  /* RESERVED_PROP_X */
@@ -442,9 +444,11 @@ const char* status_names[MAX_STATUS_MARKS] = {
     "Carrying object",
     "Peaceful townguard",
     "Hostile townguard",
+    "Eating",
+    "Busy",
 };
 
-enum game_ui_status_mark_types statusmarkorder[MAX_STATUS_MARKS] = { STATUS_MARK_TOWNGUARD_PEACEFUL, STATUS_MARK_TOWNGUARD_HOSTILE, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21 };
+enum game_ui_status_mark_types statusmarkorder[MAX_STATUS_MARKS] = { STATUS_MARK_TOWNGUARD_PEACEFUL, STATUS_MARK_TOWNGUARD_HOSTILE, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, STATUS_MARK_EATING, STATUS_MARK_FROZEN };
 
 void
 props_init()

@@ -108,6 +108,84 @@ namespace GnollHackX
                 return OtypData.special_quality;
             }
         }
+        public bool IsWorn
+        {
+            get
+            {
+                return ObjData.owornmask != 0;
+            }
+        }
+        public long WornBits
+        {
+            get
+            {
+                return ObjData.owornmask;
+            }
+        }
+        public bool IsArmor
+        {
+            get
+            {
+                return ObjData.oclass == (sbyte)obj_class_types.ARMOR_CLASS;
+            }
+        }
+        public sbyte ArmorType
+        {
+            get
+            {
+                return ObjData.oclass == (sbyte)obj_class_types.ARMOR_CLASS ? OtypData.oc_subtyp : (sbyte)-1;
+            }
+        }
+        public sbyte ClassType
+        {
+            get
+            {
+                return ObjData.oclass;
+            }
+        }
+
+        public bool IsShield
+        {
+            get
+            {
+                return ObjData.oclass == (sbyte)obj_class_types.ARMOR_CLASS && OtypData.oc_subtyp == (sbyte)obj_armor_types.ARM_SHIELD;
+            }
+        }
+        public bool IsWieldedWeapon
+        {
+            get
+            {
+                return (OtypData.ocdata_flags & (byte)ocdata_flag_types.OCDATA_WIELDED_WEAPON) != 0;
+            }
+        }
+        public bool IsQuiverable
+        {
+            get
+            {
+                return (OtypData.ocdata_flags & (byte)ocdata_flag_types.OCDATA_QUIVERABLE) != 0;
+            }
+        }
+        public bool IsBlindfold
+        {
+            get
+            {
+                return (OtypData.ocdata_flags & (byte)ocdata_flag_types.OCDATA_BLINDFOLD) != 0;
+            }
+        }
+        public bool IsBimanual
+        {
+            get
+            {
+                return (OtypData.ocdata_flags & (byte)ocdata_flag_types.OCDATA_BIMANUAL) != 0;
+            }
+        }
+        public bool IsAppliablePolearm
+        {
+            get
+            {
+                return (OtypData.ocdata_flags & (byte)ocdata_flag_types.OCDATA_APPLIABLE_POLEARM) != 0;
+            }
+        }
 
         public readonly bool Hallucinated;
         public readonly bool OutOfAmmo;

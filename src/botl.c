@@ -1345,9 +1345,9 @@ struct monst* mon;
         conditions |= BL_MASK_BLIND;
     if (is_deaf(mon))
         conditions |= BL_MASK_DEAF;
-    if (is_confused(mon))
+    if (is_stunned(mon))
         conditions |= BL_MASK_STUN;
-    if (mon->mprops[CONFUSION])
+    if (is_confused(mon))
         conditions |= BL_MASK_CONF;
     if (is_hallucinating(mon))
         conditions |= BL_MASK_HALLU;
@@ -1383,6 +1383,14 @@ boolean loc_is_you, ispeaceful, ispet, isdetected;
         boolean display_this_status_mark = FALSE;
         switch (status_mark)
         {
+        case STATUS_MARK_FROZEN:
+            if (!loc_is_you && mtmp->mfrozen > 0 && !Hallucination)
+                display_this_status_mark = TRUE;
+            break;
+        case STATUS_MARK_EATING:
+            if (!loc_is_you && mtmp->meating > 0 && !Hallucination)
+                display_this_status_mark = TRUE;
+            break;
         case STATUS_MARK_TOWNGUARD_PEACEFUL:
             if (!loc_is_you && ispeaceful && !ispet && !Hallucination && is_watch(mtmp->data))
                 display_this_status_mark = TRUE;
@@ -1404,7 +1412,7 @@ boolean loc_is_you, ispeaceful, ispet, isdetected;
                 display_this_status_mark = TRUE;
             break;
         case STATUS_MARK_BOUNTY:
-            if (!loc_is_you && Role_if(PM_KNIGHT) && !ispeaceful && !Hallucination && is_knight_bounty(mtmp->data))
+            if (!loc_is_you && Role_if(PM_KNIGHT) && !ispeaceful && !ispet && !Hallucination && is_knight_bounty(mtmp->data))
                 display_this_status_mark = TRUE;
             break;
         case STATUS_MARK_SATIATED:
@@ -1918,6 +1926,8 @@ boolean *valsetlist;
     update_all = FALSE;
 }
 
+STATIC_VAR boolean initalready = FALSE;
+
 void
 status_initialize(reassessment)
 boolean reassessment; /* TRUE: just recheck fields w/o other initialization */
@@ -1926,6 +1936,7 @@ boolean reassessment; /* TRUE: just recheck fields w/o other initialization */
     boolean fldenabl;
     int i;
     const char *fieldfmt, *fieldname;
+    issue_breadcrumb3("status_initialize", (int)reassessment, (int)blinit + ((int)initalready) * 2);
 
     if (!reassessment) {
         if (blinit)
@@ -1963,11 +1974,10 @@ boolean reassessment; /* TRUE: just recheck fields w/o other initialization */
     update_all = TRUE;
 }
 
-STATIC_VAR boolean initalready = FALSE;
-
 void
 status_finish(VOID_ARGS)
 {
+    issue_breadcrumb3("status_finish", (int)blinit, (int)initalready);
     if (blinit) /* Changed to blinit instead of VIA_WINDOWPORT() because exit_nhwindows may set VIA_WINDOWPORT() to false --JG */
     {
         int i;

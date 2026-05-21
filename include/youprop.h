@@ -174,6 +174,14 @@
 #define EProtection_from_armor_destruction u.uprops[PROTECTION_FROM_ARMOR_DESTRUCTION].extrinsic
 #define Protection_from_armor_destruction (HProtection_from_armor_destruction || EProtection_from_armor_destruction)
 
+#define HEdibility_appraisal u.uprops[EDIBILITY_APPRAISAL].intrinsic
+#define EEdibility_appraisal u.uprops[EDIBILITY_APPRAISAL].extrinsic
+#define Edibility_appraisal (HEdibility_appraisal || EEdibility_appraisal)
+
+#define HCorpse_property_appraisal u.uprops[CORPSE_PROPERTY_APPRAISAL].intrinsic
+#define ECorpse_property_appraisal u.uprops[CORPSE_PROPERTY_APPRAISAL].extrinsic
+#define Corpse_property_appraisal (HCorpse_property_appraisal || ECorpse_property_appraisal)
+
 
 /*** Troubles ***/
 /* Pseudo-property */
@@ -324,9 +332,9 @@
 #define EXRay_vision u.uprops[XRAY_VISION].extrinsic
 #define XRay_vision (HXRay_vision || EXRay_vision)
 
-#define HExtended_XRay_vision u.uprops[EXTENDED_XRAY_VISION].intrinsic
-#define EExtended_XRay_vision u.uprops[EXTENDED_XRAY_VISION].extrinsic
-#define Extended_XRay_vision (HExtended_XRay_vision || EExtended_XRay_vision)
+#define HAstral_vision u.uprops[ASTRAL_VISION].intrinsic
+#define EAstral_vision u.uprops[ASTRAL_VISION].extrinsic
+#define Astral_vision (HAstral_vision || EAstral_vision)
 
 #define HWarning u.uprops[WARNING].intrinsic
 #define EWarning u.uprops[WARNING].extrinsic

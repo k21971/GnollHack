@@ -194,6 +194,7 @@ boolean attack_only_hostiles;
                  * to allow monsters that resist conflict to respond.
                  */
                 if ((result & MM_HIT) && !(result & MM_DEF_DIED) && rn2(4)
+                    && check_mon_wants_to_attack_target(mon, mtmp)
                     && mon->movement >= NORMAL_SPEED) 
                 {
                     mon->movement -= NORMAL_SPEED;
@@ -286,6 +287,7 @@ boolean quietly;
     remove_monster(fx, fy); /* pick up from orig position */
     remove_monster(tx, ty);
     place_monster(magr, tx, ty); /* put down at target spot */
+    debugprint_pos();
     place_monster(mdef, fx, fy);
     if (vis && !quietly)
         pline("%s moves %s out of %s way!", Monnam(magr), mon_nam(mdef),
@@ -590,7 +592,7 @@ register struct monst *magr, *mdef;
                                 )
                             )
                         {
-                            Sprintf(priority_debug_buf_4, "mattackm: %d", omonwep->otyp);
+                            debugprint("mattackm: %d", omonwep->otyp);
                             if (omonwep->where == OBJ_MINVENT)
                                 m_useup(magr, omonwep);
                             else if (omonwep->where == OBJ_FREE)
@@ -1111,6 +1113,7 @@ register struct attack *mattk;
          *  magr from level.monsters[mdef->mx][mdef->my].  We need to
          *  put it back and display it.  -kd
          */
+        debugprint_pos();
         place_monster(magr, dx, dy);
         newsym(dx, dy);
         /* aggressor moves to <dx,dy> and might encounter trouble there */
@@ -1119,6 +1122,7 @@ register struct attack *mattk;
     } 
     else if (status & MM_AGR_DIED) 
     { /* aggressor died */
+        debugprint_pos();
         place_monster(mdef, dx, dy);
         newsym(dx, dy);
     }
@@ -1129,6 +1133,7 @@ register struct attack *mattk;
 
         remove_monster(dx,dy);
         place_monster(magr, ax, ay);
+        debugprint_pos();
         place_monster(mdef, dx, dy);
         newsym(ax, ay);
         newsym(dx, dy);
@@ -1847,9 +1852,9 @@ register struct obj* omonwep;
 
             if (!gold)
                 break;
-            Strcpy(debug_buf_2, "mdamagem1");
+            debugprint("mdamagem1");
             obj_extract_self(gold);
-            add_to_minv(magr, gold);
+            (void)add_to_minv(magr, gold);
         }
         mdef->mstrategy &= ~STRAT_WAITFORU;
         play_sfx_sound_at_location(SFX_STEAL_GOLD, mdef->mx, mdef->my);
@@ -1906,7 +1911,7 @@ register struct obj* omonwep;
             if (u.usteed == mdef && otmp == which_armor(mdef, W_SADDLE))
                 /* "You can no longer ride <steed>." */
                 dismount_steed(DISMOUNT_POLY);
-            Strcpy(debug_buf_2, "mdamagem2");
+            debugprint("mdamagem2");
             obj_extract_self(otmp);
             if (otmp->owornmask) {
                 mdef->worn_item_flags &= ~otmp->owornmask;
@@ -2254,6 +2259,7 @@ register struct obj* omonwep;
             {
                 struct obj* virtualcorpse = mksobj(CORPSE, FALSE, FALSE, FALSE);
                 int nutrit;
+                debugprint("mdamagem: virtual corpse");
 
                 set_corpsenm(virtualcorpse, num);
                 nutrit = dog_nutrition(magr, virtualcorpse);
@@ -2265,6 +2271,7 @@ register struct obj* omonwep;
                 if (nutrit > 1)
                     nutrit /= 2;
                 EDOG(magr)->hungrytime += nutrit;
+                refresh_m_tile_gui_info(magr, FALSE);
             }
 
             /* various checks similar to dog_eat and meatobj.

@@ -118,6 +118,7 @@ nemdead()
 {
     if (!Qstat(killed_nemesis)) {
         Qstat(killed_nemesis) = TRUE;
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_QUEST_NEMESIS);
         qt_pager_ex((struct monst*)0, QT_KILLEDNEM, ATR_NONE, CLR_MSG_HINT, FALSE);
     }
 }
@@ -196,6 +197,8 @@ boolean seal;
     d_level *dest;
     struct trap *t;
     int64_t portal_flag;
+    debugprint("expulsion: seal=%d, qexpelled=%d", (int)seal, (int)u.uevent.qexpelled);
+    issue_breadcrumb3("Expulsion.", (int)seal, (int)u.uevent.qexpelled);
 
     br = dungeon_branch("The Quest");
     dest = (br->end1.dnum == u.uz.dnum) ? &br->end2 : &br->end1;
@@ -215,7 +218,10 @@ boolean seal;
             if (t->ttyp == MAGIC_PORTAL)
                 break;
         if (t)
+        {
             deltrap(t); /* (display might be briefly out of sync) */
+            issue_breadcrumb("Quest near portal deleted.");
+        }
         else if (!reexpelled)
             impossible("quest portal already gone?");
     }
@@ -256,6 +262,7 @@ struct obj *obj; /* quest artifact; possibly null if carrying Amulet */
         fully_identify_obj(obj);
         update_inventory();
         livelog_printf(LL_ACHIEVE, "completed %s quest without incident", uhis());
+        issue_achievement(GUI_ACHIEVEMENT_COMPLETED_THE_QUEST);
         update_game_music();
     }
 }
@@ -332,12 +339,14 @@ boolean dopopup;
             qt_pager_ex(mtmp, QT_BADLEVEL, ATR_NONE, CLR_MSG_HINT, dopopup);
             exercise(A_WIS, TRUE);
             res = FALSE; // For safety
+            debugprint_pos();
             expulsion(FALSE);
         }
         else if (is_pure(TRUE) < 0) 
         {
             com_pager_ex((struct monst*)0, QT_BANISHED, ATR_NONE, CLR_MSG_NEGATIVE, dopopup);
             res = FALSE; // For safety
+            debugprint_pos();
             expulsion(TRUE);
         }
         else if (is_pure(TRUE) == 0)
@@ -347,12 +356,14 @@ boolean dopopup;
             {
                 qt_pager_ex(mtmp, QT_LASTLEADER, ATR_NONE, CLR_MSG_NEGATIVE, dopopup);
                 res = FALSE; // For safety
+                debugprint_pos();
                 expulsion(TRUE);
             }
             else 
             {
                 Qstat(not_ready)++;
                 exercise(A_WIS, TRUE);
+                debugprint_pos();
                 expulsion(FALSE);
             }
         }
@@ -384,6 +395,7 @@ struct monst *mtmp;
     if (Qstat(pissed_off)) 
     {
         qt_pager_ex(mtmp, QT_LASTLEADER, ATR_NONE, CLR_MSG_NEGATIVE, FALSE);
+        debugprint_pos();
         expulsion(TRUE); // Return FALSE for safety
     }
     else if(!u.uevent.qcompleted)

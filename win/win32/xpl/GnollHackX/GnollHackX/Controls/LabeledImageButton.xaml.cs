@@ -34,7 +34,13 @@ namespace GnollHackX.Controls
         public static readonly BindableProperty BtnMetaProperty = BindableProperty.Create(nameof(BtnMeta), typeof(bool), typeof(LabeledImageButton), false);
         public static readonly BindableProperty BtnCtrlProperty = BindableProperty.Create(nameof(BtnCtrl), typeof(bool), typeof(LabeledImageButton), false);
         public static readonly BindableProperty BtnCommandProperty = BindableProperty.Create(nameof(BtnCommand), typeof(int), typeof(LabeledImageButton), 0);
-        
+        public static readonly BindableProperty ShortcutTextProperty = BindableProperty.Create(nameof(ShortcutText), typeof(string), typeof(LabeledImageButton), string.Empty);
+        public static readonly BindableProperty ShortcutFontSizeProperty = BindableProperty.Create(nameof(ShortcutFontSize), typeof(double), typeof(LabeledImageButton), 9.0);
+        public static readonly BindableProperty ShortcutFontFamilyProperty = BindableProperty.Create(nameof(ShortcutFontFamily), typeof(string), typeof(LabeledImageButton), "LatoRegular");
+        public static readonly BindableProperty ShortcutFontColorProperty = BindableProperty.Create(nameof(ShortcutFontColor), typeof(Color), typeof(LabeledImageButton), GHColors.Gray);
+        public static readonly BindableProperty IsShortcutVisibleProperty = BindableProperty.Create(nameof(IsShortcutVisible), typeof(bool), typeof(LabeledImageButton), false);
+        public static readonly BindableProperty IsCommandMappingEnabledProperty = BindableProperty.Create(nameof(IsCommandMappingEnabled), typeof(bool), typeof(LabeledImageButton), true);
+
         public event EventHandler<EventArgs> BtnClicked;
         public char BtnLetter
         {
@@ -78,6 +84,36 @@ namespace GnollHackX.Controls
             set => SetValue(LabeledImageButton.LblFontColorProperty, value);
         }
 
+        public string ShortcutText
+        {
+            get => (string)GetValue(LabeledImageButton.ShortcutTextProperty);
+            set => SetValue(LabeledImageButton.ShortcutTextProperty, value);
+        }
+        public double ShortcutFontSize
+        {
+            get => (double)GetValue(LabeledImageButton.ShortcutFontSizeProperty);
+            set => SetValue(LabeledImageButton.ShortcutFontSizeProperty, value);
+        }
+        public string ShortcutFontFamily
+        {
+            get => (string)GetValue(LabeledImageButton.ShortcutFontFamilyProperty);
+            set => SetValue(LabeledImageButton.ShortcutFontFamilyProperty, value);
+        }
+        public Color ShortcutFontColor
+        {
+            get => (Color)GetValue(LabeledImageButton.ShortcutFontColorProperty);
+            set => SetValue(LabeledImageButton.ShortcutFontColorProperty, value);
+        }
+        public bool IsShortcutVisible
+        {
+            get => (bool)GetValue(LabeledImageButton.IsShortcutVisibleProperty);
+            set => SetValue(LabeledImageButton.IsShortcutVisibleProperty, value);
+        }
+        public bool IsCommandMappingEnabled
+        {
+            get => (bool)GetValue(LabeledImageButton.IsCommandMappingEnabledProperty);
+            set => SetValue(LabeledImageButton.IsCommandMappingEnabledProperty, value);
+        }
         public string ImgSourcePath
         {
             get => (string)GetValue(LabeledImageButton.ImgSourcePathProperty);
@@ -122,22 +158,45 @@ namespace GnollHackX.Controls
                 return ViewButton.GHCommand;
             }
         }
+        public char MappedBtnLetter
+        {
+            get => IsCommandMappingEnabled ? ViewButton.MappedLetter : ViewButton.Letter;
+        }
+        public bool MappedBtnMeta
+        {
+            get => IsCommandMappingEnabled ? ViewButton.MappedMeta : ViewButton.ApplyMeta;
+        }
+        public bool MappedBtnCtrl
+        {
+            get => IsCommandMappingEnabled ? ViewButton.MappedCtrl : ViewButton.ApplyCtrl;
+        }
+        public int MappedBtnCommand
+        {
+            get => IsCommandMappingEnabled ? ViewButton.MappedRawCommand : ViewButton.RawCommand;
+        }
+        public int MappedGHCommand
+        {
+            get => IsCommandMappingEnabled ? ViewButton.MappedGHCommand : ViewButton.GHCommand;
+        }
 
         public bool LargerFont { get; set; }
         public int LandscapeButtonsInRow { get; set; } = 0;
         public int PortraitButtonsInRow { get; set; } = 0;
 
-        public void SetSideSize(double canvasViewWidth, double canvasViewHeight, bool usingDesktopButtons, bool usingSimpleCmdLayout, int stoneButtonRows, float inverseCanvasScale, float customScale)
+        public void SetSideSize(double canvasViewWidth, double canvasViewHeight, bool usingDesktopButtons, bool usingSimpleCmdLayout, bool showShortcuts, int stoneButtonRows, float inverseCanvasScale, float customScale)
         {
-            double imgsidewidth = UIUtils.CalculateButtonSideWidth(canvasViewWidth, canvasViewHeight, usingDesktopButtons, usingSimpleCmdLayout, stoneButtonRows, inverseCanvasScale, customScale, LandscapeButtonsInRow, PortraitButtonsInRow, false);
+            double imgsidewidth = UIUtils.CalculateButtonSideWidth(canvasViewWidth, canvasViewHeight, usingDesktopButtons, usingSimpleCmdLayout, stoneButtonRows, inverseCanvasScale, customScale, LandscapeButtonsInRow, PortraitButtonsInRow, false, showShortcuts);
             double imgsideheight = imgsidewidth;
             double fontsize = 8.5 * imgsidewidth / 50.0;
             double fontsize_larger = 9.0 * imgsidewidth / 50.0;
             double gridsidewidth = imgsidewidth;
-            double gridsideheight = imgsideheight + fontsize + 2;
-            double gridsideheight_larger = imgsideheight + fontsize_larger + 2;
+            double gridsideheight = imgsideheight + fontsize * (double)(showShortcuts ? GHConstants.TextRowMultiplierWithKeyboardShortcuts : 1.0f) + 2;
+            double gridsideheight_larger = imgsideheight + fontsize_larger * (double)(showShortcuts ? GHConstants.TextRowMultiplierWithKeyboardShortcuts : 1.0f) + 2;
 
             LblFontSize = LargerFont ? fontsize_larger : fontsize;
+            ShortcutFontSize = (LargerFont ? fontsize_larger : fontsize) * GHConstants.KeyboardShortcutRelativeFontSize;
+            IsShortcutVisible = showShortcuts;
+            ShortcutText = GHUtils.ConstructShortcutText(this);
             GridWidth = gridsidewidth;
             GridHeight = LargerFont ? gridsideheight_larger : gridsideheight;
             ImgWidth = imgsidewidth;
@@ -146,12 +205,13 @@ namespace GnollHackX.Controls
             //    ViewImage.Source = ImageSource.FromResource(ImgSourcePath);
         }
 
-        private readonly object _propertyLock = new object();
         private double _threadSafeWidth = 0;
         private double _threadSafeHeight = 0;
         private double _threadSafeX = 0;
         private double _threadSafeY = 0;
         private int _threadSafeIsVisible = 1;
+
+        private readonly object _propertyLock = new object();
         private Thickness _threadSafeMargin = new Thickness();
         WeakReference<IThreadSafeView> _threadSafeParent = null;
 
@@ -161,15 +221,10 @@ namespace GnollHackX.Controls
         public double ThreadSafeY { get { return Interlocked.CompareExchange(ref _threadSafeY, 0.0, 0.0); } private set { Interlocked.Exchange(ref _threadSafeY, value); } }
         public bool ThreadSafeIsVisible { get { return Interlocked.CompareExchange(ref _threadSafeIsVisible, 0, 0) != 0; } private set { Interlocked.Exchange(ref _threadSafeIsVisible, value ? 1 : 0); } }
         public Thickness ThreadSafeMargin { get { lock (_propertyLock) { return _threadSafeMargin; } } private set { lock (_propertyLock) { _threadSafeMargin = value; } } }
-        public WeakReference<IThreadSafeView> ThreadSafeParent { get { lock (_propertyLock) { return _threadSafeParent; } } private set { lock (_propertyLock) { _threadSafeParent = value; } } }
+        public WeakReference<IThreadSafeView> ThreadSafeParent { get { return Interlocked.CompareExchange(ref _threadSafeParent, null, null); } private set { Interlocked.Exchange(ref _threadSafeParent, value); } }
 
         private void LabeledImageButton_SizeChanged(object sender, EventArgs e)
         {
-            //lock (_propertyLock)
-            //{
-            //    _threadSafeWidth = Width;
-            //    _threadSafeHeight = Height;
-            //}
             ThreadSafeWidth = Width;
             ThreadSafeHeight = Height;
         }
@@ -184,18 +239,18 @@ namespace GnollHackX.Controls
             InitializeComponent();
             SizeChanged += LabeledImageButton_SizeChanged;
             PropertyChanged += LabeledImageButton_PropertyChanged;
+            ThreadSafeWidth = Width;
+            ThreadSafeHeight = Height;
+            ThreadSafeX = X;
+            ThreadSafeY = Y;
+            ThreadSafeIsVisible = IsVisible;
+            if (Parent == null || !(Parent is IThreadSafeView))
+                ThreadSafeParent = null;
+            else
+                ThreadSafeParent = new WeakReference<IThreadSafeView>((IThreadSafeView)Parent);
             lock (_propertyLock)
             {
-                _threadSafeWidth = Width;
-                _threadSafeHeight = Height;
-                _threadSafeX = X;
-                _threadSafeY = Y;
-                _threadSafeIsVisible = IsVisible ? 1 : 0;
                 _threadSafeMargin = Margin;
-                if (Parent == null || !(Parent is IThreadSafeView))
-                    _threadSafeParent = null;
-                else
-                    _threadSafeParent = new WeakReference<IThreadSafeView>((IThreadSafeView)Parent);
             }
             ViewButton.Clicked += ViewButton_Clicked;
 #if WINDOWS
@@ -294,8 +349,8 @@ namespace GnollHackX.Controls
 
         private void ViewButton_Clicked(object sender, EventArgs e)
         {
+            GHApp.AddSentryBreadcrumb("LabeledImageButton: " + LblText + ": " + GHCommand, GHConstants.SentryGnollHackButtonClickCategoryName);
             BtnClicked?.Invoke(this, e);
         }
     }
-
 }

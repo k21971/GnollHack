@@ -405,7 +405,7 @@ int trouble;
         {
             play_sfx_sound(SFX_ITEM_VANISHES);
             Your_ex(ATR_NONE, CLR_MSG_POSITIVE, "amulet vanishes!");
-            Sprintf(priority_debug_buf_2, "fix_worst_trouble: %d", uamul->otyp);
+            debugprint("fix_worst_trouble: %d", uamul->otyp);
             useup(uamul);
         }
         if(Breathless)
@@ -997,9 +997,6 @@ gcrownu()
             {
                 class_gift = GAUNTLETS_OF_BALANCE;
                 obj = oname(obj, artiname(ART_GAUNTLETS_OF_YIN_AND_YANG));
-                at_your_feet("A pair of gauntlets");
-                dropyf(obj);
-                u.ugifts++;
                 if (obj && obj->oartifact == ART_GAUNTLETS_OF_YIN_AND_YANG)
                 {
                     obj->enchantment = 1;
@@ -1009,6 +1006,10 @@ gcrownu()
                         "was bestowed with %s",
                         artiname(ART_GAUNTLETS_OF_YIN_AND_YANG));
                 }
+                at_your_feet("A pair of gauntlets");
+                (void)dropyf(obj);
+                u.ugifts++;
+                issue_achievement(GUI_ACHIEVEMENT_WAS_GIFTED_ARTIFACT);
             }
         }
 
@@ -1025,8 +1026,9 @@ gcrownu()
                 livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT | LL_SPOILER,
                     "was bestowed with %s", an(actualoname(obj)));
                 at_your_feet("A belt");
-                dropyf(obj);
+                (void)dropyf(obj);
                 u.ugifts++;
+                issue_achievement(GUI_ACHIEVEMENT_WAS_GIFTED_ARTIFACT);
             }
         }
     }
@@ -1134,8 +1136,9 @@ gcrownu()
         livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT,
             "was bestowed with %s", an(actualoname(obj)));
         at_your_feet("A golden chest");
-        dropyf(obj);
+        (void) dropyf(obj);
         u.ugifts++;
+        issue_achievement(GUI_ACHIEVEMENT_WAS_GIFTED_ARTIFACT);
     }
     else if (Role_if(PM_PRIEST))
     {
@@ -1336,8 +1339,9 @@ gcrownu()
         livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT,
             "was bestowed with %s", an(actualoname(obj)));
         at_your_feet("A golden chest");
-        dropyf(obj);
+        (void) dropyf(obj);
         u.ugifts++;
+        issue_achievement(GUI_ACHIEVEMENT_WAS_GIFTED_ARTIFACT);
     }
     else if (Role_if(PM_VALKYRIE))
     {
@@ -1374,16 +1378,17 @@ gcrownu()
             }
             obj->enchantment = 2 + rnd(3);
             obj->oerodeproof = 1;
-            at_your_feet(is_axe(obj) ? "An axe" : is_sword(obj) ? "A sword" : "A weapon");
-            dropyf(obj);
-            u.ugifts++;
             obj->mknown = TRUE;
+            at_your_feet(is_axe(obj) ? "An axe" : is_sword(obj) ? "A sword" : "A weapon");
+            (void)dropyf(obj);
+            u.ugifts++;
             livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT | LL_SPOILER,
                 "was bestowed with %s", an(actualoname(obj)));
+            issue_achievement(GUI_ACHIEVEMENT_WAS_GIFTED_ARTIFACT);
         }
         /* acquire axe or sword skill */
         unrestrict_weapon_skill(gifttype  == DWARVISH_AXE ? P_AXE : P_SWORD);
-        if (!flags.no_pets_preference)
+        if (!flags.pets_not_gifted)
             steed_gift = PM_PEGASUS;
     }
     else if (Role_if(PM_KNIGHT))
@@ -1399,9 +1404,6 @@ gcrownu()
                     class_gift = LANCE;
                     obj = oname(obj, artiname(ART_RHONGOMYNIAD));
                     obj->enchantment = 1;
-                    at_your_feet("A lance");
-                    dropyf(obj);
-                    u.ugifts++;
                     if (obj->oartifact == ART_RHONGOMYNIAD)
                     {
                         obj->aknown = obj->nknown = TRUE;
@@ -1410,6 +1412,10 @@ gcrownu()
                             "was bestowed with %s",
                             artiname(ART_RHONGOMYNIAD));
                     }
+                    at_your_feet("A lance");
+                    (void)dropyf(obj);
+                    u.ugifts++;
+                    issue_achievement(GUI_ACHIEVEMENT_WAS_GIFTED_ARTIFACT);
                 }
             }
             else if (!grail_already_exists)
@@ -1419,9 +1425,6 @@ gcrownu()
                 {
                     class_gift = GRAIL_OF_HEALING;
                     obj = oname(obj, artiname(ART_HOLY_GRAIL));
-                    at_your_feet("A grail");
-                    dropyf(obj);
-                    u.ugifts++;
                     if (obj->oartifact == ART_HOLY_GRAIL)
                     {
                         obj->aknown = obj->nknown = TRUE;
@@ -1430,21 +1433,25 @@ gcrownu()
                             "was bestowed with %s",
                             artiname(ART_HOLY_GRAIL));
                     }
+                    at_your_feet("A grail");
+                    (void)dropyf(obj);
+                    u.ugifts++;
+                    issue_achievement(GUI_ACHIEVEMENT_WAS_GIFTED_ARTIFACT);
                 }
             }
 
             /* acquire Rhongomyniad's skill regardless of weapon or gift */
             unrestrict_weapon_skill(P_THRUSTING_WEAPON);
 
-            if (!flags.no_pets_preference)
+            if (!flags.pets_not_gifted)
                 steed_gift = PM_KI_RIN;
             break;
         case A_NEUTRAL:
-            if (!flags.no_pets_preference)
+            if (!flags.pets_not_gifted)
                 steed_gift = PM_ROC;
             break;
         case A_CHAOTIC:
-            if (!flags.no_pets_preference)
+            if (!flags.pets_not_gifted)
                 steed_gift = PM_GORGON;
             break;
         default:
@@ -1466,9 +1473,6 @@ gcrownu()
                 {
                     class_gift = GRAIL_OF_HEALING;
                     obj = oname(obj, artiname(ART_HOLY_GRAIL));
-                    at_your_feet("A grail");
-                    dropyf(obj);
-                    u.ugifts++;
                     if (obj->oartifact == ART_HOLY_GRAIL)
                     {
                         obj->aknown = obj->nknown = TRUE;
@@ -1477,6 +1481,10 @@ gcrownu()
                             "was bestowed with %s",
                             artiname(ART_HOLY_GRAIL));
                     }
+                    at_your_feet("A grail");
+                    (void)dropyf(obj);
+                    u.ugifts++;
+                    issue_achievement(GUI_ACHIEVEMENT_WAS_GIFTED_ARTIFACT);
                 }
             }
             break;
@@ -1486,7 +1494,7 @@ gcrownu()
             break;
         }
     }
-    else if (Role_if(PM_TOURIST) && !(mvitals[PM_GIANT_LUGGAGE].mvflags & MV_GONE) && !flags.no_pets_preference)
+    else if (Role_if(PM_TOURIST) && !(mvitals[PM_GIANT_LUGGAGE].mvflags & MV_GONE) && !flags.pets_not_gifted)
     {
         struct monst* luggage = summoncreature(STRANGE_OBJECT, PM_GIANT_LUGGAGE, "%s appears in a puff of smoke.", MM_SUMMON_IN_SMOKE_ANIMATION | MM_NO_MONSTER_INVENTORY, SUMMONCREATURE_FLAGS_CAPITALIZE);
         if (luggage)
@@ -1668,9 +1676,6 @@ gcrownu()
                     class_gift = KATANA;
                     obj = oname(obj, artiname(ART_KATANA_OF_MASAMUNE));
                     obj->enchantment = 1;
-                    at_your_feet("A katana");
-                    dropyf(obj);
-                    u.ugifts++;
                     if (obj->oartifact == ART_KATANA_OF_MASAMUNE)
                     {
                         obj->aknown = obj->nknown = TRUE;
@@ -1679,6 +1684,10 @@ gcrownu()
                             "was bestowed with %s",
                             artiname(ART_KATANA_OF_MASAMUNE));
                     }
+                    at_your_feet("A katana");
+                    (void)dropyf(obj);
+                    u.ugifts++;
+                    issue_achievement(GUI_ACHIEVEMENT_WAS_GIFTED_ARTIFACT);
                 }
             }
             else if (!excalibur_already_exists && obj && objects[obj->otyp].oc_subtyp == WEP_LONG_SWORD && get_object_base_value(obj) < 2000L && !obj->oartifact)
@@ -1696,6 +1705,7 @@ gcrownu()
                     livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT,
                         "was bestowed with %s",
                         artiname(ART_EXCALIBUR));
+                    issue_achievement(GUI_ACHIEVEMENT_WAS_GIFTED_ARTIFACT);
                 }
             }
             else if (!excalibur_already_exists && obj2 && objects[obj2->otyp].oc_subtyp == WEP_LONG_SWORD && get_object_base_value(obj2) < 2000L && !obj2->oartifact)
@@ -1713,6 +1723,7 @@ gcrownu()
                     livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT | LL_SPOILER,
                         "was bestowed with %s",
                         artiname(ART_EXCALIBUR));
+                    issue_achievement(GUI_ACHIEVEMENT_WAS_GIFTED_ARTIFACT);
                 }
             }
             else
@@ -1727,12 +1738,13 @@ gcrownu()
                         obj->material = MAT_SILVER;
                     randomize_mythic_quality(obj, 2, &obj->mythic_prefix, &obj->mythic_suffix);
                     obj->enchantment = 2 + rnd(3);
-                    at_your_feet("A sword");
-                    dropyf(obj);
-                    u.ugifts++;
                     obj->mknown = TRUE;
                     livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT | LL_SPOILER,
                         "was bestowed with %s", an(actualoname(obj)));
+                    at_your_feet("A sword");
+                    (void)dropyf(obj);
+                    u.ugifts++;
+                    issue_achievement(GUI_ACHIEVEMENT_WAS_GIFTED_ARTIFACT);
                     /* sword skill is acquired below */
                 }
             }
@@ -1765,9 +1777,6 @@ gcrownu()
                     class_gift = LONG_SWORD;
                     obj = oname(obj, artiname(ART_VORPAL_BLADE));
                     obj->enchantment = 1;
-                    at_your_feet("A sword");
-                    dropyf(obj);
-                    u.ugifts++;
                     obj->aknown = obj->nknown = TRUE;
                     if (obj->oartifact == ART_VORPAL_BLADE)
                     {
@@ -1775,6 +1784,10 @@ gcrownu()
                             "was bestowed with %s",
                             artiname(ART_VORPAL_BLADE));
                     }
+                    at_your_feet("A sword");
+                    (void)dropyf(obj);
+                    u.ugifts++;
+                    issue_achievement(GUI_ACHIEVEMENT_WAS_GIFTED_ARTIFACT);
                 }
             }
             else
@@ -1786,12 +1799,13 @@ gcrownu()
                     obj->exceptionality = EXCEPTIONALITY_PRIMORDIAL;
                     randomize_mythic_quality(obj, 2, &obj->mythic_prefix, &obj->mythic_suffix);
                     obj->enchantment = 2 + rnd(3);
-                    at_your_feet("A sword");
-                    dropyf(obj);
-                    u.ugifts++;
                     obj->mknown= TRUE;
                     livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT | LL_SPOILER,
                         "was bestowed with %s", an(actualoname(obj)));
+                    at_your_feet("A sword");
+                    (void)dropyf(obj);
+                    u.ugifts++;
+                    issue_achievement(GUI_ACHIEVEMENT_WAS_GIFTED_ARTIFACT);
                     /* sword skill is acquired below */
                 }
             }
@@ -1833,9 +1847,6 @@ gcrownu()
                     class_gift = chaotic_crowning_gift_baseitem;
                     obj = oname(obj, artiname(chaotic_crowning_gift_oartifact));
                     obj->enchantment = 1;
-                    at_your_feet(An(swordbuf));
-                    dropyf(obj);
-                    u.ugifts++;
                     obj->aknown = obj->nknown = TRUE;
                     if (obj->oartifact == chaotic_crowning_gift_oartifact)
                     {
@@ -1843,6 +1854,10 @@ gcrownu()
                             "was bestowed with %s",
                             artiname(chaotic_crowning_gift_oartifact));
                     }
+                    at_your_feet(An(swordbuf));
+                    (void)dropyf(obj);
+                    u.ugifts++;
+                    issue_achievement(GUI_ACHIEVEMENT_WAS_GIFTED_ARTIFACT);
                 }
             }
             else
@@ -1854,12 +1869,13 @@ gcrownu()
                     obj->exceptionality = EXCEPTIONALITY_INFERNAL;
                     randomize_mythic_quality(obj, 2, &obj->mythic_prefix, &obj->mythic_suffix);
                     obj->enchantment = 2 + rnd(3);
-                    at_your_feet("A sword");
-                    dropyf(obj);
-                    u.ugifts++;
                     obj->mknown = TRUE;
                     livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT | LL_SPOILER,
                         "was bestowed with %s", an(actualoname(obj)));
+                    at_your_feet("A sword");
+                    (void)dropyf(obj);
+                    u.ugifts++;
+                    issue_achievement(GUI_ACHIEVEMENT_WAS_GIFTED_ARTIFACT);
                     /* acquire long sword skill */
                     unrestrict_weapon_skill(P_SWORD);
                 }
@@ -1928,6 +1944,7 @@ gcrownu()
 
         u.uachieve.crowned = 1;
         achievement_gained(hofe);
+        issue_achievement(GUI_ACHIEVEMENT_WAS_CROWNED);
     }
     return;
 }
@@ -1940,6 +1957,7 @@ aligntyp g_align;
     int trouble = in_trouble(); /* what's your worst difficulty? */
     int pat_on_head = 0, kick_on_butt;
 
+    issue_achievement(GUI_ACHIEVEMENT_PRAYED);
     play_sfx_sound(SFX_PRAY_PLEASED);
     You_feel_ex(ATR_NONE, CLR_MSG_SUCCESS, "that %s is %s.", align_gname(g_align),
              (u.ualign.record >= DEVOUT)
@@ -2369,6 +2387,8 @@ boolean bless_water;
 
     if (changed)
     {
+        if (bless_water)
+            issue_achievement(GUI_ACHIEVEMENT_CREATED_HOLY_WATER_ON_ALTAR);
         play_sfx_sound(bless_water ? SFX_PRAY_BLESS_WATER : SFX_PRAY_CURSE_WATER);
 
         if (!Blind)
@@ -2537,9 +2557,7 @@ register struct obj *otmp;
         Your_ex(ATR_NONE, CLR_MSG_MYSTICAL, "sacrifice is consumed in a %s!",
             u.ualign.type == A_LAWFUL ? "flash of light" : "burst of flame");
     }
-    Sprintf(priority_debug_buf_2, "consume_offering: %d", otmp->otyp);
-    Strcpy(priority_debug_buf_3, "consume_offering");
-    Strcpy(priority_debug_buf_4, "consume_offering");
+    debugprint("consume_offering: %d", otmp->otyp);
     if (carried(otmp))
         useup(otmp);
     else
@@ -2731,9 +2749,7 @@ dosacrifice()
 
             change_luck(luck_change, TRUE);
 
-            Sprintf(priority_debug_buf_2, "dosacrifice: %d", otmp->otyp);
-            Strcpy(priority_debug_buf_3, "dosacrifice");
-            Strcpy(priority_debug_buf_4, "dosacrifice");
+            debugprint("dosacrifice: %d", otmp->otyp);
             if (carried(otmp))
                 useup(otmp);
             else
@@ -2830,9 +2846,7 @@ dosacrifice()
             if (uamul == otmp)
                 Amulet_off();
             u.uevent.ascended = 1;
-            Sprintf(priority_debug_buf_2, "dosacrifice2: %d", otmp->otyp);
-            Strcpy(priority_debug_buf_3, "dosacrifice2");
-            Strcpy(priority_debug_buf_4, "dosacrifice2");
+            debugprint("dosacrifice2: %d", otmp->otyp);
             if (carried(otmp))
                 useup(otmp); /* well, it's gone now */
             else
@@ -2902,6 +2916,155 @@ dosacrifice()
                 You_ex(ATR_NONE, CLR_MSG_POSITIVE, "ascend to the status of Demigod%s...",
                     flags.female ? "dess" : "");
                 achievement_gained("Ascended");
+                issue_achievement(GUI_ACHIEVEMENT_ASCENDED);
+                if (!ModernMode && !CasualMode && !discover)
+                {
+                    issue_achievement(GUI_ACHIEVEMENT_ASCENDED_IN_CLASSIC_MODE);
+                    if (context.game_difficulty >= 0)
+                    {
+                        issue_achievement(GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY);
+                        switch (Role_switch)
+                        {
+                        case PM_ARCHAEOLOGIST:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_ARCHAEOLOGIST_AT_EXPERT_DIFFICULTY);
+                            break;
+                        case PM_BARBARIAN:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_BARBARIAN_AT_EXPERT_DIFFICULTY);
+                            break;
+                        case PM_CAVEMAN:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_CAVEMAN_AT_EXPERT_DIFFICULTY);
+                            break;
+                        case PM_HEALER:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_HEALER_AT_EXPERT_DIFFICULTY);
+                            break;
+                        case PM_KNIGHT:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_KNIGHT_AT_EXPERT_DIFFICULTY);
+                            break;
+                        case PM_MONK:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_MONK_AT_EXPERT_DIFFICULTY);
+                            break;
+                        case PM_PRIEST:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_PRIEST_AT_EXPERT_DIFFICULTY);
+                            break;
+                        case PM_RANGER:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_RANGER_AT_EXPERT_DIFFICULTY);
+                            break;
+                        case PM_ROGUE:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_ROGUE_AT_EXPERT_DIFFICULTY);
+                            break;
+                        case PM_SAMURAI:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_SAMURAI_AT_EXPERT_DIFFICULTY);
+                            break;
+                        case PM_TOURIST:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_TOURIST_AT_EXPERT_DIFFICULTY);
+                            break;
+                        case PM_VALKYRIE:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_VALKYRIE_AT_EXPERT_DIFFICULTY);
+                            break;
+                        case PM_WIZARD:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_WIZARD_AT_EXPERT_DIFFICULTY);
+                            break;
+                        default:
+                            break;
+                        }
+                    }
+                    if (context.game_difficulty >= 1)
+                    {
+                        issue_achievement(GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY);
+                        switch (Role_switch)
+                        {
+                        case PM_ARCHAEOLOGIST:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_ARCHAEOLOGIST_AT_MASTER_DIFFICULTY);
+                            break;
+                        case PM_BARBARIAN:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_BARBARIAN_AT_MASTER_DIFFICULTY);
+                            break;
+                        case PM_CAVEMAN:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_CAVEMAN_AT_MASTER_DIFFICULTY);
+                            break;
+                        case PM_HEALER:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_HEALER_AT_MASTER_DIFFICULTY);
+                            break;
+                        case PM_KNIGHT:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_KNIGHT_AT_MASTER_DIFFICULTY);
+                            break;
+                        case PM_MONK:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_MONK_AT_MASTER_DIFFICULTY);
+                            break;
+                        case PM_PRIEST:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_PRIEST_AT_MASTER_DIFFICULTY);
+                            break;
+                        case PM_RANGER:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_RANGER_AT_MASTER_DIFFICULTY);
+                            break;
+                        case PM_ROGUE:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_ROGUE_AT_MASTER_DIFFICULTY);
+                            break;
+                        case PM_SAMURAI:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_SAMURAI_AT_MASTER_DIFFICULTY);
+                            break;
+                        case PM_TOURIST:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_TOURIST_AT_MASTER_DIFFICULTY);
+                            break;
+                        case PM_VALKYRIE:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_VALKYRIE_AT_MASTER_DIFFICULTY);
+                            break;
+                        case PM_WIZARD:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_WIZARD_AT_MASTER_DIFFICULTY);
+                            break;
+                        default:
+                            break;
+                        }
+                    }
+                    if (context.game_difficulty >= 2)
+                    {
+                        issue_achievement(GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY);
+                        switch (Role_switch)
+                        {
+                        case PM_ARCHAEOLOGIST:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_ARCHAEOLOGIST_AT_GRAND_MASTER_DIFFICULTY);
+                            break;
+                        case PM_BARBARIAN:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_BARBARIAN_AT_GRAND_MASTER_DIFFICULTY);
+                            break;
+                        case PM_CAVEMAN:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_CAVEMAN_AT_GRAND_MASTER_DIFFICULTY);
+                            break;
+                        case PM_HEALER:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_HEALER_AT_GRAND_MASTER_DIFFICULTY);
+                            break;
+                        case PM_KNIGHT:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_KNIGHT_AT_GRAND_MASTER_DIFFICULTY);
+                            break;
+                        case PM_MONK:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_MONK_AT_GRAND_MASTER_DIFFICULTY);
+                            break;
+                        case PM_PRIEST:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_PRIEST_AT_GRAND_MASTER_DIFFICULTY);
+                            break;
+                        case PM_RANGER:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_RANGER_AT_GRAND_MASTER_DIFFICULTY);
+                            break;
+                        case PM_ROGUE:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_ROGUE_AT_GRAND_MASTER_DIFFICULTY);
+                            break;
+                        case PM_SAMURAI:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_SAMURAI_AT_GRAND_MASTER_DIFFICULTY);
+                            break;
+                        case PM_TOURIST:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_TOURIST_AT_GRAND_MASTER_DIFFICULTY);
+                            break;
+                        case PM_VALKYRIE:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_VALKYRIE_AT_GRAND_MASTER_DIFFICULTY);
+                            break;
+                        case PM_WIZARD:
+                            issue_achievement(GUI_ACHIEVEMENT_ASCENDED_WIZARD_AT_GRAND_MASTER_DIFFICULTY);
+                            break;
+                        default:
+                            break;
+                        }
+                    }
+                }
                 done(ASCENDED);
             }
         }
@@ -3020,11 +3183,13 @@ dosacrifice()
             else 
             {
                 consume_offering(otmp);
+                issue_achievement(GUI_ACHIEVEMENT_SACRIFICED);
                 if(!godlessaltar)
                     You_ex(ATR_NONE, CLR_MSG_WARNING, "sense a conflict between %s and %s.", u_gname(), a_gname());
                 if (godlessaltar || rn2(8 + u.ulevel) > 5)
                 {
                     struct monst *pri;
+                    issue_achievement(GUI_ACHIEVEMENT_CONVERTED_ALTAR);
                     play_sfx_sound(SFX_ALTAR_POWER_INCREASE);
                     You_feel_ex(ATR_NONE, CLR_MSG_POSITIVE, "the power of %s increase.", u_gname());
                     exercise(A_WIS, TRUE);
@@ -3068,6 +3233,7 @@ dosacrifice()
         }
 
         consume_offering(otmp);
+        issue_achievement(GUI_ACHIEVEMENT_SACRIFICED);
 
         boolean bless_savestone = FALSE;
 
@@ -3195,9 +3361,24 @@ dosacrifice()
                         uncurse(otmp);
                     if(erosion_matters(otmp))
                         otmp->oerodeproof = TRUE;
+                    if (!Hallucination && !Blind)
+                    {
+                        otmp->dknown = 1;
+                        makeknown(otmp->otyp);
+                        if (otmp->oartifact)
+                        {
+                            otmp->nknown = 1;
+                            discover_artifact(otmp->oartifact);
+                        }
+                    }
+                    livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT,
+                        "was bestowed with %s by %s",
+                        artiname(otmp->oartifact),
+                        align_gname(u.ualign.type));
                     at_your_feet("An object");
-                    dropyf(otmp);
-                    if (is_launcher(otmp))
+                    boolean islauncher = is_launcher(otmp);
+                    (void)dropyf(otmp);
+                    if (islauncher)
                     {
                         struct obj* otmp2 = (struct obj*)0;
                         if (objects[otmp->otyp].oc_skill == P_BOW)
@@ -3214,7 +3395,7 @@ dosacrifice()
                             bless(otmp2);
                             otmp2->enchantment = rn2(4);
                             otmp2->owt = weight(otmp2);
-                            dropyf(otmp2);
+                            (void)dropyf(otmp2);
                         }
                     }
                     play_voice_god_simple_line_by_align(u.ualign.type, GOD_LINE_USE_MY_GIFT_WISELY);
@@ -3222,26 +3403,13 @@ dosacrifice()
                     u.ugifts++;
                     u.uprayer_timeout = Role_if(PM_PRIEST) ? rnz(150 + (25 * nartifacts)) : rnz(300 + (50 * nartifacts));
                     exercise(A_WIS, TRUE);
-                    livelog_printf(LL_DIVINEGIFT | LL_ARTIFACT,
-                        "was bestowed with %s by %s",
-                        artiname(otmp->oartifact),
-                        align_gname(u.ualign.type));
+                    issue_achievement(GUI_ACHIEVEMENT_WAS_GIFTED_ARTIFACT);
 
                     /* make sure we can use this weapon */
                     enum p_skills wep_skill_idx = weapon_skill_type(otmp);
                     if (wep_skill_idx > P_NONE)
                     {
                         unrestrict_weapon_skill(wep_skill_idx);
-                    }
-                    if (!Hallucination && !Blind)
-                    {
-                        otmp->dknown = 1;
-                        makeknown(otmp->otyp);
-                        if (otmp->oartifact)
-                        {
-                            otmp->nknown = 1;
-                            discover_artifact(otmp->oartifact);
-                        }
                     }
                     return 1;
                 }
@@ -3614,7 +3782,7 @@ doturn()
             if (spl_book[sp_no].sp_id == NO_SPELL)
                 break;
             else if (spl_book[sp_no].sp_id == SPE_TURN_UNDEAD)
-                return spelleffects(sp_no, FALSE, &youmonst);
+                return spelleffects(sp_no, FALSE, &youmonst, (boolean*)0);
         }
         play_sfx_sound(SFX_GENERAL_DO_NOT_KNOW_HOW);
         You_ex(ATR_NONE, CLR_MSG_FAIL, "don't know how to turn undead!");
@@ -3662,6 +3830,7 @@ doturn()
                 mtmp->mflee = 0;
                 mtmp->mfrozen = 0;
                 mtmp->mcanmove = 1;
+                refresh_m_tile_gui_info(mtmp, TRUE);
             } else if (!check_magic_resistance_and_inflict_damage(mtmp, (struct obj*)0, (struct monst*)0, u.ulevel, 0, 0, TELL)) {
                 xlev = 6;
                 switch (mtmp->data->mlet) {

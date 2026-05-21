@@ -11,7 +11,7 @@ namespace GnollHackX
     public interface IGnollHackService
     {
         Task InitializeGnollHack();
-        Task InitializeSecrets(Secrets secrets);
+        Task InitializeFilesInSettings(Secrets settings);
         Task ResetDefaultsFile();
 
         void LoadLibrary();
@@ -76,18 +76,25 @@ namespace GnollHackX
 
         bool GetCharacterClickAction();
         void SetCharacterClickAction(bool newValue);
+        void SetMetricSystem(bool newValue);
         bool GetGetPositionArrows();
         void SetGetPositionArrows(bool newValue);
         void SetDiceAsRanges(bool newValue);
+        void SetWornShowsEquipment(bool newValue);
+        void SetNoPetsPreference(bool newValue);
         void SetAutoDig(bool newValue);
         void SetIgnoreStopping(bool newValue);
         int GetMouseCommand(bool isMiddle);
         void SetMouseCommand(int newValue, bool isMiddle);
+        void SetEngraveQuickText(string newValue);
+        void SetEngraveQuickStyle(int newValue);
 
         string GetEventPathForGHSound(int ghsound);
         float GetVolumeForGHSound(int ghsound);
 
         void SetExitHack(int newValue);
-        void ExitGnhThread();
+        void ExitGnhThread(exit_hack_types used_exit_hack_code);
+        void TerminateGnollHack(exit_hack_types used_exit_hack_code);
+        IntPtr GetCommandFunctionPointer(int cmd);
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -7,6 +8,8 @@ using System.Text;
 #if GNH_MAUI
 namespace GnollHackM
 #else
+using Xamarin.Forms;
+
 namespace GnollHackX
 #endif
 {
@@ -224,6 +227,7 @@ namespace GnollHackX
         ClickCast,
         ClickFire,
         ClickZap,
+        ClickPole,
     }
 
     [Flags]
@@ -271,18 +275,20 @@ namespace GnollHackX
         AutoDig =               0x00020000UL, /* Set autodig to true by default */
         IgnoreStopping =        0x00040000UL, /* Set ignore_stopping to true by default */
         DefaultVIKeys =         0x00080000UL, /* VI Keys are default instead of number pad movement */
+        WornShowsEquipment =    0x00100000UL, /* Show the equipment screen of inventory instead of only worn items in normal menu */
+        MetricSystem =          0x00200000UL, /* Set metric_system to true by default */
 
-        RightMouseButtonBit1 =  0x00400000UL, 
-        RightMouseButtonBit2 =  0x00800000UL, 
-        RightMouseButtonBit3 =  0x01000000UL, 
-        RightMouseButtonBit4 =  0x02000000UL,
-        RightMouseButtonBit5 =  0x04000000UL,
+        //RightMouseButtonBit1 =  0x00400000UL, 
+        //RightMouseButtonBit2 =  0x00800000UL, 
+        //RightMouseButtonBit3 =  0x01000000UL, 
+        //RightMouseButtonBit4 =  0x02000000UL,
+        //RightMouseButtonBit5 =  0x04000000UL,
 
-        MiddleMouseButtonBit1 = 0x08000000UL,
-        MiddleMouseButtonBit2 = 0x10000000UL, 
-        MiddleMouseButtonBit3 = 0x20000000UL, 
-        MiddleMouseButtonBit4 = 0x40000000UL, 
-        MiddleMouseButtonBit5 = 0x80000000UL, 
+        //MiddleMouseButtonBit1 = 0x08000000UL,
+        //MiddleMouseButtonBit2 = 0x10000000UL, 
+        //MiddleMouseButtonBit3 = 0x20000000UL, 
+        //MiddleMouseButtonBit4 = 0x40000000UL, 
+        //MiddleMouseButtonBit5 = 0x80000000UL, 
     }
 
     [Flags]
@@ -620,7 +626,7 @@ namespace GnollHackX
     }
 
     /* GHMenu styles */
-    public enum ghmenu_styles
+    public enum ghmenu_styles : int
     {
         GHMENU_STYLE_GENERAL = 0,
         GHMENU_STYLE_INVENTORY,
@@ -657,6 +663,7 @@ namespace GnollHackX
         GHMENU_STYLE_ACCEPT_PLAYER,
         GHMENU_STYLE_VIEW_SPELL,
         GHMENU_STYLE_VIEW_SPELL_ALTERNATE,
+        GHMENU_STYLE_INVENTORY_EQUIPMENT,
         MAX_GHMENU_STYLES
     }
 
@@ -817,7 +824,7 @@ namespace GnollHackX
         BL_COND_RIDE,
         BL_COND_SLOWED,
         BL_COND_PARALYZED,
-        BL_COND_FEARFU,
+        BL_COND_FEARFUL,
         BL_COND_SLEEPING,
         BL_COND_CANCELLED,
         BL_COND_SILENCED,
@@ -831,7 +838,7 @@ namespace GnollHackX
     public enum game_ui_status_mark_types
     {
         STATUS_MARK_PET = 0,
-        STATUS_MARK_PEACEFU,
+        STATUS_MARK_PEACEFUL,
         STATUS_MARK_DETECTED,
         STATUS_MARK_BOUNTY,
         STATUS_MARK_SATIATED,
@@ -854,6 +861,8 @@ namespace GnollHackX
         STATUS_MARK_INVENTORY,
         STATUS_MARK_TOWNGUARD_PEACEFUL,
         STATUS_MARK_TOWNGUARD_HOSTILE,
+        STATUS_MARK_EATING,
+        STATUS_MARK_FROZEN,
         MAX_STATUS_MARKS
     }
 
@@ -1169,8 +1178,17 @@ namespace GnollHackX
         public sbyte obj_loc_x;
         public sbyte obj_loc_y;
 
-        public byte reserved_1;
-        public byte reserved_2;
+        public sbyte oc_subtyp;
+        public byte ocdata_flags;
+    }
+
+    public enum ocdata_flag_types : byte
+    {
+        OCDATA_BIMANUAL = 0x01,
+        OCDATA_WIELDED_WEAPON = 0x02,
+        OCDATA_QUIVERABLE = 0x04,
+        OCDATA_BLINDFOLD = 0x08,
+        OCDATA_APPLIABLE_POLEARM = 0x10,
     }
 
     public enum obj_class_types
@@ -1199,6 +1217,19 @@ namespace GnollHackX
 
         MAX_OBJECT_CLASSES = 21
     }
+    public enum obj_armor_types : sbyte
+    {
+        ARM_SUIT = 0,
+        ARM_SHIELD = 1,        /* needed for special wear function */
+        ARM_HELM = 2,
+        ARM_GLOVES = 3,
+        ARM_BOOTS = 4,
+        ARM_CLOAK = 5,
+        ARM_SHIRT = 6,
+        ARM_ROBE = 7,
+        ARM_BRACERS = 8,
+        MAX_ARMOR_TYPES
+    }
 
     public enum obj_where_types
     {
@@ -1214,6 +1245,116 @@ namespace GnollHackX
         OBJ_MAGIC = 9,     /* object in a magic chest */
         NOBJ_STATES = 10
     }
+
+    [Flags]
+    public enum obj_worn_flags : ulong
+    {
+        W_ARM  = 0x00000001UL,  /* Body armor */
+        W_ARMC = 0x00000002UL,  /* Cloak */
+        W_ARMH = 0x00000004UL,  /* Helmet/hat */
+        W_ARMS = 0x00000008UL,  /* Shield */
+        W_ARMG = 0x00000010UL,  /* Gloves/gauntlets */
+        W_ARMF = 0x00000020UL,  /* Footwear */
+        W_ARMU = 0x00000040UL,  /* Undershirt */
+        W_ARMO = 0x00000080UL,  /* Robe or overcoat */
+        W_ARMB = 0x00000100UL,  /* Bracers */
+
+        W_ARMOR = (W_ARM | W_ARMC | W_ARMH | W_ARMS | W_ARMG | W_ARMF | W_ARMU | W_ARMO | W_ARMB),
+
+
+        /* Weapons */
+        W_WEP         = 0x00000200UL,        /* Wielded weapon in the primary hand */
+        W_WEP2        = W_ARMS,              /* Wielded weapon in the secondary hand (uses the same hand as W_ARMS) */
+        W_AUTOSTASH   = 0x00000400UL,        /* Autostash for putting items in automatically; NOT USED currently */
+        W_QUIVER      = 0x00000800UL,        /* Quiver for (f)iring ammo */
+        W_SWAPWEP     = 0x00001000UL,        /* Alternate weapon in the primary hand */
+        W_SWAPWEP2    = 0x00002000UL,        /* Alternate weapon/shield in the secondary hand */
+
+        W_ENVIRONMENT = 0x00004000UL,        /* Caused by environment, e.g., suffocation due to no air */
+        W_STUCK       = 0x00008000UL,        /* A monster in u.ustuck had grabbed you and is e.g. constricting you */
+
+        W_WIELDED_WEAPON = (W_WEP | W_WEP2),
+        W_SWAP_WEAPON = (W_SWAPWEP | W_SWAPWEP2),
+        W_WEAPON = (W_WIELDED_WEAPON | W_SWAP_WEAPON | W_QUIVER),
+
+        /* Amulets, rings, tools, and other items */
+        W_AMUL  = 0x00010000UL,      /* Amulet */
+        W_RINGL = 0x00020000UL,      /* Left ring */
+        W_RINGR = 0x00040000UL,      /* Right ring */
+        W_RING = (W_RINGL | W_RINGR),
+        W_BLINDFOLD = 0x00080000UL,  /* Eyewear */
+
+        /* historical note: originally in slash'em, 'worn' saddle stayed in
+           hero's inventory; in GnollHack, it's kept in the steed's inventory */
+        W_SADDLE = 0x00100000UL,     /* KMH -- For riding monsters */
+        W_BALL   = 0x00200000UL,     /* Punishment ball */
+        W_CHAIN  = 0x00400000UL,     /* Punishment chain */
+
+        /* new accessories*/
+        W_MISC  = 0x00800000UL,      /* Special miscellaneous item, such as a belt, a brooch, bracelet, nose ring */
+        W_MISC2 = 0x01000000UL,      /* Special miscellaneous item, such as a belt, a brooch, bracelet, nose ring */
+        W_MISC3 = 0x02000000UL,      /* Special miscellaneous item, such as a belt, a brooch, bracelet, nose ring */
+        W_MISC4 = 0x04000000UL,      /* Special miscellaneous item, such as a belt, a brooch, bracelet, nose ring */
+        W_MISC5 = 0x08000000UL,      /* Special miscellaneous item, such as a belt, a brooch, bracelet, nose ring */
+
+        W_MISCITEMS = (W_MISC  | W_MISC2 | W_MISC3 | W_MISC4 | W_MISC5),
+        W_ACCESSORY = (W_RING | W_AMUL | W_MISCITEMS | W_BLINDFOLD),
+        W_WORN_NOT_WIELDED = ((W_ARMOR & ~W_ARMS) | W_ACCESSORY),
+        W_WORN_AND_WIELDED = (W_WORN_NOT_WIELDED | W_WIELDED_WEAPON),
+    }
+
+    public enum InventorySlotPictureIndices : int
+    {
+        General = 0,
+        WeaponRight,
+        WeaponLeft,
+        Shield,
+        SwapWeaponRight,
+        SwapWeaponLeft,
+        Quiver,
+        Reserved,
+        Suit,
+        Cloak,
+        Robe,
+        Shirt,
+        Helmet,
+        Gloves,
+        Bracers,
+        Boots,
+        Amulet,
+        RingRight,
+        RingLeft,
+        Blindfold,
+        Miscellaneous1,
+        Miscellaneous2,
+        Miscellaneous3,
+        Miscellaneous4,
+        Miscellaneous5,
+        NumPictureIndices
+    }
+
+    public class EquipmentSlot
+    {
+        public readonly string SlotName;
+        public readonly int PictureIndex;
+        public readonly int AltPictureIndex;
+        public readonly int AltPictureStyle;
+        public readonly obj_worn_flags WornFlag;
+        public readonly obj_class_types ObjClassType;
+        public readonly obj_armor_types ArmorType;
+
+        public EquipmentSlot(string slotName, int pictureIndex, int altPictureIndex, int altPictureStyle, obj_worn_flags wornFlag, obj_class_types objClassType, obj_armor_types armorType)
+        {
+            SlotName = slotName;
+            PictureIndex = pictureIndex;
+            AltPictureIndex = altPictureIndex;
+            AltPictureStyle = altPictureStyle;
+            WornFlag = wornFlag;
+            ObjClassType = objClassType;
+            ArmorType = armorType;
+        }
+    }
+
 
     [StructLayout(LayoutKind.Sequential)]
     public struct monst_info
@@ -1431,6 +1572,372 @@ namespace GnollHackX
         GUI_CMD_TOGGLE_IGNORE_STOPPING,
         GUI_CMD_EXIT_APP_ON_MAIN_SCREEN,
         GUI_CMD_BREADCRUMB,
+        GUI_CMD_BREADCRUMB2,
+        GUI_CMD_BREADCRUMB3,
+        GUI_CMD_TOGGLE_WORN_SHOWS_EQUIPMENT,
+        GUI_CMD_TOGGLE_NO_PET,
+        GUI_CMD_REPORT_COMMANDS,
+        GUI_CMD_GAME_ENTERED_MOVELOOP,
+        GUI_CMD_ACHIEVEMENT,
+        GUI_CMD_REPORT_ENGRAVE_QUICK_TEXT,
+        GUI_CMD_REPORT_ENGRAVE_QUICK_STYLE,
+        GUI_CMD_TOGGLE_METRIC_SYSTEM,
+    }
+
+    public enum gui_achievement_categories
+    {
+        Gameplay = 0,
+        Combat,
+        Exploration,
+        Playthrough,
+        Ascension,
+
+        NumberOfCategories
+    }
+
+    public enum gui_achievement_types
+    {
+        /* Gameplay: Base */
+        GUI_ACHIEVEMENT_PLAYED_GAME_IN_CLASSIC_MODE = 1,
+
+        /* Gameplay: Strategies */
+        GUI_ACHIEVEMENT_IDENTIFIED_AN_ITEM = 32,
+        GUI_ACHIEVEMENT_USED_WAND_OF_PROBING,
+        GUI_ACHIEVEMENT_ENGRAVED_ELBERETH,
+        GUI_ACHIEVEMENT_USED_SCARE_MONSTER,
+        GUI_ACHIEVEMENT_CONSULTED_ORACLE,
+        GUI_ACHIEVEMENT_MADE_A_WISH,
+        GUI_ACHIEVEMENT_RESERVED_1,
+        GUI_ACHIEVEMENT_BROKE_CHEST_LOCK_BY_KICKING,
+        GUI_ACHIEVEMENT_DISARMED_TRAP,
+        GUI_ACHIEVEMENT_FOUND_SECRET_DOOR_OR_PASSAGE,
+        GUI_ACHIEVEMENT_POLYMORPHED_FORM,
+        GUI_ACHIEVEMENT_GENOCIDED_MONSTERS,
+
+        /* Gameplay: Religious strategies */
+        GUI_ACHIEVEMENT_IDENTIFIED_BLESSEDNESS_ON_ALTAR = 64,
+        GUI_ACHIEVEMENT_PRAYED,
+        GUI_ACHIEVEMENT_SACRIFICED,
+        GUI_ACHIEVEMENT_WAS_GIFTED_ARTIFACT,
+        GUI_ACHIEVEMENT_WAS_CROWNED,
+        GUI_ACHIEVEMENT_CREATED_HOLY_WATER_ON_ALTAR,
+        GUI_ACHIEVEMENT_CONVERTED_ALTAR,
+        GUI_ACHIEVEMENT_DETERMINED_CURSED_STATUS_WITH_PET,
+
+        /* Gameplay: Experience level and stats */
+        GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_5 = 128,
+        GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_10,
+        GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_15,
+        GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_20,
+        GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_25,
+        GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_30,
+        GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_35,
+        GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_40,
+        GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_45,
+        GUI_ACHIEVEMENT_REACHED_EXPERIENCE_LEVEL_50,
+        GUI_ACHIEVEMENT_AC_0_OR_BELOW,
+        GUI_ACHIEVEMENT_AC_MINUS_10_OR_BELOW,
+        GUI_ACHIEVEMENT_AC_MINUS_20_OR_BELOW,
+        GUI_ACHIEVEMENT_AC_MINUS_30_OR_BELOW,
+        GUI_ACHIEVEMENT_AC_MINUS_40_OR_BELOW,
+        GUI_ACHIEVEMENT_AC_MINUS_50_OR_BELOW,
+        GUI_ACHIEVEMENT_AC_MINUS_75_OR_BELOW,
+        GUI_ACHIEVEMENT_AC_MINUS_100_OR_BELOW,
+        GUI_ACHIEVEMENT_AC_MINUS_125_OR_BELOW,
+        GUI_ACHIEVEMENT_AC_MINUS_150_OR_BELOW,
+        GUI_ACHIEVEMENT_AC_MINUS_175_OR_BELOW,
+        GUI_ACHIEVEMENT_AC_MINUS_200_OR_BELOW,
+        GUI_ACHIEVEMENT_MC_10_OR_MORE,
+        GUI_ACHIEVEMENT_MC_15_OR_MORE,
+        GUI_ACHIEVEMENT_MC_20_OR_MORE,
+        GUI_ACHIEVEMENT_MC_25_OR_MORE,
+        GUI_ACHIEVEMENT_HP_100_OR_MORE,
+        GUI_ACHIEVEMENT_HP_200_OR_MORE,
+        GUI_ACHIEVEMENT_HP_500_OR_MORE,
+        GUI_ACHIEVEMENT_HP_1000_OR_MORE,
+        GUI_ACHIEVEMENT_HP_1500_OR_MORE,
+        GUI_ACHIEVEMENT_HP_2000_OR_MORE,
+        GUI_ACHIEVEMENT_STR_20_OR_MORE,
+        GUI_ACHIEVEMENT_DEX_20_OR_MORE,
+        GUI_ACHIEVEMENT_CON_20_OR_MORE,
+        GUI_ACHIEVEMENT_INT_20_OR_MORE,
+        GUI_ACHIEVEMENT_WIS_20_OR_MORE,
+        GUI_ACHIEVEMENT_CHA_20_OR_MORE,
+        GUI_ACHIEVEMENT_20_OR_MORE_IN_ALL_STATS,
+        GUI_ACHIEVEMENT_STR_25,
+        GUI_ACHIEVEMENT_DEX_25,
+        GUI_ACHIEVEMENT_CON_25,
+        GUI_ACHIEVEMENT_INT_25,
+        GUI_ACHIEVEMENT_WIS_25,
+        GUI_ACHIEVEMENT_CHA_25,
+        GUI_ACHIEVEMENT_25_IN_ALL_STATS,
+
+        /* Gameplay: Props */
+        GUI_ACHIEVEMENT_PROPS_ACQUIRED_VERY_FAST_SPEED = 192,
+        GUI_ACHIEVEMENT_PROPS_ACQUIRED_ULTRA_FAST_SPEED,
+        GUI_ACHIEVEMENT_PROPS_ACQUIRED_SUPER_FAST_SPEED,
+        GUI_ACHIEVEMENT_PROPS_ACQUIRED_LIGHTNING_FAST_SPEED,
+        GUI_ACHIEVEMENT_PROPS_ACQUIRED_HEROISM,
+        GUI_ACHIEVEMENT_PROPS_ACQUIRED_SUPER_HEROISM,
+        GUI_ACHIEVEMENT_PROPS_ACQUIRED_CONFLICT,
+        GUI_ACHIEVEMENT_PROPS_ACQUIRED_REFLECTION,
+        GUI_ACHIEVEMENT_PROPS_ACQUIRED_MAGIC_RESISTANCE,
+        GUI_ACHIEVEMENT_PROPS_ACQUIRED_POISON_RESISTANCE,
+        GUI_ACHIEVEMENT_PROPS_ACQUIRED_DEATH_RESISTANCE,
+        GUI_ACHIEVEMENT_PROPS_ACQUIRED_DISINTEGRATION_RESISTANCE,
+        GUI_ACHIEVEMENT_PROPS_ACQUIRED_SLEEP_RESISTANCE,
+        GUI_ACHIEVEMENT_PROPS_ACQUIRED_PARALYSIS_RESISTANCE,
+        GUI_ACHIEVEMENT_PROPS_ACQUIRED_SICKNESS_RESISTANCE,
+        GUI_ACHIEVEMENT_PROPS_ACQUIRED_OILSKIN,
+        GUI_ACHIEVEMENT_PROPS_ACQUIRED_CEREBRAL_SAFEGUARDING,
+        GUI_ACHIEVEMENT_PROPS_ACQUIRED_FLYING,
+        GUI_ACHIEVEMENT_PROPS_ACQUIRED_LIFE_SAVING,
+
+        /* Combat: Defeated a monster */
+        GUI_ACHIEVEMENT_DEFEATED_MEDUSA = 256,
+        GUI_ACHIEVEMENT_DEFEATED_QUEST_NEMESIS,
+        GUI_ACHIEVEMENT_DEFEATED_VLAD_THE_IMPALER,
+        GUI_ACHIEVEMENT_DEFEATED_WIZARD_OF_YENDOR,
+        GUI_ACHIEVEMENT_DEFEATED_YACC,
+        GUI_ACHIEVEMENT_DEFEATED_MODRON_PRIMUS,
+        GUI_ACHIEVEMENT_DEFEATED_HIGH_PRIEST_OF_MOLOCH,
+        GUI_ACHIEVEMENT_DEFEATED_DEMOGORGON,
+        GUI_ACHIEVEMENT_DEFEATED_ASMODEUS,
+        GUI_ACHIEVEMENT_DEFEATED_DISPATER,
+        GUI_ACHIEVEMENT_DEFEATED_BAALZEBUB,
+        GUI_ACHIEVEMENT_DEFEATED_ORCUS,
+        GUI_ACHIEVEMENT_DEFEATED_YEENAGHU,
+        GUI_ACHIEVEMENT_DEFEATED_JUBILEX,
+        GUI_ACHIEVEMENT_DEFEATED_GERYON,
+        GUI_ACHIEVEMENT_DEFEATED_BAPHOMET,
+        GUI_ACHIEVEMENT_DEFEATED_ALL_DEMON_PRINCES,
+        GUI_ACHIEVEMENT_DEFEATED_TARRASQUE,
+        GUI_ACHIEVEMENT_DEFEATED_DEATH,
+        GUI_ACHIEVEMENT_DEFEATED_PESTILENCE,
+        GUI_ACHIEVEMENT_DEFEATED_FAMINE,
+        GUI_ACHIEVEMENT_DEFEATED_ALL_RIDERS,
+        GUI_ACHIEVEMENT_DEFEATED_CERBERUS,
+        GUI_ACHIEVEMENT_DEFEATED_AMONKET,
+        GUI_ACHIEVEMENT_DEFEATED_CROESUS,
+        GUI_ACHIEVEMENT_DEFEATED_GARGANTUAN_MIMIC,
+        GUI_ACHIEVEMENT_DEFEATED_XAN,
+        GUI_ACHIEVEMENT_DEFEATED_ORC_AND_A_PIE,
+        GUI_ACHIEVEMENT_DEFEATED_ORC_CAPTAIN_AND_A_PIE,
+        GUI_ACHIEVEMENT_DEFEATED_LICH,
+        GUI_ACHIEVEMENT_DEFEATED_MASTER_LICH,
+        GUI_ACHIEVEMENT_DEFEATED_ARCH_LICH,
+        GUI_ACHIEVEMENT_DEFEATED_TENTACLED_ONE,
+        GUI_ACHIEVEMENT_DEFEATED_ELDER_TENTACLED_ONE,
+
+        /* Combat: Extinctinist */
+        GUI_ACHIEVEMENT_KILLED_MORE_THAN_1000_MONSTERS = 320,
+        GUI_ACHIEVEMENT_KILLED_MORE_THAN_2000_MONSTERS,
+        GUI_ACHIEVEMENT_KILLED_MORE_THAN_3000_MONSTERS,
+        GUI_ACHIEVEMENT_KILLED_MORE_THAN_4000_MONSTERS,
+        GUI_ACHIEVEMENT_KILLED_MORE_THAN_5000_MONSTERS,
+        GUI_ACHIEVEMENT_KILLED_MORE_THAN_10000_MONSTERS,
+        GUI_ACHIEVEMENT_2_OR_MORE_SPECIES_EXTINCT,
+        GUI_ACHIEVEMENT_3_OR_MORE_SPECIES_EXTINCT,
+        GUI_ACHIEVEMENT_4_OR_MORE_SPECIES_EXTINCT,
+        GUI_ACHIEVEMENT_5_OR_MORE_SPECIES_EXTINCT,
+        GUI_ACHIEVEMENT_10_OR_MORE_SPECIES_EXTINCT,
+        GUI_ACHIEVEMENT_20_OR_MORE_SPECIES_EXTINCT,
+        GUI_ACHIEVEMENT_30_OR_MORE_SPECIES_EXTINCT,
+        GUI_ACHIEVEMENT_40_OR_MORE_SPECIES_EXTINCT,
+        GUI_ACHIEVEMENT_50_OR_MORE_SPECIES_EXTINCT,
+        GUI_ACHIEVEMENT_100_OR_MORE_SPECIES_EXTINCT,
+        GUI_ACHIEVEMENT_200_OR_MORE_SPECIES_EXTINCT,
+        GUI_ACHIEVEMENT_300_OR_MORE_SPECIES_EXTINCT,
+        GUI_ACHIEVEMENT_400_OR_MORE_SPECIES_EXTINCT,
+
+        /* Exploration: Reached depth in the main dungeon or gehennom */
+        GUI_ACHIEVEMENT_REACHED_DUNGEON_LEVEL_5 = 384,
+        GUI_ACHIEVEMENT_REACHED_DUNGEON_LEVEL_10,
+        GUI_ACHIEVEMENT_REACHED_DUNGEON_LEVEL_15,
+        GUI_ACHIEVEMENT_REACHED_DUNGEON_LEVEL_20,
+        GUI_ACHIEVEMENT_REACHED_MEDUSA_ISLAND,
+        GUI_ACHIEVEMENT_REACHED_CASTLE,
+        GUI_ACHIEVEMENT_REACHED_VALLEY_OF_THE_DEAD,
+        GUI_ACHIEVEMENT_REACHED_WIZARD_TOWER,
+        GUI_ACHIEVEMENT_REACHED_MINE_TOWN,
+
+        /* Exploration: Found a branch (32) */
+        GUI_ACHIEVEMENT_ENTERED_GEHENNOM = 448,
+        GUI_ACHIEVEMENT_ENTERED_GNOMISH_MINES,
+        GUI_ACHIEVEMENT_ENTERED_SOKOBAN,
+        GUI_ACHIEVEMENT_ENTERED_FORT_LUDIOUS,
+        GUI_ACHIEVEMENT_ENTERED_LARGE_CIRCULAR_DUNGEON,
+        GUI_ACHIEVEMENT_ENTERED_VLAD_TOWER,
+        GUI_ACHIEVEMENT_ENTERED_HELLISH_PASTURES,
+        GUI_ACHIEVEMENT_ENTERED_PLANE_OF_THE_MODRON,
+        GUI_ACHIEVEMENT_ENTERED_THE_QUEST,
+
+        /* Exploration: Reached the end of a branch (32) */
+        GUI_ACHIEVEMENT_REACHED_BOTTOM_OF_GEHENNOM = 480,
+        GUI_ACHIEVEMENT_REACHED_MINES_END,
+        GUI_ACHIEVEMENT_REACHED_TOP_OF_SOKOBAN,
+        GUI_ACHIEVEMENT_REACHED_QUANTUM_CORE,
+        GUI_ACHIEVEMENT_REACHED_TOP_OF_VLAD_TOWER,
+        GUI_ACHIEVEMENT_REACHED_PROTONUS,
+        GUI_ACHIEVEMENT_REACHED_FINAL_QUEST_LEVEL,
+
+        /* Playthrough: Minor playthrough achievement */
+        GUI_ACHIEVEMENT_COMPLETED_THE_QUEST = 512,
+        GUI_ACHIEVEMENT_COMPLETED_OPTIONAL_QUEST,
+        GUI_ACHIEVEMENT_FOUND_GLADSTONE,
+        GUI_ACHIEVEMENT_SOLVED_SOKOBAN,
+        GUI_ACHIEVEMENT_CONQUERED_FORT_LUDIOUS,
+        GUI_ACHIEVEMENT_SOLVED_CASTLE_TUNE,
+        GUI_ACHIEVEMENT_FOUND_PRIME_CODEX,
+        GUI_ACHIEVEMENT_REACHED_SANCTUM,
+
+        /* Playthrough: Major playthrough achievement */
+        GUI_ACHIEVEMENT_FOUND_BELL_OF_OPENING = 576,
+        GUI_ACHIEVEMENT_FOUND_CANDELABRUM_OF_INVOCATION,
+        GUI_ACHIEVEMENT_FOUND_BOOK_OF_THE_DEAD,
+        GUI_ACHIEVEMENT_FOUND_VIBRATING_SQUARE,
+        GUI_ACHIEVEMENT_PERFORMED_THE_RITUAL,
+        GUI_ACHIEVEMENT_FOUND_AMULET_OF_YENDOR,
+        GUI_ACHIEVEMENT_ENTERED_ELEMENTAL_PLANES,
+        GUI_ACHIEVEMENT_ENTERED_ASTRAL_PLANE,
+
+        /* 640 - 960 RESERVED */
+
+        /* Ascension: Ascended */
+        GUI_ACHIEVEMENT_ASCENDED = 1024,
+        GUI_ACHIEVEMENT_ASCENDED_IN_CLASSIC_MODE,
+        GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_RESERVED_1,
+        GUI_ACHIEVEMENT_ASCENDED_RESERVED_2,
+        GUI_ACHIEVEMENT_ASCENDED_RESERVED_3,
+        GUI_ACHIEVEMENT_ASCENDED_RESERVED_4,
+
+        GUI_ACHIEVEMENT_ASCENDED_WITH_FOODLESS_CONDUCT,
+        GUI_ACHIEVEMENT_ASCENDED_WITH_NUDIST_CONDUCT,
+        GUI_ACHIEVEMENT_ASCENDED_WITH_PACIFIST_CONDUCT,
+        GUI_ACHIEVEMENT_ASCENDED_WITH_ZEN_CONDUCT,
+        GUI_ACHIEVEMENT_ASCENDED_WITH_CONDUCT_RESERVED_1,
+        GUI_ACHIEVEMENT_ASCENDED_WITH_CONDUCT_RESERVED_2,
+        GUI_ACHIEVEMENT_ASCENDED_WITH_CONDUCT_RESERVED_3,
+        GUI_ACHIEVEMENT_ASCENDED_WITH_CONDUCT_RESERVED_4,
+
+        GUI_ACHIEVEMENT_ASCENDED_WITH_AT_LEAST_ONE_MILLION_POINTS,
+        GUI_ACHIEVEMENT_ASCENDED_WITH_AT_LEAST_FIVE_MILLION_POINTS,
+        GUI_ACHIEVEMENT_ASCENDED_WITH_AT_LEAST_TEN_MILLION_POINTS,
+        GUI_ACHIEVEMENT_ASCENDED_WITH_AT_LEAST_FIFTY_MILLION_POINTS,
+        GUI_ACHIEVEMENT_ASCENDED_WITH_AT_LEAST_HUNDRED_MILLION_POINTS,
+
+        /* Ascension: Ascended at expert for roles */
+        GUI_ACHIEVEMENT_ASCENDED_ARCHAEOLOGIST_AT_EXPERT_DIFFICULTY = 1088,
+        GUI_ACHIEVEMENT_ASCENDED_BARBARIAN_AT_EXPERT_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_CAVEMAN_AT_EXPERT_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_HEALER_AT_EXPERT_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_KNIGHT_AT_EXPERT_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_MONK_AT_EXPERT_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_PRIEST_AT_EXPERT_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_RANGER_AT_EXPERT_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_ROGUE_AT_EXPERT_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_SAMURAI_AT_EXPERT_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_VALKYRIE_AT_EXPERT_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_TOURIST_AT_EXPERT_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_WIZARD_AT_EXPERT_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_ALL_ROLES_AT_EXPERT_DIFFICULTY,
+
+        /* Ascension: Ascended at expert with conducts */
+        GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITH_CONDUCTS_0 = 1120,
+        GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITH_CONDUCTS_1,
+        GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITH_CONDUCTS_2,
+        GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITH_CONDUCTS_3,
+        GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITH_CONDUCTS_4,
+        GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITH_CONDUCTS_5,
+        GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITH_CONDUCTS_6,
+        GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITH_CONDUCTS_7,
+        GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITH_CONDUCTS_8,
+        GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITH_CONDUCTS_9,
+
+        /* Ascension: Ascended at expert, speedrun */
+        GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITHIN_40000_TURNS = 1152,
+        GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITHIN_35000_TURNS,
+        GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITHIN_30000_TURNS,
+        GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITHIN_25000_TURNS,
+        GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITHIN_20000_TURNS,
+        GUI_ACHIEVEMENT_ASCENDED_AT_EXPERT_DIFFICULTY_WITHIN_15000_TURNS,
+
+        /* Ascension: Ascended at master for roles */
+        GUI_ACHIEVEMENT_ASCENDED_ARCHAEOLOGIST_AT_MASTER_DIFFICULTY = 1216,
+        GUI_ACHIEVEMENT_ASCENDED_BARBARIAN_AT_MASTER_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_CAVEMAN_AT_MASTER_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_HEALER_AT_MASTER_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_KNIGHT_AT_MASTER_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_MONK_AT_MASTER_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_PRIEST_AT_MASTER_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_RANGER_AT_MASTER_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_ROGUE_AT_MASTER_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_SAMURAI_AT_MASTER_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_VALKYRIE_AT_MASTER_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_TOURIST_AT_MASTER_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_WIZARD_AT_MASTER_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_ALL_ROLES_AT_MASTER_DIFFICULTY,
+
+        /* Ascension: Ascended at master with conducts */
+        GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITH_CONDUCTS_0 = 1248,
+        GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITH_CONDUCTS_1,
+        GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITH_CONDUCTS_2,
+        GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITH_CONDUCTS_3,
+        GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITH_CONDUCTS_4,
+        GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITH_CONDUCTS_5,
+        GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITH_CONDUCTS_6,
+        GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITH_CONDUCTS_7,
+        GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITH_CONDUCTS_8,
+        GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITH_CONDUCTS_9,
+
+        /* Ascension: Ascended at master, speedrun */
+        GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITHIN_40000_TURNS = 1280,
+        GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITHIN_35000_TURNS,
+        GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITHIN_30000_TURNS,
+        GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITHIN_25000_TURNS,
+        GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITHIN_20000_TURNS,
+        GUI_ACHIEVEMENT_ASCENDED_AT_MASTER_DIFFICULTY_WITHIN_15000_TURNS,
+
+        /* Ascension: Ascended at master for roles */
+        GUI_ACHIEVEMENT_ASCENDED_ARCHAEOLOGIST_AT_GRAND_MASTER_DIFFICULTY = 1344,
+        GUI_ACHIEVEMENT_ASCENDED_BARBARIAN_AT_GRAND_MASTER_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_CAVEMAN_AT_GRAND_MASTER_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_HEALER_AT_GRAND_MASTER_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_KNIGHT_AT_GRAND_MASTER_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_MONK_AT_GRAND_MASTER_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_PRIEST_AT_GRAND_MASTER_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_RANGER_AT_GRAND_MASTER_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_ROGUE_AT_GRAND_MASTER_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_SAMURAI_AT_GRAND_MASTER_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_VALKYRIE_AT_GRAND_MASTER_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_TOURIST_AT_GRAND_MASTER_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_WIZARD_AT_GRAND_MASTER_DIFFICULTY,
+        GUI_ACHIEVEMENT_ASCENDED_ALL_ROLES_AT_GRAND_MASTER_DIFFICULTY,
+
+        /* Ascension: Ascended at grand master with conducts */
+        GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITH_CONDUCTS_0 = 1376,
+        GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITH_CONDUCTS_1,
+        GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITH_CONDUCTS_2,
+        GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITH_CONDUCTS_3,
+        GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITH_CONDUCTS_4,
+        GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITH_CONDUCTS_5,
+        GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITH_CONDUCTS_6,
+        GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITH_CONDUCTS_7,
+        GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITH_CONDUCTS_8,
+        GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITH_CONDUCTS_9,
+
+        /* Ascension: Ascended at grand master, speedrun */
+        GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITHIN_40000_TURNS = 1408,
+        GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITHIN_35000_TURNS,
+        GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITHIN_30000_TURNS,
+        GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITHIN_25000_TURNS,
+        GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITHIN_20000_TURNS,
+        GUI_ACHIEVEMENT_ASCENDED_AT_GRAND_MASTER_DIFFICULTY_WITHIN_15000_TURNS,
+
+        NUM_GUI_ACHIEVEMENTS
     }
 
     public enum game_status_types
@@ -1474,6 +1981,7 @@ namespace GnollHackX
         DEBUGLOG_DEBUG_ONLY,
         DEBUGLOG_FILE_DESCRIPTOR,
         DEBUGLOG_PANIC,
+        DEBUGLOG_IMPOSSIBLE,
     }
 
     public enum popup_text_types
@@ -1501,6 +2009,12 @@ namespace GnollHackX
         GUI_EFFECT_SEARCH = 0,
         GUI_EFFECT_WAIT,
         GUI_EFFECT_POLEARM,
+        GUI_EFFECT_LIGHTNING,
+        GUI_EFFECT_FIRE,
+        GUI_EFFECT_FREEZE,
+        GUI_EFFECT_MAGIC_HIT,
+        GUI_EFFECT_STUN_HIT,
+        GUI_EFFECT_DEATH_MAGIC,
     }
 
     public enum gui_polearm_types
@@ -1622,6 +2136,8 @@ namespace GnollHackX
         NHKF_CLICKFIRE,
         NHKF_CLICKLOOK,
         NHKF_CLICKCAST,
+        NHKF_CLICKZAP,
+        NHKF_CLICKPOLE,
 
         NHKF_REDRAW,
         NHKF_REDRAW2,
@@ -1629,6 +2145,7 @@ namespace GnollHackX
         NHKF_GETDIR_SELF2,
         NHKF_GETDIR_HELP,
         NHKF_COUNT,
+        NHKF_COUNT2,
         NHKF_GETPOS_SELF,
         NHKF_GETPOS_PICK,
         NHKF_GETPOS_PICK_Q,  /* quick */
@@ -1656,6 +2173,15 @@ namespace GnollHackX
         NUM_NHKF
     }
 
+    public enum exit_hack_types
+    {
+        EXITHACK_NORMAL = 0,
+        EXITHACK_RESTART_EXISTING,
+        EXITHACK_RECOVER_NEW,
+        EXITHACK_EXITTHREAD,
+    }
+
+
     public static class GHConstants
     {
         public const int MinimumFileDescriptorLimit = 16384;
@@ -1664,9 +2190,11 @@ namespace GnollHackX
         public const int InputBufferLength = 32;
         public const int BUFSZ = 256;
         public const int UTF8BUFSZ = 256 * 4;
+        public const int MaxEngraveQuickTextLength = 95; /* PL_ESIZ */
+        public const int MaxXlogUserNameLength = 31;        
         public const int MaxGHWindows = 32;
         public const int MapCols = 80;
-        public const int MapRows = 21;
+        public const int MapRows = 21;        
         public const int DelayOutputDurationInMilliseconds = 50;
         public const int ExitWindowsWithStringDelay = 1100;
         public const int FadeToBlackDelay = 325;
@@ -1720,7 +2248,10 @@ namespace GnollHackX
         public const int StatusMarkWidth = 16;
         public const int StatusMarkHeight = 16;
         public const int MaxTileSheets = 4;
-        public const int NumberOfTilesPerSheet = 16224;
+        public const int NumberOfTilesPerSheet = 8192; // 16224;
+        public const int PowerOf2ForNumberOfTilesPerSheet = 13;
+        public const int MaxTileSheetWidthInTiles = 128;
+        public const int PowerOf2ForMaxTileSheetWidthInTiles = 7;
         public const int MaxSoundParameters = 10;
         public const int MaxFramesPerAnimation = 32;
         public const int NumPositionsInEnlargement = 5;
@@ -1814,7 +2345,7 @@ namespace GnollHackX
         public const int MaxRefreshRate = 120;
         public const int PollingFrequency = 60;
         public const int PollingInterval = 15;
-        public const int SavePollingTimeoutCount = 2000;
+        public const int SavePollingTimeoutCount = 1500;
         public const double DefaultTextWindowMaxWidth = 600.0;
         public const double WindowHideIntervals = 5.0;
         public const uint MainCanvasAnimationTime = 2500000;
@@ -1851,8 +2382,8 @@ namespace GnollHackX
         public const bool DefaultUseSingleDumpLog = true;
         public const int DefaultRightMouseCommand = (int)NhGetPosMods.DefClickRole;
         public const int DefaultMiddleMouseCommand = (int)NhGetPosMods.DefClickRole;
-        public const int RightMouseBitIndex = 22;
-        public const int MiddleMouseBitIndex = 27;
+        //public const int RightMouseBitIndex = 22;
+        //public const int MiddleMouseBitIndex = 27;
         public const string InstallTimePackName = "installtimepack";
         public const string OnDemandPackName = "ondemandpack";
         public const string UserDataDirectory = "usrdata";
@@ -1874,6 +2405,9 @@ namespace GnollHackX
         public const string SavedGameSharedZipFileNameSuffix = ".zip";
         public const string ManualFilePrefix = "manual_id_";
         public const string OracleMajorConsultationFilePrefix = "major_consultation_id_";
+        public const string AchievementLongPrefix = "achievement_bits_";
+        public const string GainedAchievementLongPrefix = "gained_achievement_bits_";
+        public const string GainedAchievementTierKey = "gained_achievement_tier";
         public const bool DefaultReadStreamingBankToMemory = false;
         public const ulong AndroidBanksToMemoryThreshold = 3500000000UL;
         public const bool DefaultCopyStreamingBankToDisk = false;
@@ -1959,10 +2493,13 @@ namespace GnollHackX
         public const int FadeFromBlackDurationAtStart = 700;
         public const double FadeFromBlackAtStartExtraDelaySecs = 0.15;
 #endif
+        public const bool DefaultRuntimeEffects = false;
         public const bool DefaultCharacterClickAction = false;
         public const bool DefaultDiceAsRanges = true;
+        public const bool DefaultWornShowsEquipment = true;
         public const bool DefaultAutoDig = true;
         public const bool DefaultIgnoreStopping = false; /* Since travel is also used for normal movement in the modern version */
+        public const bool DefaultMetricSystem = false;
         public const long MapDataLockTimeOutTicks = 100L;
         public const long EffectLockTimeOutTicks = 50L;
         public const long MessageLockTimeOutTicks = 50L;
@@ -1973,9 +2510,24 @@ namespace GnollHackX
 #else
         public const bool IsPlatformRenderLoopDefault = false;
 #endif
-        public const bool AllowRestartGameUponActivityDestruction = false;
+        public const bool AllowRestartGameUponActivityDestruction = true;
         public const string SentryGnollHackGeneralCategoryName = "GnollHack Information";
         public const string SentryGnollHackLibraryCategoryName = "GnollHack Library";
+        public const string SentryGnollHackCallbackCategoryName = "GnollHack Callback";
+        public const string SentryGnollHackButtonClickCategoryName = "Button Clicked";
+        public const string SAVE_GAME_NOTIFICATION_CHANNEL_ID = "save_game_channel";
+        public const string SingleCommandPageTitle = "Commands";
+        public const int DefaultMoreButtonListSize = MoreButtonPages * MoreButtonsPerRow * MoreButtonsPerColumn + 1;
+        public const float KeyboardShortcutRelativeFontSize = 0.9f;
+        public const float TextRowMultiplierWithKeyboardShortcuts = 1.0f + KeyboardShortcutRelativeFontSize;
+        public const GHSpecialKey GameMenuKeyboardShortcut = GHSpecialKey.F10;
+        public const GHSpecialKey CancelKeyboardShortcut = GHSpecialKey.Escape;
+        public const bool DefaultShowPolearmContextButton = true;
+        public const ulong DiskSpaceSuperCriticalThresholdInBytes = 512UL * 1024UL * 1024UL;
+        public const ulong DiskSpaceCriticalThresholdInBytes = 1024UL * 1024UL * 1024UL;
+        public const ulong DiskSpaceLowThresholdInBytes = 5 * 1024UL * 1024UL * 1024UL;
+        public const bool EnableExperimentalFeatures = false;
+        public const int NumGuiAchievementLongs = ((int)gui_achievement_types.NUM_GUI_ACHIEVEMENTS - 1) / 64 + 1;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -1985,7 +2537,7 @@ namespace GnollHackX
         public int Count;
     }
 
-    public enum CanvasTypes
+    public enum CanvasTypes : int
     {
         General = 0,
         MainCanvas,
@@ -2002,6 +2554,10 @@ namespace GnollHackX
         Small,
         SimpleAlternative,
         SmallAlternative,
+        SimpleTransformTopLeft,
+        SimpleAlternativeTransformTopLeft,
+        SimpleTransformTopRight,
+        SimpleAlternativeTransformTopRight,
         Custom
     }
 
@@ -2269,4 +2825,14 @@ namespace GnollHackX
         A,
         Z = A + 25,
     }
+
+    public class InverseBooleanConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+            => value is bool b ? !b : value;
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            => value is bool b ? !b : value;
+    }
+
 }

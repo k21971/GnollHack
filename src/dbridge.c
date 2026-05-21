@@ -144,16 +144,16 @@ int x, y;
     if (lev->typ != DOOR && lev->typ != DBWALL)
         return -1;
 
-    if (IS_DRAWBRIDGE(levl[x + 1][y].typ)
+    if (isok(x + 1, y) && IS_DRAWBRIDGE(levl[x + 1][y].typ)
         && (levl[x + 1][y].drawbridgemask & DB_DIR) == DB_WEST)
         return DB_WEST;
-    if (IS_DRAWBRIDGE(levl[x - 1][y].typ)
+    if (isok(x - 1, y) && IS_DRAWBRIDGE(levl[x - 1][y].typ)
         && (levl[x - 1][y].drawbridgemask & DB_DIR) == DB_EAST)
         return DB_EAST;
-    if (IS_DRAWBRIDGE(levl[x][y - 1].typ)
+    if (isok(x, y - 1) && IS_DRAWBRIDGE(levl[x][y - 1].typ)
         && (levl[x][y - 1].drawbridgemask & DB_DIR) == DB_SOUTH)
         return DB_SOUTH;
-    if (IS_DRAWBRIDGE(levl[x][y + 1].typ)
+    if (isok(x, y + 1) && IS_DRAWBRIDGE(levl[x][y + 1].typ)
         && (levl[x][y + 1].drawbridgemask & DB_DIR) == DB_NORTH)
         return DB_NORTH;
 
@@ -1088,7 +1088,7 @@ boolean is_disintegrated;
         full_location_transform(x, y, lava ? LAVAPOOL : MOAT, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, lev1->floortyp, lev1->floorsubtyp, lev1->floorvartyp, FALSE, FALSE, 0, 0, FALSE);
         if ((otmp2 = sobj_at(BOULDER, x, y)) != 0)
         {
-            Strcpy(debug_buf_2, "destroy_drawbridge");
+            debugprint("destroy_drawbridge");
             obj_extract_self(otmp2);
             (void) flooreffects(otmp2, x, y, "fall");
         }

@@ -17,7 +17,9 @@
 #ifdef POSITIONBAR
 STATIC_DCL void NDECL(do_positionbar);
 #endif
+STATIC_DCL int FDECL(regenerate_hp_turns_to_full, (int, boolean*));
 STATIC_DCL void NDECL(regenerate_hp);
+STATIC_DCL int FDECL(regenerate_mana_turns_to_full, (boolean*));
 STATIC_DCL void NDECL(regenerate_mana);
 STATIC_DCL void FDECL(interrupt_multi, (const char *, int, int));
 STATIC_DCL void FDECL(debug_fields, (const char *));
@@ -114,6 +116,7 @@ uchar resuming; /* 0 = new game, 1 = loaded a saved game, 2 = continued playing 
 
     /* Main move loop */
     program_state.in_moveloop = 1;
+    issue_simple_gui_command(GUI_CMD_GAME_ENTERED_MOVELOOP);
 
 #ifdef WHEREIS_FILE
     touch_whereis();
@@ -435,6 +438,7 @@ uchar resuming; /* 0 = new game, 1 = loaded a saved game, 2 = continued playing 
             } else if (Warning || Warn_of_mon || Any_warning)
                 see_monsters();
 
+            debugprint_pos();
             if (vision_full_recalc)
                 vision_recalc(0); /* vision! */
         }
@@ -508,7 +512,10 @@ uchar resuming; /* 0 = new game, 1 = loaded a saved game, 2 = continued playing 
 
 #ifdef CLIPPING
         /* just before rhack */
-        cliparound(u.ux, u.uy, FALSE);
+        if (!context.is_click_looking)
+            cliparound(u.ux, u.uy, FALSE);
+        else
+            context.is_click_looking = FALSE;
 #endif
 
         u.umoved = FALSE;
@@ -542,7 +549,7 @@ uchar resuming; /* 0 = new game, 1 = loaded a saved game, 2 = continued playing 
             }
             else if (multi == 0)
             {
-#ifdef MAIL
+#if defined(MAIL) && !defined(GNH_MOBILE)
                 ckmailstatus();
 #endif
                 rhack((char*)0);
@@ -557,6 +564,7 @@ uchar resuming; /* 0 = new game, 1 = loaded a saved game, 2 = continued playing 
         else if (flags.time && (!context.move || !context.mv))
             context.botl = TRUE;
 
+        debugprint_pos();
         if (vision_full_recalc)
             vision_recalc(0); /* vision! */
 
@@ -728,7 +736,7 @@ maybe_create_rwraith()
         struct obj* ring = carrying(RIN_SUPREME_POWER);
         if (ring && ring->oartifact == ART_RULING_RING_OF_YENDOR && mdx >= LOW_PM && !rn2(20))
         {
-            if (!context.made_witch_king && mdx == PM_WRAITHLORD && !rn2(9))
+            if (!context.made_witch_king && mdx == PM_WRAITHLORD && !rn2(max(2, 9 - (int)mvitals[PM_WRAITHLORD].born)))
             {
                 rwraith = makemon(&mons[PM_WRAITHLORD], 0, 0, MM_MAX_HP | MM_MALE);
                 if (rwraith)
@@ -764,19 +772,88 @@ maybe_create_rwraith()
     return rwraith_appeared;
 }
 
+STATIC_OVL int
+regenerate_hp_turns_to_full(relevant_hpmax, known_props)
+int relevant_hpmax;
+boolean* known_props;
+{
+    int roundstofull =
+        ((!known_props || known_props[DIVINE_REGENERATION]) && Divine_regeneration) ? max(1, min(relevant_hpmax / 16, 10)) :
+        ((!known_props || known_props[RAPIDEST_REGENERATION]) && Rapidest_regeneration) ? max(1, min(relevant_hpmax / 8, 20)) :
+        ((!known_props || known_props[RAPIDER_REGENERATION]) && Rapider_regeneration) ? max(1, min(relevant_hpmax / 4, 40)) :
+        ((!known_props || known_props[RAPID_REGENERATION]) && Rapid_regeneration) ? max(1, min(relevant_hpmax / 2, 80)) :
+        ((!known_props || known_props[REGENERATION]) && Regeneration) ? max(1, min(relevant_hpmax, 160)) :
+        320;
+    return roundstofull;
+}
+
+double
+calculate_hp_regeneration(known_props)
+boolean* known_props;
+{
+    if (!known_props)
+        return 0.0;
+
+    int relevant_hpmax = Upolyd ? u.mhmax : u.uhpmax;
+    int roundstofull = regenerate_hp_turns_to_full(relevant_hpmax, known_props);
+    double res = (double)relevant_hpmax / (double)roundstofull;
+
+    /* Mummy rot here */
+    if (known_props[MUMMY_ROT] && MummyRot && (!known_props[SICK_RESISTANCE] || !Sick_resistance))
+    {
+        if (known_props[DIVINE_REGENERATION] && Divine_regeneration)
+        {
+            res = 4.0;
+        }
+        else if (known_props[RAPIDEST_REGENERATION] && Rapidest_regeneration)
+        {
+            res = 3.0;
+        }
+        else if (known_props[RAPIDER_REGENERATION] && Rapider_regeneration)
+        {
+            res = 2.0;
+        }
+        else if (known_props[RAPID_REGENERATION] && Rapid_regeneration)
+        {
+            res = 1.0;
+        }
+        else if (known_props[REGENERATION] && Regeneration)
+        {
+            res = 0.0;
+            return res;
+        }
+        else
+        {
+            roundstofull = 960;
+            res = -1.0 * (double) relevant_hpmax / (double)roundstofull;
+        }
+    }
+
+    if (Upolyd)
+    {
+        if (youmonst.data->mlet == S_EEL && !is_pool(u.ux, u.uy) && !Is_waterlevel(&u.uz))
+        {
+            if ((!known_props[REGENERATION] || !Regeneration) 
+                && (!known_props[RAPID_REGENERATION] || !Rapid_regeneration) 
+                && (!known_props[RAPIDER_REGENERATION] || !Rapider_regeneration)
+                && (!known_props[RAPIDEST_REGENERATION] || !Rapidest_regeneration)
+                && (!known_props[DIVINE_REGENERATION] || !Divine_regeneration))
+            {
+                res = -1 * (known_props[HALF_PHYSICAL_DAMAGE] && Half_physical_damage ? 0.5 : 1.0);
+            }
+        }
+    }
+    return res;
+}
+
+
 /* maybe recover some lost health (or lose some when an eel out of water) */
 STATIC_OVL void
 regenerate_hp(VOID_ARGS)
 {
     /* regenerate hp */
     int relevant_hpmax = Upolyd ? u.mhmax : u.uhpmax;
-    int roundstofull = 
-        Divine_regeneration ? max(1, min(relevant_hpmax / 16, 10)) :
-        Rapidest_regeneration ? max(1, min(relevant_hpmax / 8, 20)) :
-        Rapider_regeneration ? max(1, min(relevant_hpmax / 4, 40)) :
-        Rapid_regeneration ? max(1, min(relevant_hpmax / 2, 80)) :
-        Regeneration ? max(1, min(relevant_hpmax, 160)) :
-        320;
+    int roundstofull = regenerate_hp_turns_to_full(relevant_hpmax, (boolean*)0);
     int fixedhpperround = relevant_hpmax / roundstofull;
     int fractional_hp = (10000 * (relevant_hpmax % roundstofull)) / roundstofull;
     int added_hp = 0;
@@ -828,7 +905,8 @@ regenerate_hp(VOID_ARGS)
         {
             /* eel out of water loses hp, similar to monster eels;
                as hp gets lower, rate of further loss slows down */
-            if (!Regeneration && rn2(u.mh) > rn2(8) && (!Half_physical_damage || (Half_physical_damage && !rn2(2))))
+            if (!Regeneration && !Rapid_regeneration && !Rapider_regeneration && !Rapidest_regeneration && !Divine_regeneration 
+                && rn2(u.mh) > rn2(8) && (!Half_physical_damage || (Half_physical_damage && !rn2(2))))
             {
                 u.mh--;
                 context.botl = TRUE;
@@ -1019,16 +1097,25 @@ regenerate_hp(VOID_ARGS)
 #endif
 }
 
+STATIC_OVL int
+regenerate_mana_turns_to_full(known_props)
+boolean* known_props;
+{
+    /* regenerate mana */
+    int roundstofull =
+        ((!known_props || known_props[RAPIDEST_ENERGY_REGENERATION]) && Rapidest_energy_regeneration) ? max(1, min(u.uenmax / 12, 15)) :
+        ((!known_props || known_props[RAPIDER_ENERGY_REGENERATION]) && Rapider_energy_regeneration) ? max(1, min(u.uenmax / 6, 30)) :
+        ((!known_props || known_props[RAPID_ENERGY_REGENERATION]) && Rapid_energy_regeneration) ? max(1, min(u.uenmax / 3, 60)) :
+        ((!known_props || known_props[ENERGY_REGENERATION]) && Energy_regeneration) ? max(1, min((2 * u.uenmax) / 3, 120)) :
+        240;
+    return roundstofull;
+}
+
 STATIC_OVL void
 regenerate_mana(VOID_ARGS)
 {
     /* regenerate mana */
-    int roundstofull =
-        Rapidest_energy_regeneration ? max(1, min(u.uenmax / 12, 15)) :
-        Rapider_energy_regeneration ? max(1, min(u.uenmax / 6, 30)) :
-        Rapid_energy_regeneration ? max(1, min(u.uenmax / 3, 60)) :
-        Energy_regeneration ? max(1, min((2 * u.uenmax) / 3, 120)) :
-        240;
+    int roundstofull = regenerate_mana_turns_to_full((boolean*)0);
     int fixedmanaperround = u.uenmax / roundstofull;
     int fractional_mana = (10000 * (u.uenmax % roundstofull)) / roundstofull;
 
@@ -1053,6 +1140,14 @@ regenerate_mana(VOID_ARGS)
             interrupt_multi("You feel full of energy.", ATR_NONE, CLR_MSG_SUCCESS);
     }
 
+}
+
+double
+calculate_mana_regeneration(known_props)
+boolean* known_props;
+{
+    int roundstofull = regenerate_mana_turns_to_full(known_props);
+    return (double)u.uenmax / (double)roundstofull;
 }
 
 
@@ -1376,13 +1471,15 @@ set_mouse_buttons(VOID_ARGS)
         case PM_ARCHAEOLOGIST:
         case PM_BARBARIAN:
         case PM_CAVEMAN:
-        case PM_KNIGHT:
         case PM_RANGER:
         case PM_ROGUE:
         case PM_SAMURAI:
         case PM_TOURIST:
         case PM_VALKYRIE:
             flags.right_click_command = CLICK_FIRE;
+            break;
+        case PM_KNIGHT:
+            flags.right_click_command = CLICK_POLE;
             break;
         case PM_MONK:
         case PM_HEALER:
@@ -1493,6 +1590,7 @@ newgame(VOID_ARGS)
     /* Change to intro music */
     update_game_music();
 
+    debugprint_pos();
     docrt();
     status_reassess();
 
@@ -1582,8 +1680,9 @@ boolean new_game; /* false => restoring an old game */
                 : currentgend != flags.initgend))
         Sprintf(eos(buf), " %s", genders[currentgend].adj);
 
-    int multicolors[5] = { NO_COLOR, NO_COLOR, NO_COLOR, NO_COLOR, NO_COLOR };
-    pline_multi_ex(ATR_NONE, CLR_MSG_HINT, no_multiattrs, multicolors, new_game ? "%s %s, welcome to GnollHack!  You are a%s %s %s."
+    //int multicolors[5] = { NO_COLOR, NO_COLOR, NO_COLOR, NO_COLOR, NO_COLOR };
+    //pline_multi_ex(ATR_NONE, CLR_MSG_HINT, no_multiattrs, multicolors, new_game ? "%s %s, welcome to GnollHack!  You are a%s %s %s."
+    pline_ex(ATR_NONE, CLR_MSG_HINT, new_game ? "%s %s, welcome to GnollHack!  You are a%s %s %s."
                    : "%s %s, the%s %s %s, welcome back to GnollHack!",
           Hello((struct monst *) 0), plname, buf, urace.adj,
           (currentgend && urole.name.f) ? urole.name.f : urole.name.m);

@@ -445,7 +445,7 @@ register struct monst *mtmp;
                               (distu(mtmp->mx, mtmp->my) <= 5)
                                   ? doname(otmp)
                                   : distant_name(otmp, doname));
-                    Strcpy(debug_buf_2, "tactics");
+                    debugprint("tactics");
                     obj_extract_self(otmp);
                     (void) mpickobj(mtmp, otmp);
                     return 1;
@@ -888,6 +888,7 @@ wizdead()
     if (!u.uevent.ukilled_wizard) {
         u.uevent.ukilled_wizard = TRUE;
         u.uintervene_timer = rn1(250, 50);
+        issue_achievement(GUI_ACHIEVEMENT_DEFEATED_WIZARD_OF_YENDOR);
     }
 }
 

@@ -26,7 +26,7 @@ namespace GnollHackX.Pages.MainScreen
 #endif
 {
     [XamlCompilation(XamlCompilationOptions.Compile)]
-    public partial class AboutPage : ContentPage, ICloseablePage
+    public partial class AboutPage : ContentPage, ICloseablePage, IKeyPressHandlingPage
     {
         MainPage _mainPage = null;
         public AboutPage(MainPage mainPage)
@@ -67,7 +67,7 @@ namespace GnollHackX.Pages.MainScreen
             }
             else
             {
-                await GHApp.Navigation.PushModalAsync(displFilePage);
+                await GHApp.PushModalPageAsync(displFilePage);
             }
             AboutGrid.IsEnabled = true;
         }
@@ -85,7 +85,7 @@ namespace GnollHackX.Pages.MainScreen
         //    }
         //    else
         //    {
-        //        await GHApp.Navigation.PushModalAsync(displFilePage);
+        //        await GHApp.PushModalPageAsync(displFilePage);
         //    }
         //    AboutGrid.IsEnabled = true;
         //}
@@ -108,7 +108,7 @@ namespace GnollHackX.Pages.MainScreen
             }
             else
             {
-                await GHApp.Navigation.PushModalAsync(displFilePage);
+                await GHApp.PushModalPageAsync(displFilePage);
             }
             AboutGrid.IsEnabled = true;
         }
@@ -201,8 +201,7 @@ namespace GnollHackX.Pages.MainScreen
             if (playClickSound)
                 GHApp.PlayButtonClickedSound();
             GHApp.CurrentMainPage?.InvalidateCarousel();
-            var page = await GHApp.Navigation.PopModalAsync();
-            GHApp.DisconnectIViewHandlers(page);
+            await GHApp.PopModalPageAsync();
         }
 
         private bool _backPressed = false;
@@ -269,7 +268,7 @@ namespace GnollHackX.Pages.MainScreen
             }
             else
             {
-                await GHApp.Navigation.PushModalAsync(displFilePage);
+                await GHApp.PushModalPageAsync(displFilePage);
             }
             AboutGrid.IsEnabled = true;
         }
@@ -297,7 +296,7 @@ namespace GnollHackX.Pages.MainScreen
             }
             else
             {
-                await GHApp.Navigation.PushModalAsync(displFilePage);
+                await GHApp.PushModalPageAsync(displFilePage);
             }
             AboutGrid.IsEnabled = true;
         }
@@ -327,7 +326,7 @@ namespace GnollHackX.Pages.MainScreen
             AboutGrid.IsEnabled = false;
             GHApp.PlayButtonClickedSound();
             var verPage = new VersionPage(null);
-            await GHApp.Navigation.PushModalAsync(verPage);
+            await GHApp.PushModalPageAsync(verPage);
             AboutGrid.IsEnabled = true;
         }
 
@@ -342,13 +341,16 @@ namespace GnollHackX.Pages.MainScreen
             GHApp.PlayButtonClickedSound();
 
             ImportExportPage manageFilesPage = new ImportExportPage();
-            await GHApp.Navigation.PushModalAsync(manageFilesPage);
+            await GHApp.PushModalPageAsync(manageFilesPage);
 
             AboutGrid.IsEnabled = true;
         }
 
         public bool HandleKeyPress(int key, bool isCtrl, bool isMeta)
         {
+            if (GHApp.PushingModalPage) /* Ignore key presses when opening a page */
+                return true;
+
             bool handled = false;
             try
             {

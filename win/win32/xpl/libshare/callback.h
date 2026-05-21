@@ -44,9 +44,16 @@ struct objclassdata
     schar obj_loc_x;
     schar obj_loc_y;
 
-    uchar reserved_1;
-    uchar reserved_2;
+    schar oc_subtyp;
+    uchar ocdata_flags;
 };
+
+#define OCDATA_BIMANUAL             0x01
+#define OCDATA_WIELDED_WEAPON       0x02
+#define OCDATA_QUIVERABLE           0x04
+#define OCDATA_BLINDFOLD            0x08
+#define OCDATA_APPLIABLE_POLEARM    0x10
+
 
  /* General callback types */
 typedef void(__callconv* VoidVoidCallback)();
@@ -145,7 +152,7 @@ typedef void(__callconv* ExitHackCallback)(int);
 
 typedef char*(__callconv* GetCwdCallback)();
 typedef int (__callconv* MessageBoxCallback)(char*, char*, unsigned int);
-typedef void(__callconv* FreeMemoryCallback)(int64_t**);
+typedef void(__callconv* FreeMemoryCallback)(int64_t*);
 typedef void (__callconv* ReportPlayerNameCallback)(char*);
 typedef void (__callconv* ReportPlayTimeCallback)(int64_t, int64_t);
 typedef void(__callconv* SendObjectDataCallback)(int, int, struct obj*, int, int, struct objclassdata*, uint64_t);

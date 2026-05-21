@@ -28,6 +28,12 @@ get_objclassdata(struct obj* otmp)
     otypdata.rustprone = (uchar)is_rustprone(otmp);
     otypdata.poisonable = (uchar)is_poisonable(otmp);
 
+    otypdata.oc_subtyp = objects[otmp->otyp].oc_subtyp;
+    otypdata.ocdata_flags |= (bimanual(otmp) ? OCDATA_BIMANUAL : 0);
+    otypdata.ocdata_flags |= (is_wieldable_weapon(otmp) && !is_ammo(otmp) && !nonmelee_throwing_weapon(otmp) ? OCDATA_WIELDED_WEAPON : 0);
+    otypdata.ocdata_flags |= (is_ammo(otmp) || throwing_weapon(otmp) || ammo_for_sling(otmp) ? OCDATA_QUIVERABLE : 0);
+    otypdata.ocdata_flags |= (is_blindfold(otmp) ? OCDATA_BLINDFOLD : 0);
+    otypdata.ocdata_flags |= (is_appliable_pole_type_weapon(otmp) ? OCDATA_APPLIABLE_POLEARM : 0);
 
     if (otmp == uchain || otmp == uball)
     {

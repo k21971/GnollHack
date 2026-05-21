@@ -66,6 +66,98 @@ struct monst *mtmp;
     return FALSE;
 }
 
+boolean
+check_mon_wants_to_attack_target(mtmp, mtarg)
+struct monst* mtmp, * mtarg;
+{
+    if (!mtmp || !mtarg)
+        return FALSE;
+
+    int i;
+    int max_dmg = max_passive_dmg(mtarg, mtmp);
+    boolean has_enough_hp = mon_disregards_own_health(mtmp) || max_dmg < mtmp->mhp;
+    boolean dmg_not_too_high = mon_disregards_own_health(mtmp) || max_dmg < mtmp->mhp / 3;
+    boolean self_strong_enough = ((mtmp->mhp >= (8 * mtmp->mhpmax) / 10 && max_dmg < mtmp->mhp / 2) || dmg_not_too_high);
+    boolean target_weak = (mon_has_bloodlust(mtmp) || mon_disregards_enemy_strength(mtmp) || mtarg->m_lev < mtmp->m_lev / 2 || mtarg->mhp < mtarg->mhpmax / 10 || dmg_not_too_high);
+    boolean is_insta_kill = FALSE;
+    boolean haspassive = FALSE;
+    boolean resistspassive = FALSE;
+    for (i = 0; i < NATTK && mtarg->data->mattk[i].aatyp != AT_NONE; i++)
+    {
+        if (mtarg->data->mattk[i].aatyp == AT_PASV)
+        {
+            haspassive = TRUE;
+            switch (mtarg->data->mattk[i].adtyp)
+            {
+            case AD_FIRE:
+                if (is_mon_immune_to_fire(mtmp))
+                    resistspassive = TRUE;
+                else if (mon_resists_fire_weakly(mtmp) && dmg_not_too_high)
+                    resistspassive = TRUE;
+                else if (mon_resists_fire_strongly(mtmp) && dmg_not_too_high)
+                    resistspassive = TRUE;
+                break;
+            case AD_COLD:
+                if (is_mon_immune_to_cold(mtmp))
+                    resistspassive = TRUE;
+                else if (mon_resists_cold_weakly(mtmp) && dmg_not_too_high)
+                    resistspassive = TRUE;
+                else if (mon_resists_cold_strongly(mtmp) && dmg_not_too_high)
+                    resistspassive = TRUE;
+                break;
+            case AD_ELEC:
+                if (is_mon_immune_to_elec(mtmp))
+                    resistspassive = TRUE;
+                else if (mon_resists_elec_weakly(mtmp) && dmg_not_too_high)
+                    resistspassive = TRUE;
+                else if (mon_resists_elec_strongly(mtmp) && dmg_not_too_high)
+                    resistspassive = TRUE;
+                break;
+            case AD_ACID:
+                if (is_mon_immune_to_acid(mtmp))
+                    resistspassive = TRUE;
+                else if (mon_resists_acid_weakly(mtmp) && dmg_not_too_high)
+                    resistspassive = TRUE;
+                else if (mon_resists_acid_strongly(mtmp) && dmg_not_too_high)
+                    resistspassive = TRUE;
+                break;
+            case AD_MAGM:
+                if (is_mon_immune_to_magic_missile(mtmp))
+                    resistspassive = TRUE;
+                else if (mon_resists_magic_missile_weakly(mtmp) && dmg_not_too_high)
+                    resistspassive = TRUE;
+                else if (mon_resists_magic_missile_strongly(mtmp) && dmg_not_too_high)
+                    resistspassive = TRUE;
+                break;
+            case AD_STON:
+                is_insta_kill = TRUE;
+                if (resists_ston(mtmp))
+                    resistspassive = TRUE;
+                break;
+            case AD_SLIM:
+                is_insta_kill = TRUE;
+                if (resists_slime(mtmp))
+                    resistspassive = TRUE;
+                break;
+            case AD_PLYS:
+                if (resists_paralysis(mtmp))
+                    resistspassive = TRUE;
+                break;
+            case AD_STUN:
+                if (resists_stun(mtmp))
+                    resistspassive = TRUE;
+                break;
+            case AD_RUST:
+                break;
+            default:
+                break;
+            }
+            break;
+        }
+    }
+    return !haspassive || resistspassive || (self_strong_enough && target_weak && has_enough_hp && !is_insta_kill);
+}
+
 /* check whether a monster is carrying a locking/unlocking tool */
 boolean
 monhaskey(mon, for_unlocking)
@@ -533,7 +625,7 @@ boolean digest_meal;
 
     if (digest_meal)
     {
-        if (mon->meating)
+        if (mon->meating > 0)
         {
             mon->meating--;
             if (mon->meating <= 0)
@@ -1083,16 +1175,14 @@ register struct monst *mtmp;
     /*  Now, attack the player if possible - one attack set per monst
      */
 
-    boolean foundyou = (mtmp->mux == u.ux && mtmp->muy == u.uy);
-    boolean found_or_wildmiss_ok = (foundyou || m_cannotsenseu(mtmp) || Displaced || Underwater);
-    if (found_or_wildmiss_ok && (!is_peaceful(mtmp) || is_crazed(mtmp) || (Conflict && !check_ability_resistance_success(mtmp, A_WIS, 0))))
+    if (!is_peaceful(mtmp) || is_crazed(mtmp) || (Conflict && !check_ability_resistance_success(mtmp, A_WIS, 0)))
     {
         if (inrange && !noattacks(mdat) && (Upolyd ? u.mh : u.uhp) > 0 && !scared && tmp != 3)
         {
-            Sprintf(debug_buf_4, "mattacku mon, mx:%d, my:%d, mux:%d, muy:%d, ux:%d, uy:%d, peaceful:%d, tame:%d, blinded:%d, crazed:%d, confused:%d, conflict:%d, displaced:%d",
-                (int)mtmp->mx, (int)mtmp->my, (int)mtmp->mux, (int)mtmp->muy, (int)u.ux, (int)u.uy,
+            debugprint("mattacku mon, mnum:%d, mx:%d, my:%d, mux:%d, muy:%d, ux:%d, uy:%d, peaceful:%d, tame:%d, blinded:%d, crazed:%d, confused:%d, conflict:%d, displaced:%d, invisible:%d",
+                (int)mtmp->mnum, (int)mtmp->mx, (int)mtmp->my, (int)mtmp->mux, (int)mtmp->muy, (int)u.ux, (int)u.uy,
                 is_peaceful(mtmp) != 0, is_tame(mtmp) != 0, is_blinded(mtmp) != 0, is_crazed(mtmp) != 0, is_confused(mtmp) != 0,
-                Conflict != 0, Displaced != 0);
+                Conflict != 0, Displaced != 0, Invisib != 0);
             if (mattacku(mtmp))
                 return 1; /* monster died (e.g. exploded) */
         }
@@ -1311,13 +1401,14 @@ register int after;
     }
     ptr = mtmp->data; /* mintrap() can change mtmp->data -dlc */
 
-    if (mtmp->meating)
+    if (mtmp->meating > 0)
     {
         mtmp->meating--;
         if (mtmp->meating <= 0)
             finish_meating(mtmp);
         return 3; /* still eating */
     }
+
     if (hides_under(ptr) && OBJ_AT(mtmp->mx, mtmp->my) && rn2(10))
         return 0; /* do not leave hiding place */
 
@@ -1339,6 +1430,7 @@ register int after;
     /* my dog gets special treatment */
     if (is_tame(mtmp)) 
     {
+        debugprint_pos();
         mmoved = dog_move(mtmp, after);
         goto postmov;
     }
@@ -1794,6 +1886,7 @@ register int after;
                     return 2;
 
                 if ((mstatus & MM_HIT) && !(mstatus & MM_DEF_DIED) && rn2(4)
+                    && check_mon_wants_to_attack_target(mtmp2, mtmp)
                     && mtmp2->movement >= NORMAL_SPEED) 
                 {
                     mtmp2->movement -= NORMAL_SPEED;
@@ -1825,6 +1918,7 @@ register int after;
         if (!m_in_out_region(mtmp, nix, niy))
             return 3;
 
+        debugprint("m_move: mnum=%d, omx=%d, omy=%d, nix=%d, niy=%d", mtmp->mnum, omx, omy, nix, niy);
         remove_monster(omx, omy);
         place_monster(mtmp, nix, niy);
         play_movement_sound(mtmp, CLIMBING_TYPE_NONE);
@@ -2129,7 +2223,7 @@ register int after;
             }
 
             /* Maybe a rock mole just ate some metal object */
-            if (lithovore(ptr))
+            if (lithovorous(ptr))
             {
                 if (meatrock(mtmp) == 2)
                     return 2; /* it died */

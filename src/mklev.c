@@ -957,6 +957,7 @@ int trap_type;
                         struct monst* mon = makemon(&mons[PM_ORC], xx, yy + dy, MM_MAX_HP | MM_WAITFORU);
                         if (mon)
                         {
+                            mon->mon_flags |= MON_FLAGS_ORC_AND_A_PIE;
                             context.made_orc_and_a_pie = TRUE;
                             if (!m_carrying(mon, ORCISH_CHAIN_MAIL))
                                 (void)mongets(mon, ORCISH_CHAIN_MAIL);
@@ -983,6 +984,7 @@ int trap_type;
                         struct monst* mon = makemon(&mons[PM_ORC_CAPTAIN], xx, yy + dy, MM_MAX_HP);
                         if (mon)
                         {
+                            mon->mon_flags |= MON_FLAGS_ORC_AND_A_PIE;
                             context.made_orc_and_a_pie2 = TRUE;
                             if (!m_carrying(mon, ORCISH_CHAIN_MAIL))
                                 mongets(mon, ORCISH_CHAIN_MAIL);
@@ -1782,6 +1784,8 @@ boolean skip_lvl_checks;
         }
     }
 
+    debugprint("mineralize");
+
     /*
      * Seed rock areas with gold and/or gems.
      * We use fairly low level object handling to avoid unnecessary
@@ -2037,7 +2041,7 @@ xchar x, y; /* location */
 
     if (br->type == BR_PORTAL) 
     {
-        mkportal(x, y, dest->dnum, dest->dlevel);
+        mkportal(x, y, dest->dnum, dest->dlevel, 0, 0, FALSE);
     }
     else if (make_stairs) 
     {
@@ -2841,12 +2845,11 @@ int dist;
     make_rocks = (dist != 1 && dist != 4 && dist != 5) ? TRUE : FALSE;
     while ((otmp = sobj_at(BOULDER, x, y)) != 0) {
         if (make_rocks) {
-            fracture_rock(otmp, FALSE);
+            (void)fracture_rock(otmp, FALSE);
             make_rocks = FALSE; /* don't bother with more rocks */
         } else {
-            Strcpy(debug_buf_2, "mkinvpos");
+            debugprint("mkinvpos: %d", otmp->otyp);
             obj_extract_self(otmp);
-            Sprintf(priority_debug_buf_4, "mkinvpos: %d", otmp->otyp);
             obfree(otmp, (struct obj *) 0);
         }
     }

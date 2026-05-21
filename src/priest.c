@@ -88,6 +88,9 @@ register xchar omx, omy, gx, gy;
     struct obj *ib = (struct obj *) 0;
 #endif
 
+    debugprint("move_special: mnum=%d, shk=%d, pri=%d, smi=%d, npc=%d, mx=%d, my=%d, ux=%d, uy=%d, in_his_shop=%d, appr=%d, uondoor=%d, avoid=%d, omx=%d, omy=%d, gx=%d, gy=%d", 
+        mtmp->mnum, (int)mtmp->isshk, (int)mtmp->ispriest, (int)mtmp->issmith, (int)mtmp->isnpc, mtmp->mx, mtmp->my, u.ux, u.uy, (int)in_his_shop, (int)appr, (int)uondoor, (int)avoid, omx, omy, gx, gy);
+
     if (omx == gx && omy == gy)
         return 0;
 
@@ -99,7 +102,7 @@ register xchar omx, omy, gx, gy;
 
     nix = omx;
     niy = omy;
-    if (mtmp->isshk)
+    if (mtmp->isshk || mtmp->issmith)
         allowflags = ALLOW_SSM;
     else
         allowflags = ALLOW_SSM | ALLOW_SANCT;
@@ -151,7 +154,7 @@ pick_move:
             }
         }
     }
-    if (mtmp->ispriest && avoid && nix == omx && niy == omy
+    if ((mtmp->ispriest || mtmp->issmith) && avoid && nix == omx && niy == omy
         && onlineu(omx, omy)) 
     {
         /* might as well move closer as long it's going to stay
@@ -162,6 +165,7 @@ pick_move:
 
     if (nix != omx || niy != omy) 
     {
+        debugprint("move_special2: mnum=%d, omx=%d, omy=%d, nix=%d, niy=%d", mtmp->mnum, omx, omy, nix, niy);
         remove_monster(omx, omy);
         place_monster(mtmp, nix, niy);
         play_movement_sound(mtmp, CLIMBING_TYPE_NONE);
@@ -738,8 +742,8 @@ int mtype;
         /* Nothing here */
     }
 
+    issue_breadcrumb2("Creating smith of montype", smith_montype);
     uint64_t extraflags = Inhell ? MM_MALE : 0UL; /* Since there is only one soundset for unusual creature types */
-
     smith = makemon(&mons[smith_montype], smith_loc_x, smith_loc_y, MM_ESMI | extraflags);
     if(!smith)
         smith = makemon(&mons[PM_SMITH], smith_loc_x, smith_loc_y, MM_ESMI | extraflags); /* Fallback */
@@ -1110,13 +1114,16 @@ int roomno;
             mtmp->mpeaceful = 0;
             set_mhostility(mtmp);
             newsym(mtmp->mx, mtmp->my);
-            if (flags.verbose)
-                You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "are frightened to death, and unable to move.");
-            nomul(-3);
-            multi_reason = "being terrified of a ghost";
-            nomovemsg = "You regain your composure.";
-            nomovemsg_attr = ATR_NONE;
-            nomovemsg_color = CLR_MSG_SUCCESS;
+            if (!Fear_resistance)
+            {
+                if (flags.verbose)
+                    You_ex(ATR_NONE, CLR_MSG_NEGATIVE, "are frightened to death, and unable to move.");
+                nomul(-3);
+                multi_reason = "being terrified of a ghost";
+                nomovemsg = "You regain your composure.";
+                nomovemsg_attr = ATR_NONE;
+                nomovemsg_color = CLR_MSG_SUCCESS;
+            }
         }
     }
 }
@@ -1810,7 +1817,7 @@ boolean showheads;
     }
 
     /* pets eating mimic corpses mimic while eating, so this comes first */
-    if (mtmp->meating)
+    if (mtmp->meating > 0)
         Strcat(info, ", eating");
     /* a stethoscope exposes mimic before getting here so this
        won't be relevant for it, but wand of probing doesn't */

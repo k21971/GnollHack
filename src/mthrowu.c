@@ -237,7 +237,7 @@ int x, y;
     }
     else
     {
-        Sprintf(priority_debug_buf_4, "drop_throw: %d", obj->otyp);
+        debugprint("drop_throw: %d", obj->otyp);
         obfree(obj, (struct obj*)0);
     }
     return retvalu;
@@ -564,6 +564,7 @@ boolean verbose;    /* give message(s) even when you can't see what happened */
                     if (vis)
                     {
                         play_sfx_sound_at_location(SFX_MONSTER_COVERED_IN_FROST, mtmp->mx, mtmp->my);
+                        display_gui_effect(GUI_EFFECT_FREEZE, 0, mtmp->mx, mtmp->my, 0, 0, 0UL);
                         pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "cold sears %s!", mon_nam(mtmp));
                     }
                     else if (verbose && !target)
@@ -591,6 +592,7 @@ boolean verbose;    /* give message(s) even when you can't see what happened */
                     if (vis)
                     {
                         play_sfx_sound_at_location(SFX_MONSTER_ON_FIRE, mtmp->mx, mtmp->my);
+                        display_gui_effect(GUI_EFFECT_FIRE, 0, mtmp->mx, mtmp->my, 0, 0, 0UL);
                         pline_The_ex(ATR_NONE, CLR_MSG_ATTENTION, "fire burns %s!", mon_nam(mtmp));
                     }
                     else if (verbose && !target)
@@ -618,6 +620,7 @@ boolean verbose;    /* give message(s) even when you can't see what happened */
                     if (vis)
                     {
                         play_sfx_sound_at_location(SFX_MONSTER_GETS_ZAPPED, mtmp->mx, mtmp->my);
+                        display_gui_effect(GUI_EFFECT_LIGHTNING, 0, mtmp->mx, mtmp->my, 0, 0, 0UL);
                         pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s is jolted by lightning!", Monnam(mtmp));
                     }
                     else if (verbose && !target)
@@ -650,8 +653,8 @@ boolean verbose;    /* give message(s) even when you can't see what happened */
                     if (vis)
                     {
                         play_sfx_sound_at_location(SFX_MONSTER_IS_HIT_WITH_DEATH_MAGIC, mtmp->mx, mtmp->my);
+                        display_gui_effect(GUI_EFFECT_DEATH_MAGIC, 0, mtmp->mx, mtmp->my, 0, 0, 0UL);
                         pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s is slain!", Monnam(mtmp));
-
                     }
                     else if (verbose && !target)
                     {
@@ -752,7 +755,7 @@ boolean verbose;    /* give message(s) even when you can't see what happened */
 
         if (!objgone && range == -1)
         { /* special case */
-            Strcpy(debug_buf_2, "ohitmon");
+            debugprint("ohitmon");
             obj_extract_self(otmp);    /* free it for motion again */
             return 0;
         }
@@ -809,13 +812,13 @@ struct obj *obj;         /* missile (or stack providing it) */
         /* location, not its existence */
         if (MON_WEP(mon) == obj)
             setmnotwielded(mon, obj);
-        Strcpy(debug_buf_2, "m_throw1");
+        debugprint("m_throw1");
         obj_extract_self(obj);
         singleobj = obj;
         obj = (struct obj *) 0;
     } else {
         singleobj = splitobj(obj, 1L);
-        Strcpy(debug_buf_2, "m_throw2");
+        debugprint("m_throw2");
         obj_extract_self(singleobj);
     }
 
@@ -876,7 +879,7 @@ struct obj *obj;         /* missile (or stack providing it) */
                     You("are not interested in %s junk.",
                         s_suffix(mon_nam(mon)));
                     makeknown(singleobj->otyp);
-                    dropy(singleobj);
+                    (void) dropy(singleobj);
                 } else {
                     You(
                      "accept %s gift in the spirit in which it was intended.",
@@ -1006,7 +1009,7 @@ struct obj *obj;         /* missile (or stack providing it) */
                 poisoned(onmbuf, A_STR, knmbuf,
                          /* if damage triggered life-saving,
                             poison is limited to attrib loss */
-                           0, TRUE, 2);
+                           0, TRUE, 2, mon);
             }
 
             if (hitu && singleobj->elemental_enchantment)
@@ -1018,7 +1021,7 @@ struct obj *obj;         /* missile (or stack providing it) */
                 
                 /* if damage triggered life-saving,
                    major death magic is limited to minor death magic */
-                extra_enchantment_damage(onmbuf, singleobj->elemental_enchantment, knmbuf, (u.umortality > oldumort));
+                extra_enchantment_damage(onmbuf, singleobj->elemental_enchantment, knmbuf, (u.umortality > oldumort), mon);
             
                 //Remove special enchantment
                 switch (singleobj->elemental_enchantment)
@@ -1600,7 +1603,7 @@ m_useupall(mon, obj)
 struct monst *mon;
 struct obj *obj;
 {
-    Strcpy(debug_buf_2, "m_useupall");
+    debugprint("m_useupall1: %d", obj->otyp);
     obj_extract_self(obj);
     if (obj->owornmask) {
         if (obj == MON_WEP(mon))
@@ -1611,7 +1614,7 @@ struct obj *obj;
         if (mon == u.usteed && obj->otyp == SADDLE)
             dismount_steed(DISMOUNT_FELL);
     }
-    Sprintf(priority_debug_buf_4, "m_useupall: %d", obj->otyp);
+    debugprint("m_useupall2: %d", obj->otyp);
     obfree(obj, (struct obj *) 0);
 }
 
@@ -1787,9 +1790,8 @@ struct attack *mattk;
             }
             else
             {
-                Strcpy(debug_buf_2, "spitmu");
+                debugprint("spitmu: %d", otmp->otyp);
                 obj_extract_self(otmp);
-                Sprintf(priority_debug_buf_4, "spitmu: %d", otmp->otyp);
                 obfree(otmp, (struct obj*)0);
             }
         }
@@ -1965,7 +1967,7 @@ int range;
         do {
             /* <bx,by> is guaranteed to eventually converge with <ax,ay> */
             bx += dx, by += dy;
-            if (IS_ROCK(levl[bx][by].typ) || closed_door(bx, by))
+            if (!isok(bx, by) || IS_ROCK(levl[bx][by].typ) || closed_door(bx, by))
                 return FALSE;
             if (bx != ax || by != ay)
             {
@@ -2094,6 +2096,49 @@ int type;
             return otmp;
     return (struct obj *) 0;
 }
+
+struct obj *
+m_carrying_with_best_bounded_exceptionality(mtmp, type, lowestexc, highestexc)
+struct monst *mtmp;
+int type, lowestexc, highestexc;
+{
+    if (!mtmp->minvent)
+        return (struct obj*)0;
+
+    struct obj* otmp;
+    int exc;
+    for (exc = highestexc; exc >= lowestexc; exc--)
+    {
+        for (otmp = mtmp->minvent; otmp; otmp = otmp->nobj)
+            if (otmp->otyp == type && otmp->exceptionality == (uchar)exc && !inappropriate_exceptionality(mtmp, otmp))
+                return otmp;
+    }
+    return (struct obj*)0;
+}
+
+struct obj *
+m_carrying_with_best_exceptionality(mtmp, type)
+struct monst *mtmp;
+int type;
+{
+    if (!mtmp->minvent)
+        return (struct obj*)0;
+
+    int lowestexc = MAX_EXCEPTIONALITY_TYPES - 1;
+    int highestexc = 0;
+    struct obj *otmp;
+    for (otmp = mtmp->minvent; otmp; otmp = otmp->nobj)
+    {
+        if (otmp->otyp != type)
+            continue;
+        if (otmp->exceptionality < lowestexc)
+            lowestexc = otmp->exceptionality;
+        if (otmp->exceptionality > highestexc)
+            highestexc = otmp->exceptionality;
+    }
+    return m_carrying_with_best_bounded_exceptionality(mtmp, type, lowestexc, highestexc);
+}
+
 
 void
 hit_bars(objp, objx, objy, barsx, barsy, your_fault, from_invent)

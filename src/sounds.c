@@ -98,6 +98,7 @@ STATIC_DCL int FDECL(do_chat_pet_dowield_axe, (struct monst*));
 STATIC_DCL int FDECL(do_chat_pet_dounwield, (struct monst*));
 STATIC_DCL int FDECL(do_chat_feed, (struct monst*));
 STATIC_DCL int FDECL(do_chat_quaff, (struct monst*));
+STATIC_DCL int FDECL(do_chat_unicorn_horn, (struct monst*));
 STATIC_DCL int FDECL(do_chat_uncurse_items, (struct monst*));
 STATIC_DCL int FDECL(do_chat_buy_items, (struct monst*));
 STATIC_DCL int FDECL(do_chat_join_party, (struct monst*));
@@ -398,7 +399,7 @@ dosounds(VOID_ARGS)
                 switch (rn2(2) + hallu)
                 {
                 case 0:
-                    You_ex(ATR_NONE, CLR_MSG_ATTENTION, "suddenly realize it is quiter than usual.");
+                    You_ex(ATR_NONE, CLR_MSG_ATTENTION, "suddenly realize it is quieter than usual.");
                     break;
                 case 1:
                     play_sfx_sound(SFX_LEVEL_SOMEONE_DEMANDING_QUIETNESS);
@@ -1532,12 +1533,15 @@ bark_here:
     case MS_BONES:
         pline("%s rattles noisily.", fromchatmenu ? noittame_Monnam(mtmp) : Monnam(mtmp));
         chat_line = 0;
-        You("freeze for a moment.");
-        nomul(-2);
-        multi_reason = "scared by rattling";
-        nomovemsg = 0;
-        nomovemsg_attr = ATR_NONE;
-        nomovemsg_color = NO_COLOR;
+        if (!Fear_resistance)
+        {
+            You("freeze for a moment.");
+            nomul(-2);
+            multi_reason = "scared by rattling";
+            nomovemsg = 0;
+            nomovemsg_attr = ATR_NONE;
+            nomovemsg_color = NO_COLOR;
+        }
         break;
     case MS_LAUGH: {
         static const char *const laugh_msg[4] = {
@@ -3192,7 +3196,7 @@ struct monst* mtmp;
                     available_chat_list[chatnum].category = CHAT_CATEGORY_COMBAT;
                     if (mtmp->mspec_used > 0)
                     {
-                        Sprintf(available_chat_list[chatnum].name, "Breath weapon cooling down (%u round%s left)", mtmp->mspec_used, plur(mtmp->mspec_used));
+                        Sprintf(available_chat_list[chatnum].name, "Breath weapon cooling down (%u turn%s left)", mtmp->mspec_used, plur(mtmp->mspec_used));
                         available_chat_list[chatnum].using_menu_color = TRUE;
                         available_chat_list[chatnum].color = CLR_GRAY;
                     }
@@ -3200,13 +3204,13 @@ struct monst* mtmp;
                     {
                         char cooldownbuf[BUFSZ];
                         struct attack* mattk = attacktype_fordmg(mtmp->data, AT_BREA, AD_ANY);
-                        int typ = get_ray_adtyp(mattk->adtyp);
+                        int typ = mattk->adtyp; //  get_ray_adtyp(mattk->adtyp);
                         if (typ == AD_SLEE)
                             printdice(cooldownbuf, MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_DICE, MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_DIESIZE, MONSTER_BREATH_WEAPON_SLEEP_COOLDOWN_CONSTANT);
                         else
                             printdice(cooldownbuf, MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_DICE, MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_DIESIZE, MONSTER_BREATH_WEAPON_NORMAL_COOLDOWN_CONSTANT);
                         const char* steedbreathefmt = ((windowprocs.wincap2 & WC2_SPECIAL_SYMBOLS) != 0) ?
-                            "%s (&cool; %s after use)" : "%s (%s round cooldown after use)";
+                            "%s (&cool; %s after use)" : "%s (%s turn cooldown after use)";
                         Sprintf(available_chat_list[chatnum].name, steedbreathefmt, "Command the steed to use breath weapon", cooldownbuf);
                         //any.a_char = available_chat_list[chatnum].charnum;
                     }
@@ -3262,21 +3266,6 @@ struct monst* mtmp;
             //    available_chat_list[chatnum].name, MENU_UNSELECTED);
 
             chatnum++;
-
-            Sprintf(available_chat_list[chatnum].name, "Give a potion to %s to drink", noittame_mon_nam(mtmp));
-            available_chat_list[chatnum].function_ptr = &do_chat_quaff;
-            //available_chat_list[chatnum].charnum = 'a' + chatnum;
-            available_chat_list[chatnum].stops_dialogue = TRUE;
-            available_chat_list[chatnum].category = CHAT_CATEGORY_INTERACTION;
-
-            //any = zeroany;
-            //any.a_char = available_chat_list[chatnum].charnum;
-
-            //add_menu(win, NO_GLYPH, &any,
-            //    any.a_char, 0, ATR_NONE, NO_COLOR,
-            //    available_chat_list[chatnum].name, MENU_UNSELECTED);
-
-            chatnum++;
         }
 
         if (is_tame(mtmp) && invent && is_peaceful(mtmp)) /*  && !mtmp->issummoned */
@@ -3314,6 +3303,25 @@ struct monst* mtmp;
 
                 chatnum++;
 
+            }
+
+            if (carrying_class(POTION_CLASS))
+            {
+                Sprintf(available_chat_list[chatnum].name, "Give a potion to %s to drink", noittame_mon_nam(mtmp));
+                available_chat_list[chatnum].function_ptr = &do_chat_quaff;
+                //available_chat_list[chatnum].charnum = 'a' + chatnum;
+                available_chat_list[chatnum].stops_dialogue = TRUE;
+                available_chat_list[chatnum].category = CHAT_CATEGORY_INTERACTION;
+                chatnum++;
+            }
+
+            if (carrying(UNICORN_HORN) && has_mon_need_for_unicorn_horn(mtmp))
+            {
+                Sprintf(available_chat_list[chatnum].name, "Use a unicorn horn on %s", noittame_mon_nam(mtmp));
+                available_chat_list[chatnum].function_ptr = &do_chat_unicorn_horn;
+                available_chat_list[chatnum].stops_dialogue = TRUE;
+                available_chat_list[chatnum].category = CHAT_CATEGORY_INTERACTION;
+                chatnum++;
             }
         }
 
@@ -4550,6 +4558,8 @@ struct monst* mtmp;
                 if (i != '\0')
                 {
                     stopsdialogue = available_chat_list[j].stops_dialogue;
+                    if (available_chat_list[j].function_ptr == monsterdescription)
+                        issue_breadcrumb("monsterdescription via chat menu");
                     res = (available_chat_list[j].function_ptr)(mtmp);
                     bot();
                     if (res == 2) /* Changed level or the like and mtmp does not exist anymore */
@@ -5509,7 +5519,7 @@ struct monst* mtmp;
                         pline("%s picks up %s.", noittame_Monnam(mtmp),
                             distant_name(otmp, doname));
 
-                    Strcpy(debug_buf_2, "do_chat_pet_pickitems");
+                    debugprint("do_chat_pet_pickitems");
                     obj_extract_self(otmp);
                     newsym(omx, omy);
                     (void)mpickobj(mtmp, otmp);
@@ -5554,7 +5564,7 @@ struct monst* mtmp;
 
     /* should coordinate with perm invent, maybe not show worn items */
     n = query_objlist(qbuf, &invent,
-        (USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON), &pick_list, PICK_ANY,
+        (USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON | SHOW_QUICK), &pick_list, PICK_ANY,
         is_packmule(mtmp->data) ? allow_all : allow_all_but_coins, SHOWWEIGHTS_DROP);
     if (n > 0) 
     {
@@ -5589,10 +5599,18 @@ struct monst* mtmp;
             struct monst* shkp;
             if(otmp)
             {
+                debugprint_pos();
                 if (otmp->owornmask & (W_ARMOR | W_ACCESSORY))
                 {
                     play_sfx_sound(SFX_GENERAL_CANNOT);
-                    Sprintf(pbuf, "You cannot give %s to %s. You are wearing it.", doname(otmp), noittame_mon_nam(mtmp));
+                    Sprintf(pbuf, "You cannot give %s to %s; you are wearing it.", thecxname(otmp), noittame_mon_nam(mtmp));
+                    pline_ex1_popup(ATR_NONE, CLR_MSG_FAIL, pbuf, "Cannot Give Item", TRUE);
+                }
+                else if ((otmp->owornmask & (W_BALL | W_CHAIN)) != 0 || otmp == uball || otmp == uchain)
+                {
+                    play_sfx_sound(SFX_GENERAL_CANNOT);
+                    Sprintf(pbuf, "You cannot give %s to %s; it is %s to you.", thecxname(otmp), noittame_mon_nam(mtmp),
+                        (otmp->owornmask & W_CHAIN) != 0 || otmp == uchain ? "attached": "chained");
                     pline_ex1_popup(ATR_NONE, CLR_MSG_FAIL, pbuf, "Cannot Give Item", TRUE);
                 }
                 else if (carryamt == 0 || carryamt < otmp->quan)
@@ -5752,7 +5770,7 @@ struct monst* mtmp;
     add_valid_menu_class(REAGENT_CLASS);
 
     n = query_objlist(qbuf, &invent,
-        (USE_INVLET | INVORDER_SORT), &pick_list, PICK_ONE,
+        (USE_INVLET | INVORDER_SORT | SHOW_QUICK), &pick_list, PICK_ONE,
         allow_category, SHOWWEIGHTS_DROP);
 
     if (n > 0)
@@ -5783,6 +5801,8 @@ struct monst* mtmp;
             {
                 
                 if (welded(otmp, &youmonst)
+                    || otmp == uball
+                    || otmp == uchain
                     || !willeat
                     || !mon_can_move(mtmp) 
                     || mtmp->meating
@@ -5844,7 +5864,7 @@ struct monst* mtmp;
                                     currency(oprice));
                                 /* delobj->obfree will handle actual shop billing update */
                             }
-                            Sprintf(priority_debug_buf_3, "do_chat_feed: %d", otmp->otyp);
+                            debugprint("do_chat_feed: %d", otmp->otyp);
                             delobj(otmp);
                         }
                     }
@@ -5854,6 +5874,8 @@ struct monst* mtmp;
                             pline("%s does not seem to be able to move in order to eat %s.", noittame_Monnam(mtmp), the(singular(otmp, cxname)));
                         else if (mtmp->meating)
                             pline("%s is already eating something else.", noittame_Monnam(mtmp));
+                        else if (otmp == uball || otmp == uchain)
+                            You_cant("give %s to %s; it is chained to you.", yname(otmp), noittame_mon_nam(mtmp));
                         else if (!releasesuccess)
                             ; /* Nothing here */
                         else
@@ -6017,7 +6039,7 @@ struct monst* mtmp;
     {
     case 1:
         Strcpy(qbuf, "Which potion would you like to dip items into?");
-        n = query_objlist(qbuf, &invent, (SIGNAL_NOMENU | SIGNAL_ESCAPE | USE_INVLET | INVORDER_SORT),
+        n = query_objlist(qbuf, &invent, (SIGNAL_NOMENU | SIGNAL_ESCAPE | USE_INVLET | INVORDER_SORT | SHOW_QUICK),
             &pick_list, PICK_ONE, is_potion_of_water, SHOWWEIGHTS_NONE);
         if (n && pick_list && pick_list[0].item.a_obj)
         {
@@ -6025,7 +6047,7 @@ struct monst* mtmp;
             free((genericptr_t)pick_list);
             pick_list = 0;
             Sprintf(qbuf, "What would you like to dip into %s?", the(cxname(otmp)));
-            n = query_objlist(qbuf, &mtmp->minvent, (SIGNAL_NOMENU | SIGNAL_ESCAPE | USE_INVLET | INVORDER_SORT),
+            n = query_objlist(qbuf, &mtmp->minvent, (SIGNAL_NOMENU | SIGNAL_ESCAPE | USE_INVLET | INVORDER_SORT | SHOW_QUICK),
                 &pick_list, PICK_ONE, allow_all, SHOWWEIGHTS_NONE);
             if (n && pick_list && pick_list[0].item.a_obj)
             {
@@ -6035,7 +6057,7 @@ struct monst* mtmp;
                 const char* obj_glows = Yobjnam2(obj, "glow");
                 if (H2Opotion_dip(otmp, obj, TRUE, obj_glows))
                 {
-                    Sprintf(priority_debug_buf_2, "do_chat_uncurse_items: %d", otmp->otyp);
+                    debugprint("do_chat_uncurse_items: %d", otmp->otyp);
                     useup(otmp);
                     return 1;
                 }
@@ -6044,7 +6066,7 @@ struct monst* mtmp;
         break;
     case 2:
         Sprintf(qbuf, "Which scroll would you like to have %s read?", mon_nam(mtmp));
-        n = query_objlist(qbuf, &invent, (SIGNAL_NOMENU | SIGNAL_ESCAPE | USE_INVLET | INVORDER_SORT),
+        n = query_objlist(qbuf, &invent, (SIGNAL_NOMENU | SIGNAL_ESCAPE | USE_INVLET | INVORDER_SORT | SHOW_QUICK),
             &pick_list, PICK_ONE, is_scroll_of_remove_curse, SHOWWEIGHTS_NONE);
         if (n && pick_list && pick_list[0].item.a_obj)
         {
@@ -6054,7 +6076,7 @@ struct monst* mtmp;
             if (otmp->otyp == SCR_REMOVE_CURSE)
             {
                 (void)remove_curse(otmp, mtmp, !!mtmp->mprops[CONFUSION]);
-                Sprintf(priority_debug_buf_2, "do_chat_uncurse_items2: %d", otmp->otyp);
+                debugprint("do_chat_uncurse_items2: %d", otmp->otyp);
                 useup(otmp);
                 otmp = 0;
             }
@@ -6062,7 +6084,7 @@ struct monst* mtmp;
         break;
     case 3:
         if(spellid >= 0)
-            spelleffects(spellid, FALSE, mtmp);
+            spelleffects(spellid, FALSE, mtmp, (boolean*)0);
         break;
     case 4:
         if (priest)
@@ -6078,6 +6100,7 @@ struct monst* mtmp;
 
     return 0;
 }
+
 STATIC_OVL int
 do_chat_quaff(mtmp)
 struct monst* mtmp;
@@ -6115,7 +6138,7 @@ struct monst* mtmp;
     add_valid_menu_class(POTION_CLASS);
 
     n = query_objlist(qbuf, &invent,
-        (USE_INVLET | INVORDER_SORT), &pick_list, PICK_ONE,
+        (USE_INVLET | INVORDER_SORT | SHOW_QUICK), &pick_list, PICK_ONE,
         allow_category, SHOWWEIGHTS_DROP);
 
     boolean res = 0;
@@ -6234,6 +6257,93 @@ struct monst* mtmp;
     return (n_given > 0) && res;
 }
 
+STATIC_OVL int
+do_chat_unicorn_horn(mtmp)
+struct monst* mtmp;
+{
+    if (!mtmp)
+        return 0;
+
+    int n, i;
+    int64_t cnt;
+    struct obj* otmp, * otmp2;
+    menu_item* pick_list;
+
+    boolean appritemfound = FALSE;
+    for (otmp = invent; otmp; otmp = otmp->nobj)
+    {
+        if (otmp->otyp == UNICORN_HORN)
+        {
+            appritemfound = TRUE;
+            break;
+        }
+    }
+    if (!appritemfound)
+    {
+        char fbuf[BUFSZ];
+        Sprintf(fbuf, "don't have unicorn horns to apply on %s.", mon_nam(mtmp));
+        play_sfx_sound(SFX_GENERAL_CANNOT);
+        You_ex1_popup(fbuf, "No Unicorn Horns", ATR_NONE, CLR_MSG_FAIL, NO_GLYPH, POPUP_FLAGS_NONE);
+        return 0;
+    }
+
+    char qbuf[BUFSZ * 2] = "";
+    Sprintf(qbuf, "What would you like to apply on %s?", noittame_mon_nam(mtmp));
+
+    add_valid_menu_class(0); /* clear any classes already there */
+    add_valid_menu_class(TOOL_CLASS);
+
+    n = query_objlist(qbuf, &invent,
+        (USE_INVLET | INVORDER_SORT | SHOW_QUICK), &pick_list, PICK_ONE,
+        allow_unicorn_horn, SHOWWEIGHTS_DROP);
+
+    boolean res = 0;
+    if (n > 0)
+    {
+        bypass_objlist(invent, TRUE);
+        for (i = 0; i < n; i++)
+        {
+            otmp = pick_list[i].item.a_obj;
+
+            for (otmp2 = invent; otmp2; otmp2 = otmp2->nobj)
+                if (otmp2 == otmp)
+                    break;
+            if (!otmp2 || !otmp2->bypass)
+                continue;
+
+            /* found next selected invent item */
+            cnt = pick_list[i].count;
+            /* only one food item or potion can be fed at a time*/
+            if (cnt > 1)
+                cnt = 1;
+
+            /* Use here */
+            if (set_defensive_unicorn_horn(mtmp, otmp))
+            {
+                use_defensive(mtmp);
+                clear_defensive();
+                //char cstr[BUFSZ];
+                //Sprintf(cstr, "%s has used %s.", upstart(noittame_mon_nam(mtmp)), thecxname(otmp));
+                //display_popup_text(cstr, "Unicorn Horn Used", POPUP_TEXT_GENERAL, ATR_NONE, NO_COLOR, obj_to_glyph(otmp, rn2_on_display_rng), 0);
+            }
+            //else
+            //{
+            //    char cstr[BUFSZ];
+            //    Sprintf(cstr, "%s did not use %s.", upstart(noittame_mon_nam(mtmp)), thecxname(otmp));
+            //    display_popup_text(cstr, "Unicorn Horn Not Used", POPUP_TEXT_GENERAL, ATR_NONE, NO_COLOR, obj_to_glyph(otmp, rn2_on_display_rng), 0);
+            //}
+        }
+        bypass_objlist(invent, FALSE); /* reset invent to normal */
+        free((genericptr_t)pick_list);
+    }
+    else
+    {
+        pline1(Never_mind);
+    }
+
+    return res;
+}
+
 int
 release_item_from_hero_inventory(obj)
 struct obj* obj;
@@ -6241,6 +6351,8 @@ struct obj* obj;
     if (!obj)
         return 0;
     if (!canletgo(obj, "give"))
+        return 0;
+    if (obj == uball || obj == uchain) /* Cannot be given even though can be let go */
         return 0;
     if (obj == uwep) 
     {
@@ -6592,6 +6704,7 @@ struct monst* mtmp;
     }
     else if (is_tame(mtmp)) 
     {
+        issue_breadcrumb("do_chat_explain_statistics");
         monsterdescription(mtmp);
         return 0;
     }
@@ -6633,6 +6746,7 @@ struct monst* mtmp;
         play_sfx_sound(SFX_READ);
         money2mon(mtmp, u_pay);
         bot();
+        issue_breadcrumb("do_chat_explain_statistics2");
         monsterdescription(mtmp);
         stop_all_dialogue_of_mon_on_mobile(mtmp);
         return 1;
@@ -6694,7 +6808,7 @@ struct monst* mtmp;
                     madeheader = TRUE;
                     any = zeroany;
 
-                    add_extended_menu(win, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR,
+                    add_extended_menu(win, NO_GLYPH, &any, 0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
                         get_class_name(oclass), MENU_UNSELECTED, menu_group_heading_info(def_oc_syms[(int)oclass].sym));
                 }
 
@@ -6853,9 +6967,9 @@ struct monst* mtmp;
                     if (quan < item_to_buy->quan)
                         item_to_buy = splitobj(item_to_buy, quan);
                     
-                    Strcpy(debug_buf_2, "do_chat_buy_items");
+                    debugprint("do_chat_buy_items");
                     obj_extract_self(item_to_buy);
-                    hold_another_object(item_to_buy, "Oops!  %s out of your grasp!",
+                    (void) hold_another_object(item_to_buy, "Oops!  %s out of your grasp!",
                         The(aobjnam(item_to_buy, "slip")),
                         (const char*)0, TRUE);
                     buy_count++;
@@ -6976,7 +7090,7 @@ struct monst* mtmp;
                     madeheader = TRUE;
                     any = zeroany;
 
-                    add_extended_menu(win, NO_GLYPH, &any, 0, 0, iflags.menu_headings, NO_COLOR,
+                    add_extended_menu(win, NO_GLYPH, &any, 0, 0, iflags.menu_headings | ATR_HEADING, NO_COLOR,
                         get_class_name(oclass), MENU_UNSELECTED, menu_group_heading_info(def_oc_syms[(int)oclass].sym));
                 }
 
@@ -7046,7 +7160,7 @@ struct monst* mtmp;
                     if (item_to_take->quan > 1 && pick_list[i].count > 0 && pick_list[i].count < item_to_take->quan)
                         item_to_take = splitobj(item_to_take, pick_list[i].count);
 
-                    Strcpy(debug_buf_2, "do_chat_pet_take_items");
+                    debugprint("do_chat_pet_take_items");
                     obj_extract_self(item_to_take);
                     item_to_take->item_flags &= ~ITEM_FLAGS_GIVEN_BY_HERO;
 
@@ -7054,7 +7168,7 @@ struct monst* mtmp;
                     //You("took %s from %s.", doname(item_to_take), noittame_mon_nam(mtmp));
                     Strcpy(itembuf, doname(item_to_take));
 
-                    hold_another_object(item_to_take, "Oops!  %s out of your grasp!",
+                    (void) hold_another_object(item_to_take, "Oops!  %s out of your grasp!",
                         The(aobjnam(item_to_take, "slip")),
                         (const char*)0, TRUE);
                     take_count++;
@@ -7310,6 +7424,7 @@ struct monst* mtmp;
 
     struct obj pseudo = { 0 };
     pseudo.otyp = otyp;
+    pseudo.oclass = objects[pseudo.otyp].oc_class;
     pseudo.quan = 20L;
     pseudo.speflags = SPEFLAGS_SERVICED_SPELL;
 
@@ -7371,6 +7486,7 @@ struct monst* mtmp;
 
     struct obj pseudo = { 0 };
     pseudo.otyp = SPE_EXTRA_HEALING;
+    pseudo.oclass = objects[pseudo.otyp].oc_class;
     pseudo.quan = 1L;
     pseudo.speflags = SPEFLAGS_SERVICED_SPELL;
     if (targetmonst == &youmonst)
@@ -7429,6 +7545,7 @@ struct monst* mtmp;
 
     struct obj pseudo = { 0 };
     pseudo.otyp = SPE_FULL_HEALING;
+    pseudo.oclass = objects[pseudo.otyp].oc_class;
     pseudo.quan = 1L;
     pseudo.speflags = SPEFLAGS_SERVICED_SPELL;
     if (targetmonst == &youmonst)
@@ -7487,6 +7604,7 @@ struct monst* mtmp;
 
     struct obj pseudo = { 0 };
     pseudo.otyp = SPE_CURE_SICKNESS;
+    pseudo.oclass = objects[pseudo.otyp].oc_class;
     pseudo.quan = 1L;
     pseudo.speflags = SPEFLAGS_SERVICED_SPELL;
     if (targetmonst == &youmonst)
@@ -8710,6 +8828,7 @@ const char* title_text;
         any.a_char = (char)forge_idx + 1;
         struct obj pseudo = zeroobj;
         pseudo.otyp = forge_any_target_otyp_temp;
+        pseudo.oclass = objects[pseudo.otyp].oc_class;
         pseudo.quan = (int64_t)forge_any_target_quan_temp;
         pseudo.exceptionality = forge_any_target_exceptionality_temp;
         pseudo.material = forge_any_target_material_temp == MAT_NONE ? objects[forge_any_target_otyp_temp].oc_material : forge_any_target_material_temp;
@@ -9172,7 +9291,7 @@ boolean FDECL((*allow), (OBJ_P)); /* allow function */
 
     /* should coordinate with perm invent, maybe not show worn items */
     n = query_objlist("What would you like to sell?", &invent,
-        (USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON), &pick_list, PICK_ANY, allow, SHOWWEIGHTS_DROP);
+        (USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON | SHOW_QUICK), &pick_list, PICK_ANY, allow, SHOWWEIGHTS_DROP);
 
     if (n > 0 && pick_list)
     {
@@ -10185,7 +10304,7 @@ int64_t id_cost;
     Strcpy(buf, "What would you like to identify?");
 
     n = query_objlist(buf, &invent, (SIGNAL_NOMENU | SIGNAL_ESCAPE
-        | USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON),
+        | USE_INVLET | INVORDER_SORT | OBJECT_COMPARISON | SHOW_QUICK),
         &pick_list, PICK_ANY, not_fully_identified, SHOWWEIGHTS_NONE);
 
     if (n > 0)
@@ -10293,7 +10412,7 @@ STATIC_OVL int
 sell_to_npc(obj, mtmp, items_left_in_list, auto_yes)
 struct obj* obj;
 struct monst* mtmp;
-int items_left_in_list;
+int items_left_in_list UNUSED;
 boolean auto_yes;
 {
     if (!obj)
@@ -10358,10 +10477,10 @@ boolean auto_yes;
     }
     else if(has_enpc(mtmp))
     {
-        if ((npc_subtype_definitions[ENPC(mtmp)->npc_typ].service_flags & NPC_SERVICE_BUY_DILITHIUM_CRYSTALS) && obj->otyp == DILITHIUM_CRYSTAL)
+        if ((npc_subtype_definitions[ENPC(mtmp)->npc_typ].service_flags & NPC_SERVICE_BUY_DILITHIUM_CRYSTALS) && obj->oclass == GEM_CLASS) // && obj->otyp == DILITHIUM_CRYSTAL)
         {
             saleitem = TRUE;
-            makeknown(DILITHIUM_CRYSTAL);
+            //makeknown(DILITHIUM_CRYSTAL);
         }
 
         if((npc_subtype_definitions[ENPC(mtmp)->npc_typ].service_flags & NPC_SERVICE_BUY_GEMS_AND_STONES) && obj->oclass == GEM_CLASS)
@@ -10419,7 +10538,8 @@ boolean auto_yes;
         (void)safe_qbuf(qbuf, qbuf, qsfx, obj, xname, simpleonames,
             one ? "that" : "those");
 
-        char ans = auto_yes ? 'y' : items_left_in_list > 1 ? ynaq(qbuf) : yn_query(qbuf);
+        /* Switching to yn_query could have been confusing in GUI, as yes and no buttons changed positions */
+        char ans = auto_yes ? 'y' : ynaq(qbuf); // items_left_in_list > 1 ? ynaq(qbuf) : yn_query(qbuf);
 
         switch (ans)
         {
@@ -10459,7 +10579,7 @@ boolean auto_yes;
 merge_obj_back:
     if (obj->where == OBJ_INVENT)
     {
-        Sprintf(priority_debug_buf_3, "sell_to_npc: %d", obj->otyp);
+        debugprint("sell_to_npc: %d", obj->otyp);
         for (otmp = invent; otmp; otmp = otmp->nobj)
             if (merged(&otmp, &obj)) 
             {
@@ -10656,7 +10776,7 @@ struct monst* mtmp;
     const char* linearray[4] = {
         "That is a wand of town portal.",
         "It enables you to teleport back and forth between this town and your original location.",
-        "I supply them to local inhabitants and travellers alike.",
+        "I supply them to local inhabitants and travelers alike.",
         0 };
 
     hermit_talk(mtmp, linearray, GHSOUND_QUANTUM_SPECIAL_WAND);
@@ -11219,15 +11339,18 @@ int special_dialogue_sound_id;
     pseudo->quan = 20L; /* do not let useup get it */
     pseudo->speflags = SPEFLAGS_SERVICED_SPELL;
     boolean effect_happened = 0;
-    (void)seffects(pseudo, &effect_happened, &youmonst);
+    boolean gone = seffects(pseudo, &effect_happened, &youmonst);
     if (effect_happened)
     {
         money2mon(mtmp, u_pay);
         bot();
     }
-    Sprintf(priority_debug_buf_4, "spell_service_query: %d", pseudo->otyp);
-    obfree(pseudo, (struct obj*)0);
-    /* gnostic handled in seffects */
+    if (!gone)
+    {
+        debugprint("spell_service_query: %d", pseudo->otyp);
+        obfree(pseudo, (struct obj*)0);
+        /* gnostic handled in seffects */
+    }
 
     stop_all_dialogue_of_mon_on_mobile(mtmp);
     return 1;
@@ -11450,7 +11573,7 @@ int64_t service_cost;
         play_monster_special_dialogue_line(mtmp, special_dialogue_sound_id);
     }
 
-    struct obj* otmp = getobj_ex(selectable_item_categories, "enchant", 0, costbuf, (boolean(*)(struct obj*))0, service_cost, 3U);
+    struct obj* otmp = getobj_ex(selectable_item_categories, "enchant", 0, TRUE, costbuf, (boolean(*)(struct obj*))0, service_cost, 3U);
     if (!otmp)
         return 0;
 
@@ -11786,7 +11909,7 @@ refill_lantern_func(mtmp)
 struct monst* mtmp;
 {
     const char refill_lantern_objects[] = { ALL_CLASSES, TOOL_CLASS, 0 };
-    struct obj* otmp = getobj_ex(refill_lantern_objects, "refill", 0, "", maybe_refillable_with_oil, 0, 0U);
+    struct obj* otmp = getobj_ex(refill_lantern_objects, "refill", 0, TRUE, "", maybe_refillable_with_oil, 0, 0U);
     char talkbuf[BUFSZ];
 
     if (!otmp)
@@ -11882,7 +12005,7 @@ forge_dragon_scale_mail_func(mtmp)
 struct monst* mtmp;
 {
     const char forge_objects[] = { ALL_CLASSES, ARMOR_CLASS, 0 };
-    struct obj* otmp = getobj_ex(forge_objects, "forge into a dragon scale mail", 0, "", maybe_dragon_scales, 0, 0U);
+    struct obj* otmp = getobj_ex(forge_objects, "forge into a dragon scale mail", 0, TRUE, "", maybe_dragon_scales, 0, 0U);
     char talkbuf[BUFSZ];
 
     if (!otmp)
@@ -12058,7 +12181,7 @@ boolean initialize;
     }
 
     otyp_for_maybe_otyp = forge_source_otyp;
-    struct obj* otmp = getobj_ex((const char*)forge_objects, forge_string, 0, header_string, maybe_otyp, 0, 0U);
+    struct obj* otmp = getobj_ex((const char*)forge_objects, forge_string, 0, TRUE, header_string, maybe_otyp, 0, 0U);
 
     if (!otmp)
         return 0;
@@ -12119,7 +12242,7 @@ boolean initialize;
     }
     else
     {
-        Sprintf(priority_debug_buf_3, "forge_special_func: %d", otmp->otyp);
+        debugprint("forge_special_func: %d", otmp->otyp);
         useupall(otmp);
         otmp = 0;
     }
@@ -12140,7 +12263,7 @@ boolean initialize;
         fully_identify_obj(craftedobj);
         Sprintf(talkbuf, "%s hands %s to you.", noittame_Monnam(mtmp), acxname(craftedobj));
         popup_talk_line_ex(mtmp, talkbuf, ATR_NONE, NO_COLOR, TRUE, FALSE);
-        hold_another_object(craftedobj, "Oops!  %s out of your grasp!",
+        (void) hold_another_object(craftedobj, "Oops!  %s out of your grasp!",
             The(aobjnam(craftedobj, "slip")),
             (const char*)0, TRUE);
 
@@ -12223,6 +12346,7 @@ int* spell_otyps;
         char spellbuf[BUFSZ * 2] = "";
         struct obj pseudo = zeroobj;
         pseudo.otyp = i;
+        pseudo.oclass = objects[pseudo.otyp].oc_class;
         pseudo.blessed = 1;
         int64_t cost = get_cost(&pseudo, mtmp);
         Sprintf(spellbuf, "%s (%s%lld %s)", OBJ_NAME(objects[i]),
@@ -12279,6 +12403,7 @@ int* spell_otyps;
             char* txt = 0;
             struct obj pseudo = zeroobj;
             pseudo.otyp = spell_to_learn;
+            pseudo.oclass = objects[pseudo.otyp].oc_class;
             pseudo.blessed = 1;
             int64_t cost = get_cost(&pseudo, mtmp);
             char buf[BUFSZ * 2] = "";

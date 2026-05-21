@@ -386,6 +386,7 @@ register struct obj *sobj;
         return 1;
     }
     /* only under me - no separate display required */
+    debugprint_pos();
     if (stale)
         docrt();
     You("notice some gold between your %s.", makeplural(body_part(FOOT)));
@@ -433,6 +434,7 @@ outgoldmap:
         {
             gold = zeroobj; /* ensure oextra is cleared too */
             gold.otyp = GOLD_PIECE;
+            gold.oclass = COIN_CLASS;
             gold.quan = (int64_t) rnd(10); /* usually more than 1 */
             gold.ox = mtmp->mx;
             gold.oy = mtmp->my;
@@ -479,6 +481,7 @@ outgoldmap:
     reconstrain_map();
     issue_simple_gui_command(GUI_CMD_RESTORE_ZOOM);
     //zoomtoscale(scale_before);
+    debugprint_pos();
     docrt();
     if (Underwater)
         under_water(2);
@@ -525,12 +528,16 @@ register struct obj *sobj;
     if (!ct && !ctu) {
         known = stale && !confused;
         if (stale) {
+            debugprint_pos();
             docrt();
             You("sense a lack of %s nearby.", what);
             if (sobj && sobj->blessed) {
                 if (!u.uedibility)
-                    Your("%s starts to tingle.", body_part(NOSE));
+                    Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s starts to tingle.", body_part(NOSE));
+                else if (!Corpse_property_appraisal)
+                    Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s starts to prickle.", body_part(NOSE));
                 u.uedibility = 1;
+                HCorpse_property_appraisal |= FROM_ACQUIRED;
             }
         } else if (sobj) {
             char buf[BUFSZ];
@@ -538,7 +545,11 @@ register struct obj *sobj;
             Sprintf(buf, "Your %s twitches%s.", body_part(NOSE),
                     (sobj->blessed && !u.uedibility)
                         ? " then starts to tingle"
+                    : (sobj->blessed && !Corpse_property_appraisal)
+                        ? " then starts to prickle"
                         : "");
+            if (sobj->blessed)
+                HCorpse_property_appraisal |= FROM_ACQUIRED;
             if (sobj->blessed && !u.uedibility) {
                 boolean savebeginner = flags.beginner;
 
@@ -548,6 +559,7 @@ register struct obj *sobj;
                 u.uedibility = 1;
             } else
                 strange_feeling(sobj, buf, FALSE);
+
         }
         return !stale;
     } else if (!ct) {
@@ -555,8 +567,11 @@ register struct obj *sobj;
         You("%s %s nearby.", sobj ? "smell" : "sense", what);
         if (sobj && sobj->blessed) {
             if (!u.uedibility)
-                pline("Your %s starts to tingle.", body_part(NOSE));
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "Your %s starts to tingle.", body_part(NOSE));
+            else if (!Corpse_property_appraisal)
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "Your %s starts to prickle.", body_part(NOSE));
             u.uedibility = 1;
+            HCorpse_property_appraisal |= FROM_ACQUIRED;
         }
     } else {
         struct obj *temp;
@@ -597,6 +612,7 @@ register struct obj *sobj;
                 Your("%s %s to tingle and you smell %s.", body_part(NOSE),
                      u.uedibility ? "continues" : "starts", what);
                 u.uedibility = 1;
+                HCorpse_property_appraisal |= FROM_ACQUIRED;
             } else
                 Your("%s tingles and you smell %s.", body_part(NOSE), what);
         } else
@@ -610,6 +626,7 @@ register struct obj *sobj;
         reconstrain_map();
         issue_simple_gui_command(GUI_CMD_RESTORE_ZOOM);
         //zoomtoscale(scale_before);
+        debugprint_pos();
         docrt();
         if (Underwater)
             under_water(2);
@@ -636,6 +653,7 @@ int class;            /* an object class, 0 for all */
     int do_dknown = (detector && (detector->oclass == POTION_CLASS
                                   || detector->oclass == SPBOOK_CLASS)
                      && detector->blessed);
+    int do_ore_dknown = detector && detector->otyp == WAN_ORE_DETECTION;
     int ct = 0, ctu = 0;
     register struct obj *obj, *otmp = (struct obj *) 0;
     register struct monst *mtmp;
@@ -669,6 +687,16 @@ int class;            /* an object class, 0 for all */
         for (obj = invent; obj; obj = obj->nobj)
             do_dknown_of(obj);
 
+    if (do_ore_dknown)
+    {
+        for (obj = invent; obj; obj = obj->nobj)
+            if (is_ore(obj))
+                do_dknown_of(obj);
+        for (obj = memoryobjs; obj; obj = obj->nobj)
+            if (is_ore(obj))
+                do_dknown_of(obj);
+    }
+
     for (obj = fobj; obj; obj = obj->nobj) {
         if ((!class && !boulder) || o_in(obj, class) || o_in(obj, boulder)) {
             if (obj->ox == u.ux && obj->oy == u.uy)
@@ -677,6 +705,8 @@ int class;            /* an object class, 0 for all */
                 ct++;
         }
         if (do_dknown)
+            do_dknown_of(obj);
+        if (do_ore_dknown && is_ore(obj))
             do_dknown_of(obj);
     }
 
@@ -688,6 +718,8 @@ int class;            /* an object class, 0 for all */
                 ct++;
         }
         if (do_dknown)
+            do_dknown_of(obj);
+        if (do_ore_dknown && is_ore(obj))
             do_dknown_of(obj);
     }
 
@@ -702,6 +734,8 @@ int class;            /* an object class, 0 for all */
                 || o_in(obj, boulder))
                 ct++;
             if (do_dknown)
+                do_dknown_of(obj);
+            if (do_ore_dknown && is_ore(obj))
                 do_dknown_of(obj);
         }
         if ((is_cursed && M_AP_TYPE(mtmp) == M_AP_OBJECT
@@ -793,6 +827,7 @@ int class;            /* an object class, 0 for all */
             {
                 temp = zeroobj;
                 temp.otyp = mtmp->mappearance; /* needed for obj_to_glyph() */
+                temp.oclass = objects[mtmp->mappearance].oc_class;
                 temp.corpsenm = PM_TENGU; /* if mimicing a corpse */
                 temp.quan = 1L;
             }
@@ -805,6 +840,7 @@ int class;            /* an object class, 0 for all */
 
             gold = zeroobj; /* ensure oextra is cleared too */
             gold.otyp = GOLD_PIECE;
+            gold.oclass = COIN_CLASS;
             gold.quan = (int64_t) rnd(10); /* usually more than 1 */
             gold.ox = mtmp->mx;
             gold.oy = mtmp->my;
@@ -832,6 +868,7 @@ int class;            /* an object class, 0 for all */
     reconstrain_map();
     issue_simple_gui_command(GUI_CMD_RESTORE_ZOOM);
     //zoomtoscale(scale_before);
+    debugprint_pos();
     docrt(); /* this will correctly reset vision */
     if (Underwater)
         under_water(2);
@@ -931,6 +968,7 @@ int mclass;                /* monster class, 0 for all */
         reconstrain_map();
         issue_simple_gui_command(GUI_CMD_RESTORE_ZOOM);
         //zoomtoscale(scale_before);
+        debugprint_pos();
         docrt(); /* redraw the screen to remove unseen monsters from map */
         if (Underwater)
             under_water(2);
@@ -958,6 +996,7 @@ int src_cursed;
             obj.oy = y;
         }
         obj.otyp = !Hallucination ? GOLD_PIECE : random_object(rn2);
+        obj.oclass = objects[obj.otyp].oc_class;
         obj.quan = (int64_t) ((obj.otyp == GOLD_PIECE) ? rnd(10)
                            : objects[obj.otyp].oc_merge ? rnd(2) : 1);
         obj.corpsenm = random_monster(rn2); /* if otyp == CORPSE */
@@ -1127,6 +1166,7 @@ outtrapmap:
     reconstrain_map();
     issue_simple_gui_command(GUI_CMD_RESTORE_ZOOM);
     //zoomtoscale(scale_before);
+    debugprint_pos();
     docrt(); /* redraw the screen to remove unseen traps from the map */
     if (Underwater)
         under_water(2);
@@ -1268,7 +1308,7 @@ struct obj **optr;
             play_special_effect_at(SPECIAL_EFFECT_SMALL_FIERY_EXPLOSION, 0, u.ux, u.uy, FALSE);
             special_effect_wait_until_action(0);
             pline_ex(ATR_NONE, CLR_MSG_NEGATIVE, "%s!", Tobjnam(obj, "explode"));
-            Sprintf(priority_debug_buf_2, "use_crystal_ball: %d", obj->otyp);
+            debugprint("use_crystal_ball: %d", obj->otyp);
             useup(obj);
             *optr = obj = 0; /* it's gone */
             /* physical damage cause by the shards and force */
@@ -1566,6 +1606,7 @@ do_mapping()
         /* browse_map() instead of display_nhwindow(WIN_MAP, TRUE) */
         browse_map(TER_DETECT | TER_MAP | TER_TRP | TER_OBJ,
                    "anything of interest");
+        debugprint_pos();
         docrt();
     }
     reconstrain_map();
@@ -1693,6 +1734,7 @@ struct obj *sobj; /* scroll--actually fake spellbook--object */
         }
     see_monsters();
 
+    debugprint_pos();
     if (refresh)
         docrt();
 }
@@ -1769,6 +1811,7 @@ genericptr_t num;
 
     if (levl[zx][zy].typ == SDOOR) 
     {
+        issue_achievement(GUI_ACHIEVEMENT_FOUND_SECRET_DOOR_OR_PASSAGE);
         cvt_sdoor_to_door(zx, zy); /* .typ = DOOR */
         magic_map_background(zx, zy, 0);
         newsym(zx, zy);
@@ -1777,6 +1820,7 @@ genericptr_t num;
     else if (levl[zx][zy].typ == SCORR)
     {
         levl[zx][zy].typ = CORR;
+        issue_achievement(GUI_ACHIEVEMENT_FOUND_SECRET_DOOR_OR_PASSAGE);
         unblock_vision_and_hearing_at_point(zx, zy);
         magic_map_background(zx, zy, 0);
         newsym(zx, zy);
@@ -1825,9 +1869,12 @@ genericptr_t num;
     register struct obj *otmp;
     int *num_p = (int *) num;
 
-    if (OBJ_AT(zx, zy)) {
-        for (otmp = level.objects[zx][zy]; otmp; otmp = otmp->nexthere) {
-            if (Is_box(otmp) && otmp->olocked) {
+    if (OBJ_AT(zx, zy)) 
+    {
+        for (otmp = level.objects[zx][zy]; otmp; otmp = otmp->nexthere) 
+        {
+            if (Is_box(otmp) && otmp->olocked) 
+            {
                 otmp->olocked = 0;
                 (*num_p)++;
             }
@@ -1836,10 +1883,15 @@ genericptr_t num;
     }
     if (levl[zx][zy].typ == SDOOR
         || (levl[zx][zy].typ == DOOR
-            && (levl[zx][zy].doormask & (D_CLOSED | D_LOCKED)))) {
+            && (levl[zx][zy].doormask & (D_CLOSED | D_LOCKED)))) 
+    {
         if (levl[zx][zy].typ == SDOOR)
+        {
+            issue_achievement(GUI_ACHIEVEMENT_FOUND_SECRET_DOOR_OR_PASSAGE);
             cvt_sdoor_to_door(zx, zy); /* .typ = DOOR */
-        if (levl[zx][zy].doormask & D_TRAPPED) {
+        }
+        if (levl[zx][zy].doormask & D_TRAPPED) 
+        {
             if (distu(zx, zy) < 3)
             {
                 b_trapped(get_door_name_at(zx, zy), 0, zx, zy);
@@ -1865,16 +1917,21 @@ genericptr_t num;
         unblock_vision_and_hearing_at_point(zx, zy);
         newsym(zx, zy);
         (*num_p)++;
-    } else if (levl[zx][zy].typ == SCORR) {
+    }
+    else if (levl[zx][zy].typ == SCORR) 
+    {
         levl[zx][zy].typ = CORR;
         unblock_vision_and_hearing_at_point(zx, zy);
         newsym(zx, zy);
         (*num_p)++;
-    } else if ((ttmp = t_at(zx, zy)) != 0) {
+    }
+    else if ((ttmp = t_at(zx, zy)) != 0) 
+    {
         struct monst *mon;
         boolean dummy; /* unneeded "you notice it arg" */
 
-        if (!ttmp->tseen && ttmp->ttyp != STATUE_TRAP) {
+        if (!ttmp->tseen && ttmp->ttyp != STATUE_TRAP) 
+        {
             ttmp->tseen = 1;
             newsym(zx, zy);
             (*num_p)++;
@@ -1883,7 +1940,9 @@ genericptr_t num;
         if (openholdingtrap(mon, &dummy)
             || openfallingtrap(mon, TRUE, &dummy))
             (*num_p)++;
-    } else if (find_drawbridge(&zx, &zy)) {
+    }
+    else if (find_drawbridge(&zx, &zy))
+    {
         /* make sure it isn't an open drawbridge */
         open_drawbridge(zx, zy, FALSE);
         (*num_p)++;
@@ -1963,6 +2022,7 @@ struct trap *trap;
         create_context_menu(CREATE_CONTEXT_MENU_BLOCKING_WINDOW);
         display_nhwindow(WIN_MAP, TRUE); /* wait */
         create_context_menu(CREATE_CONTEXT_MENU_NORMAL);
+        debugprint_pos();
         docrt();
     }
 }
@@ -2095,6 +2155,7 @@ register int aflag; /* intrinsic autosearch vs explicit searching */
                     {
                         if (rn2(7 - fund))
                             continue;
+                        issue_achievement(GUI_ACHIEVEMENT_FOUND_SECRET_DOOR_OR_PASSAGE);
                         play_sfx_sound(SFX_HIDDEN_DOOR_FOUND);
                         You_ex(ATR_NONE, CLR_MSG_SUCCESS, "find a hidden door.");
                         cvt_sdoor_to_door_with_animation(x, y); /* .typ = DOOR */
@@ -2107,6 +2168,7 @@ register int aflag; /* intrinsic autosearch vs explicit searching */
                     {
                         if (rn2(7 - fund))
                             continue;
+                        issue_achievement(GUI_ACHIEVEMENT_FOUND_SECRET_DOOR_OR_PASSAGE);
                         play_sfx_sound(SFX_HIDDEN_DOOR_FOUND);
                         You_ex(ATR_NONE, CLR_MSG_SUCCESS, "find a hidden passage.");
                         cvt_scorr_to_corr_with_animation(x, y);
@@ -2413,6 +2475,7 @@ int which_subset; /* when not full, whether to suppress objs and/or traps */
                 keep_mons = (which_subset & TER_MON) != 0; /* not used */
         boolean swallowed = u.uswallow; /* before unconstrain_map() */
 
+        debugprint_pos();
         if (unconstrain_map())
             docrt();
         default_glyph = cmap_to_glyph(level.flags.arboreal ? S_tree : S_unexplored);
@@ -2450,6 +2513,7 @@ int which_subset; /* when not full, whether to suppress objs and/or traps */
         browse_map(which_subset, "anything of interest");
 
         reconstrain_map();
+        debugprint_pos();
         docrt(); /* redraw the screen, restoring regular map */
         if (Underwater)
             under_water(2);

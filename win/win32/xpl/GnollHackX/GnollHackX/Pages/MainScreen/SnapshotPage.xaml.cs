@@ -170,7 +170,7 @@ namespace GnollHackX.Pages.MainScreen
                         dispfilepage.FontSize = 15;
                         string errormsg;
                         if (dispfilepage.ReadFile(out errormsg))
-                            await GHApp.Navigation.PushModalAsync(dispfilepage);
+                            await GHApp.PushModalPageAsync(dispfilepage);
                         else
                             await GHApp.DisplayMessageBox(this, "Error Reading Snapshot", "Error reading snapshot at " + usedFilePath + ": " + errormsg, "OK");
                     }
@@ -190,8 +190,7 @@ namespace GnollHackX.Pages.MainScreen
             _backPressed = true;
             if (playClickedSound)
                 GHApp.PlayButtonClickedSound();
-            var page = await GHApp.Navigation.PopModalAsync();
-            GHApp.DisconnectIViewHandlers(page);
+            await GHApp.PopModalPageAsync();
         }
 
         public void ClosePage()

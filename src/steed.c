@@ -124,10 +124,14 @@ struct obj *otmp;
     if (rn2(100) < chance) {
         play_simple_object_sound(otmp, OBJECT_SOUND_TYPE_APPLY);
         You_ex(ATR_NONE, CLR_MSG_SUCCESS, "put the saddle on %s.", mon_nam(mtmp));
+        boolean ogone = FALSE;
         if (otmp->owornmask)
-            remove_worn_item(otmp, FALSE);
-        freeinv(otmp);
-        put_saddle_on_mon(otmp, mtmp);
+            ogone = remove_worn_item(otmp, FALSE);
+        if (!ogone)
+        {
+            freeinv(otmp);
+            put_saddle_on_mon(otmp, mtmp);
+        }
     }
     else
     {
@@ -759,6 +763,7 @@ int reason; /* Player was thrown off etc. */
         if (mtmp->mhp < 1)
             mtmp->mhp = 0; /* make sure it isn't negative */
         mtmp->mhp++; /* force at least one hit point, possibly resurrecting */
+        debugprint_pos();
         place_monster(mtmp, steedcc.x, steedcc.y);
         mtmp->mhp--; /* take the extra hit point away: cancel resurrection */
     } else {
@@ -885,6 +890,7 @@ struct monst *steed;
         if (!rn2(frozen)) {
             steed->mfrozen = 0;
             steed->mcanmove = 1;
+            refresh_m_tile_gui_info(steed, TRUE);
         } else {
             /* didn't awake, but remaining duration is halved */
             steed->mfrozen = frozen;
@@ -930,18 +936,24 @@ int x, y;
     /* normal map bounds are <1..COLNO-1,0..ROWNO-1> but sometimes
        vault guards (either living or dead) are parked at <0,0> */
     if (!isok(x, y) && (x != 0 || y != 0 || !mon->isgd)) {
-        impossible("trying to place monster at <%d,%d>", x, y);
+        impossible("trying to place monster (mnum=%d) at <%d,%d>", mon->mnum, x, y);
         x = y = 0;
     }
     if (mon == u.usteed
         /* special case is for convoluted vault guard handling */
         || (DEADMONSTER(mon) && !(mon->isgd && x == 0 && y == 0))) {
-        impossible("placing %s onto map?",
-                   (mon == u.usteed) ? "steed" : "defunct monster");
+        impossible("placing %s onto map (mnum=%d)?",
+                   (mon == u.usteed) ? "steed" : "defunct monster", mon->mnum);
         return;
     }
     if (level.monsters[x][y])
-        impossible("placing monster over another at <%d,%d>?", x, y);
+    {
+        s_level* slev = Is_special(&u.uz);
+        impossible("placing monster (mnum=%d%s) over another (mnum=%d%s) at <%d,%d> on level (%d,%d,%s) [mklev=%d,mx=%d,my=%d,ux=%d,uy=%d]?", 
+            mon->mnum, mon->isshk ? ", shopkeeper" : mon->isnpc ? ", npc" : mon->ispriest ? ", priest" : mon->issmith ? ", smith" : "",
+            level.monsters[x][y]->mnum, level.monsters[x][y] == mon ? ", same" : "",
+            x, y, (int)u.uz.dnum, (int)u.uz.dlevel, slev ? slev->name : "normal", (int)in_mklev, mon->mx, mon->my, u.ux, u.uy);
+    }
     mon->mx = x, mon->my = y;
     level.monsters[x][y] = mon;
 }

@@ -451,12 +451,15 @@ boolean exclude_ascii;
         return;
 
     register int x = obj->ox, y = obj->oy;
+    if (!isok(x, y))
+        return;
+
     register int glyph = obj_to_glyph(obj, newsym_rn2);
     boolean draw_in_front = is_obj_drawn_in_front(obj);
     enum layer_types layer = draw_in_front ? LAYER_COVER_OBJECT : LAYER_OBJECT;
     boolean in_pit = FALSE;
     struct trap* t = 0;
-    if (isok(x, y) && (t = t_at(x, y)) != 0 && t->tseen && (t->ttyp == PIT || t->ttyp == SPIKED_PIT))
+    if ((t = t_at(x, y)) != 0 && t->tseen && (t->ttyp == PIT || t->ttyp == SPIKED_PIT))
         in_pit = TRUE;
 
     int obj_height = get_obj_height(obj);
@@ -773,8 +776,8 @@ boolean dropping_piercer;
         switch (M_AP_TYPE(mon)) 
         {
         default:
-            impossible("display_monster:  bad m_ap_type value [ = %d ]",
-                       (int) mon->m_ap_type);
+            impossible("display_monster:  bad m_ap_type value [ = %d ] (mnum=%d, hp=%d, dnum=%d, dlevel=%d)",
+                       (int) mon->m_ap_type, mon->mnum, mon->mhp, u.uz.dnum, u.uz.dlevel);
             /*FALLTHRU*/
         case M_AP_NOTHING:
             show_monster_glyph_with_extra_info(x, y, any_mon_to_glyph(mon, newsym_rn2),  mon, 0UL, 0UL, 0, 0);
@@ -828,6 +831,7 @@ boolean dropping_piercer;
             {
                 obj = zeroobj;
                 obj.otyp = mon->mappearance;
+                obj.oclass = objects[mon->mappearance].oc_class;
                 obj.quan = 1L;
                 /* might be mimicing a corpse or statue */
                 obj.corpsenm = has_mcorpsenm(mon) ? MCORPSENM(mon) : PM_TENGU;
@@ -2306,6 +2310,7 @@ curs_on_u()
 int
 doredraw()
 {
+    debugprint_pos();
     docrt();
     return 0;
 }
@@ -2333,6 +2338,7 @@ docrt()
     }
 
     /* shut down vision */
+    debugprint_pos();
     vision_recalc(2);
 
     /* clear detection markers from memory objects */
@@ -2364,6 +2370,7 @@ docrt()
     }
 
     /* see what is to be seen */
+    debugprint_pos();
     vision_recalc(0);
 
     /* overlay with monsters */

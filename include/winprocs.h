@@ -178,8 +178,16 @@ extern
 #define issue_debuglog(e, s) if(windowprocs.win_issue_gui_command) (*windowprocs.win_issue_gui_command)(GUI_CMD_DEBUGLOG, DEBUGLOG_GENERAL, e, s)
 #define issue_debuglog_priority(e, s) if(windowprocs.win_issue_gui_command) (*windowprocs.win_issue_gui_command)(GUI_CMD_DEBUGLOG, DEBUGLOG_PRIORITY, e, s)
 #define issue_debuglog_panic(e, s) if(windowprocs.win_issue_gui_command) (*windowprocs.win_issue_gui_command)(GUI_CMD_DEBUGLOG, DEBUGLOG_PANIC, e, s)
+#define issue_debuglog_impossible(e, s) if(windowprocs.win_issue_gui_command) (*windowprocs.win_issue_gui_command)(GUI_CMD_DEBUGLOG, DEBUGLOG_IMPOSSIBLE, e, s)
 #define issue_debuglog_fd(f, s) if(windowprocs.win_issue_gui_command) (*windowprocs.win_issue_gui_command)(GUI_CMD_DEBUGLOG, DEBUGLOG_FILE_DESCRIPTOR, f, s)
 #define issue_breadcrumb(s) if(windowprocs.win_issue_gui_command) (*windowprocs.win_issue_gui_command)(GUI_CMD_BREADCRUMB, 0, 0, s)
+#define issue_breadcrumb2(s, a) if(windowprocs.win_issue_gui_command) (*windowprocs.win_issue_gui_command)(GUI_CMD_BREADCRUMB2, a, 0, s)
+#define issue_breadcrumb3(s, a, b) if(windowprocs.win_issue_gui_command) (*windowprocs.win_issue_gui_command)(GUI_CMD_BREADCRUMB3, a, b, s)
+#ifdef DEBUG
+#define issue_achievement(a) if(windowprocs.win_issue_gui_command) (*windowprocs.win_issue_gui_command)(GUI_CMD_ACHIEVEMENT, a, 0, (char*)0)
+#else
+#define issue_achievement(a) if(windowprocs.win_issue_gui_command && !wizard && !discover && !flags.non_scoring) (*windowprocs.win_issue_gui_command)(GUI_CMD_ACHIEVEMENT, a, 0, (char*)0)
+#endif
 #define raw_print (*windowprocs.win_raw_print)
 #define raw_print_bold (*windowprocs.win_raw_print_bold)
 #define nhgetch (*windowprocs.win_nhgetch)

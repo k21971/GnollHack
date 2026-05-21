@@ -55,6 +55,8 @@ struct obj {
 #define ITEM_FLAGS_GIVEN_BY_HERO               0x00000001UL
 #define ITEM_FLAGS_MEMORY_OBJECT_LAMPLIT       0x00000002UL /* Lamplit for graphics but it does not have an associated light source */
 #define ITEM_FLAGS_FIRED_BY_MONSTER            0x00000004UL
+#define ITEM_FLAGS_LAVA_EFFECTS_SKIP           0x00000008UL /* The item is already on its way to be destroyed (e.g. by destroy armor scroll), so do not burn it in lava effects */
+#define ITEM_FLAGS_SAVED_UNPAID                0x00000010UL
 
     uint64_t speflags;    /* anything else that might be going on with an item, not affected by cancellation */
 
@@ -187,7 +189,7 @@ struct obj {
     Bitfield(nomerge, 1);     /* set temporarily to prevent merging */
     Bitfield(was_thrown, 1);  /* thrown by hero since last picked up */
     Bitfield(has_special_tileset, 1); /* the object uses a dungeon-specific tileset defined in special_tileset; in particular, applies to boulders */
-    Bitfield(in_use, 1);      /* for magic items before useup items */
+    Bitfield(in_use, 1);      /* item is going to be deallocated (used, broken, destroyed, etc.), but the hero may die before deallocation; ensure that the item does not appear in bones or in error save files or the like. For magic items before useup items */
     Bitfield(bypass, 1);      /* mark this as an object to be skipped by bhito() */
     Bitfield(cknown, 1);      /* contents of container assumed to be known */
     Bitfield(lknown, 1);      /* locked/unlocked status is known */
@@ -399,10 +401,11 @@ enum elemental_enchantments {
     ((objects[(o)->otyp].oc_flags4 & O4_TETHERED_WEAPON) != 0 && ((wmask) & W_WIELDED_WEAPON) != 0)
 
 #define is_unweapon(o) (((o)->oclass == WEAPON_CLASS) \
-    ? is_launcher(o) || is_ammo(o) || is_missile(o) || (is_appliable_pole_type_weapon(o) && !is_spear(o) && !is_trident(o) && !u.usteed) \
+    ? is_launcher(o) || is_ammo(o) || nonmelee_throwing_weapon(o) || (is_appliable_pole_type_weapon(o) && !is_spear(o) && !is_trident(o) && !u.usteed) \
     : !is_wieldable_weapon(o) && !is_wet_towel(o))
 
 #define uslinging() (uwep && objects[uwep->otyp].oc_skill == P_SLING)
+
 /* 'is_quest_artifact()' only applies to the current role's artifact */
 #define any_quest_artifact(o) ((o)->oartifact >= ART_ORB_OF_DETECTION)
 
@@ -533,6 +536,8 @@ enum elemental_enchantments {
 #define Is_container_with_lid(o) Is_otyp_container_with_lid((o)->otyp)
 #define Is_noncontainer(o) ((objects[(o)->otyp].oc_flags2 & O2_CONTAINER_NONCONTAINER) != 0)
 #define Is_proper_container(o) (Is_container(o) && !Is_noncontainer(o))
+#define Is_specialized_container(o) ((objects[(o)->otyp].oc_flags4 & (O4_CONTAINER_ACCEPTS_ONLY_SCROLLS_AND_BOOKS | O4_CONTAINER_ACCEPTS_ONLY_WEAPONS)) != 0)
+#define Is_container_with_closed_lid(o) (Is_container_with_lid(o) && !((o)->speflags & (SPEFLAGS_LID_OPENED)))
 #define Is_box(o) ((objects[(o)->otyp].oc_flags2 & O2_CONTAINER_BOX) != 0)
 #define Is_mbag(o) \
     ((objects[(o)->otyp].oc_flags2 & O2_CONTAINER_MAGIC_BAG) != 0)
@@ -665,6 +670,9 @@ enum elemental_enchantments {
 #define is_ore(obj)                                 \
     (is_otyp_ore((obj)->otyp))
 
+#define ammo_for_sling(o) (uslinging() && (is_rock(o) || ((o)->otyp == FLINT && objects[(o)->otyp].oc_name_known) \
+    || ((o)->oclass == GEM_CLASS && ((o)->material == MAT_GLASS || (o)->material == MAT_CRYSTAL) && objects[(o)->otyp].oc_name_known)))
+
 /* other */
 #define is_otyp_key(otyp)                                 \
     ((objects[(otyp)].oc_flags2 & O2_KEY) != 0)
@@ -723,10 +731,10 @@ enum elemental_enchantments {
     ((objects[(otyp)].oc_flags3 & O3_BURIED_SEARCHABLE) != 0)
 #define is_otyp_content_description_shuffled(otyp) \
     ((objects[(otyp)].oc_flags3 & O3_CONTENT_DESCRIPTION_SHUFFLED) != 0)
-#define otyp_consumes_nutrition_every_20_rounds(otyp) \
-    ((objects[(otyp)].oc_flags3 & O3_CONSUMES_NUTRITION_EVERY_20_ROUNDS) != 0)
-#define obj_consumes_nutrition_every_20_rounds(otmp) \
-    otyp_consumes_nutrition_every_20_rounds((otmp)->otyp)
+#define otyp_consumes_nutrition_every_20_turns(otyp) \
+    ((objects[(otyp)].oc_flags3 & O3_CONSUMES_NUTRITION_EVERY_20_TURNS) != 0)
+#define obj_consumes_nutrition_every_20_turns(otmp) \
+    otyp_consumes_nutrition_every_20_turns((otmp)->otyp)
 #define is_otyp_quaffable(otyp)                                 \
     ((objects[otyp].oc_flags3 & O3_QUAFFABLE) != 0)
 #define is_obj_quaffable(obj)                                 \
@@ -771,13 +779,16 @@ enum elemental_enchantments {
 #define does_obj_drain_instead_of_explode(obj) \
     (does_otyp_drain_instead_of_explode((obj)->otyp))
 
-#define can_obj_cause_choking(o) (obj_nutrition(o, &youmonst) > 50)
+#define can_obj_cause_choking(o) (mon_obj_nutrition_value(o, &youmonst) > 50)
 
 #define can_otyp_joust(otyp)                                 \
     ((objects[(otyp)].oc_flags5 & O5_JOUSTING_WEAPON) != 0)
 
 #define can_obj_joust(obj) \
     (can_otyp_joust((obj)->otyp))
+
+#define is_sex_changing_item(o)                                            \
+    ((objects[(o)->otyp].oc_flags6 & O6_SEX_CHANGE_AND_DISINTEGRATE) != 0 || (o)->otyp == BELT_OF_CHANGE || (o)->otyp == AMULET_OF_CHANGE)
 
 #define is_obj_found_this_turn(obj) \
     (((obj)->speflags & SPEFLAGS_FOUND_THIS_TURN) != 0)
@@ -855,6 +866,7 @@ struct mythic_definition {
     int64_t price_addition;
     uint64_t mythic_powers;
     uint64_t mythic_flags;
+    uint64_t mythic_flags2;
 };
 
 #define MYTHIC_FLAG_NONE                        0x00000000UL
@@ -883,9 +895,20 @@ struct mythic_definition {
 #define MYTHIC_FLAG_NO_ELVEN_ITEMS              0x00400000UL
 #define MYTHIC_FLAG_NO_DEMONIC_ITEMS            0x00800000UL
 #define MYTHIC_FLAG_NO_OTHER_SORCERY            0x01000000UL
+#define MYTHIC_FLAG_NO_BOOTS                    0x02000000UL /* Must not be boots */
+#define MYTHIC_FLAG_BOOTS_REQUIRED              0x04000000UL /* Must be boots */
+#define MYTHIC_FLAG_WEAPON_BOOTS_OR_GLOVES_REQUIRED 0x08000000UL /* Must be a weapon, boots, or gloves */
+#define MYTHIC_FLAG_NO_GLOVES                   0x10000000UL /* Must not be gloves */
+#define MYTHIC_FLAG_GLOVES_REQUIRED             0x20000000UL /* Must be gloves */
+#define MYTHIC_FLAG_NO_GLOVES_WITH_WHACK        0x40000000UL /* Must not be gloves with whack damage (ordinary weapon gloves) */
 
-#define MYTHIC_FLAG_SLASHING_WEAPONS_ONLY    (MYTHIC_FLAG_NO_PIERCING_WEAPONS | MYTHIC_FLAG_NO_BLUDGEONING_WEAPONS)
-#define MYTHIC_FLAG_PIERCING_WEAPONS_ONLY    (MYTHIC_FLAG_NO_BLUDGEONING_WEAPONS | MYTHIC_FLAG_NO_SLASHING_WEAPONS)
+#define MYTHIC_FLAG2_NONE                       0x00000000UL
+#define MYTHIC_FLAG2_SLASHING_WEAPONS_ONLY      0x00000001UL
+#define MYTHIC_FLAG2_PIERCING_WEAPONS_ONLY      0x00000002UL
+
+//#define MYTHIC_FLAG_SLASHING_WEAPONS_ONLY    (MYTHIC_FLAG_NO_PIERCING_WEAPONS | MYTHIC_FLAG_NO_BLUDGEONING_WEAPONS)
+//#define MYTHIC_FLAG_PIERCING_WEAPONS_ONLY    (MYTHIC_FLAG_NO_BLUDGEONING_WEAPONS | MYTHIC_FLAG_NO_SLASHING_WEAPONS)
+
 #define MYTHIC_FLAG_BLUDGEONING_WEAPONS_ONLY (MYTHIC_FLAG_NO_PIERCING_WEAPONS | MYTHIC_FLAG_NO_SLASHING_WEAPONS)
 #define MYTHIC_FLAG_SHARP_WEAPONS_ONLY        MYTHIC_FLAG_NO_BLUDGEONING_WEAPONS
 
@@ -939,6 +962,7 @@ enum mythic_suffix_types {
     MYTHIC_SUFFIX_RETURNING,
     MYTHIC_SUFFIX_BANISHMENT,
     MYTHIC_SUFFIX_LAST_ALLIANCE,
+    MYTHIC_SUFFIX_STEALTH,
     MAX_MYTHIC_SUFFIXES
 };
 
@@ -1049,6 +1073,7 @@ enum mythic_suffix_power_types {
     MYTHIC_SUFFIX_POWER_INDEX_SEARCHING,
     MYTHIC_SUFFIX_POWER_INDEX_SEE_INVISIBLE,
     MYTHIC_SUFFIX_POWER_INDEX_RETURN_TO_HAND_AFTER_THROW,
+    MYTHIC_SUFFIX_POWER_INDEX_STEALTH,
     MAX_MYTHIC_SUFFIX_POWERS
 };
 
@@ -1082,6 +1107,7 @@ enum mythic_suffix_power_types {
 #define MYTHIC_SUFFIX_POWER_SEARCHING                   (1UL << MYTHIC_SUFFIX_POWER_INDEX_SEARCHING)
 #define MYTHIC_SUFFIX_POWER_SEE_INVISIBLE               (1UL << MYTHIC_SUFFIX_POWER_INDEX_SEE_INVISIBLE)
 #define MYTHIC_SUFFIX_POWER_RETURN_TO_HAND_AFTER_THROW  (1UL << MYTHIC_SUFFIX_POWER_INDEX_RETURN_TO_HAND_AFTER_THROW)
+#define MYTHIC_SUFFIX_POWER_STEALTH                     (1UL << MYTHIC_SUFFIX_POWER_INDEX_STEALTH)
 
 
 extern NEARDATA const struct mythic_definition mythic_prefix_qualities[MAX_MYTHIC_PREFIXES];
@@ -1206,6 +1232,7 @@ extern NEARDATA const struct mythic_power_definition mythic_suffix_powers[MAX_MY
 #define obj_destroyed_in_lava_effects(o) \
     ((melts_in_lava(o) || o->oclass == POTION_CLASS) \
         && !o->oerodeproof \
+        && !((o)->item_flags & ITEM_FLAGS_LAVA_EFFECTS_SKIP) \
         && !oresist_fire(o))
 
 /* Manuals */

@@ -4575,6 +4575,14 @@ paintTile(PNHMapWindow data, int i, int j, RECT * rect)
 
                                 switch (status_mark)
                                 {
+                                case STATUS_MARK_FROZEN:
+                                    if (!loc_is_you && mtmp->mfrozen > 0 && !Hallucination)
+                                        display_this_status_mark = TRUE;
+                                    break;
+                                case STATUS_MARK_EATING:
+                                    if (!loc_is_you && mtmp->meating > 0 && !Hallucination)
+                                        display_this_status_mark = TRUE;
+                                    break;
                                 case STATUS_MARK_TOWNGUARD_PEACEFUL:
                                     if (!loc_is_you && ispeaceful && !ispet && !Hallucination && is_watch(mtmp->data))
                                         display_this_status_mark = TRUE;
@@ -4596,7 +4604,7 @@ paintTile(PNHMapWindow data, int i, int j, RECT * rect)
                                         display_this_status_mark = TRUE;
                                     break;
                                 case STATUS_MARK_BOUNTY:
-                                    if (!loc_is_you && Role_if(PM_KNIGHT) && !ispeaceful && !Hallucination && is_knight_bounty(mtmp->data))
+                                    if (!loc_is_you && Role_if(PM_KNIGHT) && !ispeaceful && !ispet && !Hallucination && is_knight_bounty(mtmp->data))
                                         display_this_status_mark = TRUE;
                                     break;
                                 case STATUS_MARK_SATIATED:

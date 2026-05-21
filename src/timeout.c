@@ -19,8 +19,8 @@ STATIC_DCL void NDECL(laugh_uncontrollably);
 STATIC_DCL void NDECL(get_odd_idea);
 STATIC_DCL void FDECL(see_lamp_flicker, (struct obj *, const char *));
 STATIC_DCL void FDECL(lantern_message, (struct obj *));
-STATIC_DCL void FDECL(cleanup_burn, (ANY_P *, int64_t));
-STATIC_DCL void FDECL(cleanup_sound, (ANY_P*, int64_t));
+STATIC_DCL int FDECL(cleanup_burn, (ANY_P *, int64_t));
+STATIC_DCL int FDECL(cleanup_sound, (ANY_P*, int64_t));
 STATIC_DCL void NDECL(sick_dialogue);
 STATIC_DCL void NDECL(food_poisoned_dialogue);
 STATIC_DCL void NDECL(mummy_rot_dialogue);
@@ -541,7 +541,7 @@ struct kinfo *kptr;
      * [formerly implicit] change of form; polymon() takes care of that.
      * Temporarily ungenocide if necessary.
      */
-    Strcpy(debug_buf_4, "slimed_to_death");
+    debugprint("slimed_to_death");
     if (emitted_light_range(youmonst.data))
         del_light_source(LS_MONSTER, monst_to_any(&youmonst));
     if (mon_ambient_sound(youmonst.data))
@@ -742,6 +742,7 @@ nh_timeout()
                 break;
             case SLIMED:
                 /* involuntarily break "never changed form" conduct */
+                issue_achievement(GUI_ACHIEVEMENT_POLYMORPHED_FORM);
                 if (!u.uconduct.polyselfs++)
                     livelog_printf(LL_CONDUCT, "%s",
                         "changed form for the first time by turning to slime");
@@ -873,7 +874,7 @@ nh_timeout()
                 if (uamul && uamul->otyp == AMULET_OF_STRANGULATION) {
                     play_sfx_sound(SFX_ITEM_VANISHES);
                     Your_ex(ATR_NONE, CLR_MSG_ATTENTION, "amulet vanishes!");
-                    Sprintf(priority_debug_buf_2, "nh_timeout: %d", uamul->otyp);
+                    debugprint("nh_timeout: %d", uamul->otyp);
                     useup(uamul);
                 }
                 break;
@@ -1226,7 +1227,7 @@ nh_timeout()
                 You_ex(ATR_NONE, CLR_MSG_ATTENTION, "are starting to feel less courageous.");
                 break;
             case MIND_SHIELDING:
-                You_ex(ATR_NONE, CLR_MSG_ATTENTION, "are starting to feel less protected from mental detection.");
+                You_ex(ATR_NONE, CLR_MSG_ATTENTION, "are starting to feel less protected from mental attacks, control, and detection.");
                 break;
             case LYCANTHROPY_RESISTANCE:
                 You_ex(ATR_NONE, CLR_MSG_ATTENTION, "are starting to feel less protected from lycanthropy.");
@@ -1430,7 +1431,7 @@ struct obj *egg;
 }
 
 /* timer callback routine: hatch the given egg */
-void
+int
 hatch_egg(arg, timeout)
 anything *arg;
 int64_t timeout;
@@ -1441,12 +1442,12 @@ int64_t timeout;
     xchar x, y;
     boolean yours, tamed, silent, knows_egg = FALSE;
     boolean cansee_hatchspot = FALSE;
-    int i, mnum, hatchcount = 0;
+    int i, mnum, hatchcount = 0, obj_gone = FALSE;
 
     egg = arg->a_obj;
     /* sterilized while waiting */
     if (egg->corpsenm == NON_PM)
-        return;
+        return FALSE;
 
     mon = mon2 = (struct monst *) 0;
     mnum = big_to_little(egg->corpsenm);
@@ -1603,14 +1604,15 @@ int64_t timeout;
             /* Instead of ordinary egg timeout use a short one */
             attach_egg_hatch_timeout(egg, (int64_t) rnd(12));
         } else if (carried(egg)) {
-            Sprintf(priority_debug_buf_2, "hatch_egg: %d", egg->otyp);
+            debugprint("hatch_egg1: %d", egg->otyp);
             useup(egg);
+            obj_gone = TRUE;
         } else {
             /* free egg here because we use it above */
-            Strcpy(debug_buf_2, "hatch_egg");
+            debugprint("hatch_egg2: %d", egg->otyp);
             obj_extract_self(egg);
-            Sprintf(priority_debug_buf_4, "hatch_egg: %d", egg->otyp);
             obfree(egg, (struct obj *) 0);
+            obj_gone = TRUE;
         }
         if (redraw)
             newsym(x, y);
@@ -1647,6 +1649,7 @@ int64_t timeout;
             }
         }
     }
+    return obj_gone;
 }
 
 /* Learn to recognize eggs of the given type. */
@@ -1892,7 +1895,7 @@ struct obj *obj;
  * Timeout callback for for objects that are burning. E.g. lamps, candles.
  * See begin_burn() for meanings of obj->age and obj->enchantment.
  */
-void
+int
 burn_object(arg, timeout)
 anything *arg;
 int64_t timeout;
@@ -1901,6 +1904,7 @@ int64_t timeout;
     boolean canseeit, many, is_candelabrum, need_newsym, need_invupdate;
     xchar x, y;
     char whose[BUFSZ];
+    int is_gone = FALSE;
 
     is_candelabrum = is_obj_candelabrum(obj);
     many = is_candelabrum ? obj->special_quality > 1 : obj->quan > 1L;
@@ -1911,7 +1915,7 @@ int64_t timeout;
 
         if (how_long >= obj->age) {
             obj->age = 0;
-            Strcpy(debug_buf_3, "burn_object1");
+            debugprint("burn_object1");
             end_burn(obj, FALSE);
 
             if (is_candelabrum) {
@@ -1921,18 +1925,18 @@ int64_t timeout;
                 /* get rid of candles and burning oil potions;
                    we know this object isn't carried by hero,
                    nor is it migrating */
-                Strcpy(debug_buf_2, "burn_object1");
+                debugprint("burn_object1b: %d", obj->otyp);
                 obj_extract_self(obj);
-                Sprintf(priority_debug_buf_4, "burn_object: %d", obj->otyp);
                 obfree(obj, (struct obj *) 0);
                 obj = (struct obj *) 0;
+                is_gone = TRUE;
             }
 
         } else {
             obj->age -= how_long;
             begin_burn(obj, TRUE);
         }
-        return;
+        return is_gone;
     }
 
     /* only interested in INVENT, FLOOR, and MINVENT */
@@ -1965,22 +1969,22 @@ int64_t timeout;
                 break;
             }
         }
-        Strcpy(debug_buf_3, "burn_object2");
+        debugprint("burn_object2");
         end_burn(obj, FALSE); /* turn off light source */
         if (carried(obj)) {
-            Sprintf(priority_debug_buf_3, "burn_object: %d", obj->otyp);
+            debugprint("burn_object: %d", obj->otyp);
             useupall(obj);
         } else {
             /* clear migrating obj's destination code before obfree
                to avoid false complaint of deleting worn item */
             if (obj->where == OBJ_MIGRATING)
                 obj->owornmask = 0L;
-            Strcpy(debug_buf_2, "burn_object2");
+            debugprint("burn_object2b: %d", obj->otyp);
             obj_extract_self(obj);
-            Sprintf(priority_debug_buf_4, "burn_object2: %d", obj->otyp);
             obfree(obj, (struct obj *) 0);
         }
         obj = (struct obj *) 0;
+        is_gone = TRUE;
         break;
 
     case BRASS_LANTERN:
@@ -2040,7 +2044,7 @@ int64_t timeout;
                     break;
                 }
             }
-            Strcpy(debug_buf_3, "burn_object3");
+            debugprint("burn_object3");
             end_burn(obj, FALSE);
             break;
 
@@ -2128,12 +2132,12 @@ int64_t timeout;
                         : "Its flame dies."));
                 
             }
-            Strcpy(debug_buf_3, "burn_object4");
+            debugprint("burn_object4");
             end_burn(obj, FALSE);
 
             if (carried(obj)) 
             {
-                Sprintf(priority_debug_buf_3, "burn_object2: %d", obj->otyp);
+                debugprint("burn_object5b: %d", obj->otyp);
                 useupall(obj);
             }
             else
@@ -2142,12 +2146,12 @@ int64_t timeout;
                     so obfree won't think this item is worn */
                 if (obj->where == OBJ_MIGRATING)
                     obj->owornmask = 0L;
-                Strcpy(debug_buf_2, "burn_object3");
+                debugprint("burn_object6: %d", obj->otyp);
                 obj_extract_self(obj);
-                Sprintf(priority_debug_buf_4, "burn_object3: %d", obj->otyp);
                 obfree(obj, (struct obj*)0);
             }
             obj = (struct obj*)0;
+            is_gone = TRUE;
             break; /* case [age ==] 0 */
 
         default:
@@ -2256,7 +2260,7 @@ int64_t timeout;
                                                    : "Its flame dies."));
                 }
             }
-            Strcpy(debug_buf_3, "burn_object5");
+            debugprint("burn_object5");
             end_burn(obj, FALSE);
 
             if (is_candelabrum) {
@@ -2264,19 +2268,19 @@ int64_t timeout;
                 obj->owt = weight(obj);
             } else {
                 if (carried(obj)) {
-                    Sprintf(priority_debug_buf_3, "burn_object3: %d", obj->otyp);
+                    debugprint("burn_object3b: %d", obj->otyp);
                     useupall(obj);
                 } else {
                     /* clear migrating obj's destination code
                        so obfree won't think this item is worn */
                     if (obj->where == OBJ_MIGRATING)
                         obj->owornmask = 0L;
-                    Strcpy(debug_buf_2, "burn_object4");
+                    debugprint("burn_object4b: %d", obj->otyp);
                     obj_extract_self(obj);
-                    Sprintf(priority_debug_buf_4, "burn_object4: %d", obj->otyp);
                     obfree(obj, (struct obj *) 0);
                 }
                 obj = (struct obj *) 0;
+                is_gone = TRUE;
             }
             break; /* case [age ==] 0 */
 
@@ -2301,6 +2305,7 @@ int64_t timeout;
         newsym(x, y);
     if (need_invupdate)
         update_inventory();
+    return is_gone;
 }
 
 /*
@@ -2481,7 +2486,8 @@ end_burn(obj, timer_attached)
 struct obj *obj;
 boolean timer_attached;
 {
-    if (!obj->lamplit) {
+    if (!obj->lamplit) 
+    {
         impossible("end_burn: obj %s not lit", xname(obj));
         return;
     }
@@ -2489,21 +2495,24 @@ boolean timer_attached;
     if (obj_burns_infinitely(obj))
         timer_attached = FALSE;
 
-    if (!timer_attached) {
-        Strcpy(debug_buf_4, "end_burn");
+    xchar was_timed = obj->timed;
+    if (!timer_attached) 
+    {
+        debugprint("end_burn");
         /* [DS] Cleanup explicitly, since timer cleanup won't happen */
         del_light_source(LS_OBJECT, obj_to_any(obj));
         obj->lamplit = 0;
         if (obj->where == OBJ_INVENT)
             update_inventory();
-    } else if (!stop_timer(BURN_OBJECT, obj_to_any(obj)))
+    }
+    else if (!stop_timer(BURN_OBJECT, obj_to_any(obj)) && was_timed) /* Could be also timeout == monstermoves */
         impossible("end_burn: obj %s not timed!", xname(obj));
 }
 
 /*
  * Cleanup a burning object if timer stopped.
  */
-STATIC_OVL void
+STATIC_OVL int
 cleanup_burn(arg, expire_time)
 anything *arg;
 int64_t expire_time;
@@ -2511,10 +2520,10 @@ int64_t expire_time;
     struct obj *obj = arg->a_obj;
     if (!obj->lamplit) {
         impossible("cleanup_burn: obj %s not lit", xname(obj));
-        return;
+        return FALSE;
     }
 
-    Strcpy(debug_buf_4, "cleanup_burn");
+    debugprint("cleanup_burn");
     del_light_source(LS_OBJECT, obj_to_any(obj));
     obj->lamplit = 0;
 
@@ -2523,13 +2532,14 @@ int64_t expire_time;
 
     if (obj->where == OBJ_INVENT)
         update_inventory();
+    return FALSE;
 }
 
 //Black Blade
 /*
  * Timeout callback for for Black Blade and other summonable objects, very similar to rot_corpse
  */
-void
+int
 unsummon_item(arg, timeout)
 anything* arg;
 int64_t timeout;
@@ -2543,7 +2553,7 @@ int64_t timeout;
     char whosebuf[BUFSZ] = "";
 
     if (!obj)
-        return;
+        return FALSE;
 
     if (timeout)
     {
@@ -2563,9 +2573,11 @@ int64_t timeout;
     }
     else if (in_invent) 
     {
+        boolean ogone = FALSE;
         if (obj->owornmask)
-            remove_worn_item(obj, TRUE);
-
+            ogone = remove_worn_item(obj, TRUE);
+        if (ogone)
+            return TRUE;
         Strcpy(whosebuf, "Your ");
         canseeunsummon = TRUE;
     }
@@ -2629,16 +2641,15 @@ int64_t timeout;
     /* Destroy item */
     if (carried(obj)) 
     {
-        Sprintf(priority_debug_buf_3, "burn_object4: %d", obj->otyp);
+        debugprint("unsummon_item1: %d", obj->otyp);
         useupall(obj);
     }
     else 
     {
         /* clear migrating obj's destination code
            so obfree won't think this item is worn */
-        Strcpy(debug_buf_2, "unsummon_item");
+        debugprint("unsummon_item2: %d", obj->otyp);
         obj_extract_self(obj);
-        Sprintf(priority_debug_buf_4, "unsummon_item: %d", obj->otyp);
         obfree(obj, (struct obj*) 0);
     }
     obj = (struct obj*) 0;
@@ -2660,6 +2671,7 @@ int64_t timeout;
     else if (in_invent)
         update_inventory();
 
+    return TRUE;
 }
 
 /*
@@ -2679,7 +2691,7 @@ struct obj* obj;
 /*
  * Timeout callback for for summon monster spells
  */
-void
+int
 unsummon_monster(arg, timeout)
 anything* arg;
 int64_t timeout;
@@ -2687,7 +2699,7 @@ int64_t timeout;
     struct monst* mon = arg->a_monst;
 
     if (!mon || (mon && DEADMONSTER(mon)))
-        return;
+        return FALSE;
 
     if (timeout)
     {
@@ -2709,6 +2721,7 @@ int64_t timeout;
 
     release_monster_objects(mon, FALSE, FALSE, FALSE);
     mongone(mon);
+    return TRUE;
 }
 
 
@@ -2741,7 +2754,7 @@ int64_t duration;
 }
 
 
-void
+int
 restart_time(arg, timeout)
 anything* arg;
 int64_t timeout;
@@ -2753,6 +2766,7 @@ int64_t timeout;
 
     context.time_stopped = FALSE;
     pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "The flow of time seems faster again.");
+    return FALSE;
 }
 
 
@@ -3065,24 +3079,40 @@ run_timers()
      * any time.  The list is ordered, we are done when the first element
      * is in the future.
      */
-    while (timer_base && timer_base->timeout <= monstermoves) {
+    while (timer_base && timer_base->timeout <= monstermoves) 
+    {
         curr = timer_base;
         timer_base = curr->next;
 
         if (curr->kind == TIMER_OBJECT)
         {
             (curr->arg.a_obj)->timed--;
-            Sprintf(priority_debug_buf_2, "run_timers: %d, %d", (curr->arg.a_obj)->otyp, (curr->arg.a_obj)->corpsenm);
-            Strcpy(priority_debug_buf_3, "run_timers");
-            Strcpy(priority_debug_buf_4, "run_timers");
+            //debugprint("run_timers: %d, %d", (curr->arg.a_obj)->otyp, (curr->arg.a_obj)->corpsenm);
         }
         else if (curr->kind == TIMER_MONSTER)
         {
             (curr->arg.a_monst)->timed--;
         }
 
-        (*timeout_funcs[curr->func_index].f)(&curr->arg, curr->timeout);
-        free((genericptr_t) curr);
+        if ((*timeout_funcs[curr->func_index].f)(&curr->arg, curr->timeout))
+        {
+            /* obj been deleted, so other timers pointing to it must be removed */
+            if (curr->kind == TIMER_OBJECT)
+            {
+                /* This will NOT free curr, since it has been removed from timer_base */
+                obj_remove_timers(curr->arg.a_obj);
+            }
+            else if (curr->kind == TIMER_MONSTER)
+            {
+                /* This will NOT free curr, since it has been removed from timer_base */
+                mon_remove_timers(curr->arg.a_monst);
+            }
+            free((genericptr_t)curr);
+        }
+        else
+        {
+            free((genericptr_t)curr);
+        }
     }
 }
 
@@ -3141,16 +3171,19 @@ anything *arg;
 
     doomed = remove_timer(&timer_base, func_index, arg);
 
-    if (doomed) {
+    if (doomed) 
+    {
         timeout = doomed->timeout;
-        if (doomed->kind == TIMER_OBJECT) {
+        if (doomed->kind == TIMER_OBJECT) 
+        {
             (arg->a_obj)->timed--;
         }
-        else if (doomed->kind == TIMER_MONSTER) {
+        else if (doomed->kind == TIMER_MONSTER) 
+        {
             (arg->a_monst)->timed--;
         }
         if (timeout_funcs[doomed->func_index].cleanup)
-            (*timeout_funcs[doomed->func_index].cleanup)(arg, timeout);
+            (void)(*timeout_funcs[doomed->func_index].cleanup)(arg, timeout);
         free((genericptr_t) doomed);
         return (timeout - monstermoves);
     }
@@ -3167,7 +3200,8 @@ anything *arg;
 {
     timer_element *curr;
 
-    for (curr = timer_base; curr; curr = curr->next) {
+    for (curr = timer_base; curr; curr = curr->next) 
+    {
         if (curr->func_index == type && curr->arg.a_void == arg->a_void)
             return curr->timeout;
     }
@@ -3184,8 +3218,10 @@ struct obj *src, *dest;
     int count;
     timer_element *curr;
 
-    for (count = 0, curr = timer_base; curr; curr = curr->next) {
-        if (curr->kind == TIMER_OBJECT && curr->arg.a_obj == src) {
+    for (count = 0, curr = timer_base; curr; curr = curr->next) 
+    {
+        if (curr->kind == TIMER_OBJECT && curr->arg.a_obj == src) 
+        {
             curr->arg.a_obj = dest;
             dest->timed++;
             count++;
@@ -3206,8 +3242,10 @@ struct monst* src, * dest;
     int count;
     timer_element* curr;
 
-    for (count = 0, curr = timer_base; curr; curr = curr->next) {
-        if (curr->kind == TIMER_MONSTER && curr->arg.a_monst == src) {
+    for (count = 0, curr = timer_base; curr; curr = curr->next) 
+    {
+        if (curr->kind == TIMER_MONSTER && curr->arg.a_monst == src) 
+        {
             curr->arg.a_monst = dest;
             dest->timed++;
             count++;
@@ -3227,9 +3265,11 @@ struct obj *src, *dest;
 {
     timer_element *curr, *next_timer = 0;
 
-    for (curr = timer_base; curr; curr = next_timer) {
+    for (curr = timer_base; curr; curr = next_timer) 
+    {
         next_timer = curr->next; /* things may be inserted */
-        if (curr->kind == TIMER_OBJECT && curr->arg.a_obj == src) {
+        if (curr->kind == TIMER_OBJECT && curr->arg.a_obj == src) 
+        {
             (void) start_timer(curr->timeout - monstermoves, TIMER_OBJECT,
                                curr->func_index, obj_to_any(dest));
         }
@@ -3245,9 +3285,11 @@ struct monst* src, * dest;
 {
     timer_element* curr, * next_timer = 0;
 
-    for (curr = timer_base; curr; curr = next_timer) {
+    for (curr = timer_base; curr; curr = next_timer) 
+    {
         next_timer = curr->next; /* things may be inserted */
-        if (curr->kind == TIMER_MONSTER && curr->arg.a_monst == src) {
+        if (curr->kind == TIMER_MONSTER && curr->arg.a_monst == src) 
+        {
             (void)start_timer(curr->timeout - monstermoves, TIMER_MONSTER,
                 curr->func_index, monst_to_any(dest));
         }
@@ -3264,22 +3306,50 @@ struct obj *obj;
 {
     timer_element *curr, *prev, *next_timer = 0;
 
-    for (prev = 0, curr = timer_base; curr; curr = next_timer) {
+    for (prev = 0, curr = timer_base; curr; curr = next_timer) 
+    {
         next_timer = curr->next;
-        if (curr->kind == TIMER_OBJECT && curr->arg.a_obj == obj) {
+        if (curr->kind == TIMER_OBJECT && curr->arg.a_obj == obj) 
+        {
             if (prev)
                 prev->next = curr->next;
             else
                 timer_base = curr->next;
             if (timeout_funcs[curr->func_index].cleanup)
-                (*timeout_funcs[curr->func_index].cleanup)(&curr->arg,
-                                                           curr->timeout);
+                (void)(*timeout_funcs[curr->func_index].cleanup)(&curr->arg, curr->timeout);
             free((genericptr_t) curr);
-        } else {
+        }
+        else 
+        {
             prev = curr;
         }
     }
     obj->timed = 0;
+}
+
+/* This is for the situation where obj has been freed, and timers pointing to it must be removed */
+void
+obj_remove_timers(obj)
+struct obj* obj;
+{
+    timer_element* curr, * prev, * next_timer = 0;
+
+    for (prev = 0, curr = timer_base; curr; curr = next_timer) 
+    {
+        next_timer = curr->next;
+        if (curr->kind == TIMER_OBJECT && curr->arg.a_obj == obj) 
+        {
+            if (prev)
+                prev->next = curr->next;
+            else
+                timer_base = curr->next;
+            free((genericptr_t)curr);
+        }
+        else 
+        {
+            prev = curr;
+        }
+    }
 }
 
 /*
@@ -3292,23 +3362,50 @@ struct monst* mon;
 {
     timer_element* curr, * prev, * next_timer = 0;
 
-    for (prev = 0, curr = timer_base; curr; curr = next_timer) {
+    for (prev = 0, curr = timer_base; curr; curr = next_timer) 
+    {
         next_timer = curr->next;
-        if (curr->kind == TIMER_MONSTER && curr->arg.a_monst == mon) {
+        if (curr->kind == TIMER_MONSTER && curr->arg.a_monst == mon) 
+        {
             if (prev)
                 prev->next = curr->next;
             else
                 timer_base = curr->next;
             if (timeout_funcs[curr->func_index].cleanup)
-                (*timeout_funcs[curr->func_index].cleanup)(&curr->arg,
-                    curr->timeout);
+                (void)(*timeout_funcs[curr->func_index].cleanup)(&curr->arg, curr->timeout);
             free((genericptr_t)curr);
         }
-        else {
+        else 
+        {
             prev = curr;
         }
     }
     mon->timed = 0;
+}
+
+/* This is for the situation where mon has been freed, and timers pointing to it must be removed */
+void
+mon_remove_timers(mon)
+struct monst* mon;
+{
+    timer_element* curr, * prev, * next_timer = 0;
+
+    for (prev = 0, curr = timer_base; curr; curr = next_timer) 
+    {
+        next_timer = curr->next;
+        if (curr->kind == TIMER_MONSTER && curr->arg.a_monst == mon) 
+        {
+            if (prev)
+                prev->next = curr->next;
+            else
+                timer_base = curr->next;
+            free((genericptr_t)curr);
+        }
+        else 
+        {
+            prev = curr;
+        }
+    }
 }
 
 
@@ -3350,19 +3447,22 @@ short func_index;
     timer_element *curr, *prev, *next_timer = 0;
     int64_t where = (((int64_t) x << 16) | ((int64_t) y));
 
-    for (prev = 0, curr = timer_base; curr; curr = next_timer) {
+    for (prev = 0, curr = timer_base; curr; curr = next_timer) 
+    {
         next_timer = curr->next;
         if (curr->kind == TIMER_LEVEL && curr->func_index == func_index
-            && curr->arg.a_long == where) {
+            && curr->arg.a_long == where) 
+        {
             if (prev)
                 prev->next = curr->next;
             else
                 timer_base = curr->next;
             if (timeout_funcs[curr->func_index].cleanup)
-                (*timeout_funcs[curr->func_index].cleanup)(&curr->arg,
-                                                           curr->timeout);
+                (void)(*timeout_funcs[curr->func_index].cleanup)(&curr->arg, curr->timeout);
             free((genericptr_t) curr);
-        } else {
+        }
+        else 
+        {
             prev = curr;
         }
     }
@@ -3380,7 +3480,8 @@ short func_index;
     timer_element *curr;
     int64_t where = (((int64_t) x << 16) | ((int64_t) y));
 
-    for (curr = timer_base; curr; curr = curr->next) {
+    for (curr = timer_base; curr; curr = curr->next) 
+    {
         if (curr->kind == TIMER_LEVEL && curr->func_index == func_index
             && curr->arg.a_long == where)
             return curr->timeout;
@@ -3650,7 +3751,7 @@ int64_t adjust;     /* how much to adjust timeout */
 {
     int count;
     timer_element *curr;
-    Strcpy(debug_buf_4, "restore_timers");
+    //debugprint("restore_timers");
 
     if (range == RANGE_GLOBAL)
         mread(fd, (genericptr_t) &timer_id, sizeof timer_id);
@@ -3721,7 +3822,7 @@ boolean ghostly;
                 curr->arg.a_obj = find_oid(nid);
                 if (!curr->arg.a_obj)
                 {
-                    panic("cant find o_id %d", nid);
+                    panic("cant find o_id %u", nid);
                     return;
                 }
                 curr->needs_fixup = 0;
@@ -3756,7 +3857,7 @@ boolean ghostly;
 /*
  * Timeout callback for for objects that are making noise.
  */
-void
+int
 make_sound_object(arg, timeout)
 anything* arg;
 int64_t timeout;
@@ -3766,13 +3867,13 @@ int64_t timeout;
         /* Do nothing */
     }
 
-    return;
+    return FALSE;
 }
 
 /*
  * Cleanup an object making sound if timer stopped.
  */
-STATIC_OVL void
+STATIC_OVL int
 cleanup_sound(arg, expire_time)
 anything* arg;
 int64_t expire_time;
@@ -3781,7 +3882,7 @@ int64_t expire_time;
     if (!obj->makingsound)
     {
         impossible("cleanup_sound: obj %s not making sound", xname(obj));
-        return;
+        return FALSE;
     }
 
     del_sound_source(SOUNDSOURCE_OBJECT, obj_to_any(obj));
@@ -3793,6 +3894,7 @@ int64_t expire_time;
 
     if (obj->where == OBJ_INVENT)
         update_inventory();
+    return FALSE;
 }
 
 void
@@ -3912,6 +4014,7 @@ boolean was_flying;
         {
             play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "feel less limber than before.");
+            check_wielded_cockatrice(FALSE, FALSE, TRUE);
         }
         break;
     case DRAIN_RESISTANCE:
@@ -4048,7 +4151,7 @@ boolean was_flying;
         if (!Mind_shielding)
         {
             play_sfx_sound(SFX_PROTECTION_END_WARNING);
-            You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "unprotected from mental detection.");
+            You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "unprotected from mental attacks, control, and detection.");
         }
         break;
     case LYCANTHROPY_RESISTANCE:
@@ -4097,20 +4200,20 @@ boolean was_flying;
         see_monsters();
         break;
     case XRAY_VISION:
-        if (!Extended_XRay_vision && !XRay_vision)
+        if (!Astral_vision && !XRay_vision)
         {
             play_sfx_sound(SFX_PROTECTION_END_WARNING);
             You_ex(ATR_NONE, CLR_MSG_ATTENTION, "can no longer see through walls.");
         }
         see_monsters();
         break;
-    case EXTENDED_XRAY_VISION:
-        if (!Extended_XRay_vision)
+    case ASTRAL_VISION:
+        if (!Astral_vision)
         {
             if (XRay_vision)
             {
                 play_sfx_sound(SFX_PROTECTION_END_WARNING);
-                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "The range of your X-ray vision becomes shorter.");
+                pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "The range of your vision through walls becomes shorter.");
             }
             else
             {

@@ -933,6 +933,8 @@ boolean with_you;
     int num_segs;
     boolean failed_to_place = FALSE;
 
+    debugprint("mon_arrive: mnum:%d, from: %d/%d, to: %d/%d.", mtmp->mnum, u.uz0.dnum, u.uz0.dlevel, u.uz.dnum, u.uz.dlevel);
+
     mtmp->nmon = fmon;
     fmon = mtmp;
     if (mtmp->isshk)
@@ -1034,7 +1036,7 @@ boolean with_you;
         }
         else
         {
-            impossible("mon_arrive: no corresponding portal?");
+            impossible("mon_arrive: modron up, no corresponding portal? from: %d/%d, to: %d/%d.", u.uz0.dnum, u.uz0.dlevel, u.uz.dnum, u.uz.dlevel);
         }
         break;
     case MIGR_MODRON_PORTAL_DOWN:
@@ -1048,7 +1050,7 @@ boolean with_you;
         }
         else
         {
-            impossible("mon_arrive: no corresponding portal?");
+            impossible("mon_arrive: modron down, no corresponding portal? from: %d/%d, to: %d/%d.", u.uz0.dnum, u.uz0.dlevel, u.uz.dnum, u.uz.dlevel);
         }
         break;
     case MIGR_PORTAL:
@@ -1074,7 +1076,7 @@ boolean with_you;
         }
         else 
         {
-            impossible("mon_arrive: no corresponding portal?");
+            impossible("mon_arrive: portal, no corresponding portal? from: %d/%d, to: %d/%d.", u.uz0.dnum, u.uz0.dlevel, u.uz.dnum, u.uz.dlevel);
         } /*FALLTHRU*/
     default:
     case MIGR_RANDOM:
@@ -1225,10 +1227,15 @@ int64_t nmv; /* number of moves */
         mtmp->mprops[STUNNED] = 0;
 
     /* might finish eating or be able to use special ability again */
-    if (mtmp->meating > 0 && imv > mtmp->meating)
-        finish_meating(mtmp);
-    else
-        mtmp->meating -= imv;
+    if (mtmp->meating > 0)
+    {
+        if (imv > mtmp->meating)
+            finish_meating(mtmp);
+        else
+            mtmp->meating -= imv;
+    }
+    else /* Zero or negative */
+        mtmp->meating = 0;
 
     /* reduce spec_used */
     /* recover lost energy */
@@ -1473,6 +1480,7 @@ boolean pets_only, nearby_only; /* pets_only is true for ascension or final esca
                 cnt = count_wsegs(mtmp);
                 num_segs = min(cnt, MAX_NUM_WORMS - 1);
                 wormgone(mtmp);
+                debugprint_pos();
                 place_monster(mtmp, mtmp->mx, mtmp->my);
             } else
                 num_segs = 0;
@@ -1610,6 +1618,9 @@ register struct obj *obj;
         if ((obj->otyp == CORPSE || obj->otyp == TIN || obj->otyp == EGG) && obj->corpsenm >= 0)
             fptr = &mons[obj->corpsenm];
 
+        if (is_nonedible_corpse_material(mon->data, obj) != 0)
+            return TABU;
+
         if (obj->otyp == CORPSE && fptr && is_rider_or_tarrasque(fptr))
             return TABU;
 
@@ -1621,7 +1632,15 @@ register struct obj *obj;
             return POISON;
 
         if ((obj->otyp == CORPSE || obj->otyp == EGG) &&
-            (polyfodder(obj) || obj->corpsenm == PM_GREEN_SLIME || (obj->corpsenm >= LOW_PM && is_mimic(&mons[obj->corpsenm]))))
+            ((polyfodder(obj) && !resists_polymorph(mon)) || (obj->corpsenm == PM_GREEN_SLIME && !resists_slime(mon)) ||
+                (obj->corpsenm >= LOW_PM &&
+                    ((is_mimic(&mons[obj->corpsenm]) && !resists_mimicking(mon)) ||
+                        (has_hallucinating_corpse(&mons[obj->corpsenm]) && !has_hallucination_resistance(mon)) ||
+                        (has_poisonous_corpse(&mons[obj->corpsenm]) && !resists_poison(mon)) ||
+                        (has_sickening_corpse(&mons[obj->corpsenm]) && !resists_sickness(mon)) ||
+                        (has_mummy_rotted_corpse(&mons[obj->corpsenm]) && !resists_sickness(mon)) ||
+                        (has_stunning_corpse(&mons[obj->corpsenm]) && !resists_stun(mon))
+                        ))))
             return POISON;
 
         if (objects[obj->otyp].oc_edible_subtype > EDIBLETYPE_NORMAL)
@@ -1688,12 +1707,6 @@ register struct obj *obj;
                 return (starving && carni && !is_elf(mptr)) ? ACCFOOD : TABU;
             else
                 return carni ? CADAVER : MANFOOD;
-        case CLOVE_OF_GARLIC:
-            return (is_undead(mptr) || is_vampshifter(mon))
-                      ? TABU
-                      : (herbi || starving)
-                         ? ACCFOOD
-                         : MANFOOD;
         case TIN:
             return metallivorous(mptr) ? ACCFOOD : MANFOOD;
         case APPLE:
@@ -1717,15 +1730,32 @@ register struct obj *obj;
     case ART_CLASS:
     case REAGENT_CLASS:
     default:
+        if (obj->otyp == CLOVE_OF_GARLIC)
+            return (is_undead(mptr) || is_vampshifter(mon))
+            ? TABU
+            : (herbi || starving)
+            ? ACCFOOD
+            : MANFOOD;
         if (obj->otyp == AMULET_OF_STRANGULATION || obj->otyp == RIN_SLOW_DIGESTION)
             return TABU;
         if (slurps_items(mptr) && is_slurpable(obj))
             return ACCFOOD;
-        if (lithovore(mptr) && is_obj_stony(obj))
+        if (lithovorous(mptr) && is_obj_edible_by_lithovore(obj))
             return (In_sokoban(&u.uz) && obj->otyp == BOULDER) ? TABU : eschewed ? ACCFOOD : DOGFOOD;
+        if (obj->oclass == REAGENT_CLASS)
+        {
+            if (bonevorous(mptr) && is_obj_edible_by_bonevore(obj))
+                return eschewed ? APPORT : starving ? DOGFOOD : ACCFOOD;
+            if (toothvorous(mptr) && is_obj_edible_by_toothvore(obj))
+                return eschewed ? APPORT : starving ? DOGFOOD : ACCFOOD;
+            if (chitinvorous(mptr) && is_obj_edible_by_chitinvore(obj))
+                return eschewed ? APPORT : starving ? DOGFOOD : ACCFOOD;
+        }
         /* Non-rustproofed ferrous based metals are preferred. */
         if (metallivorous(mptr) && is_metallic(obj)  && (is_rustprone(obj) || !rust_causing_and_ironvorous(mptr)))
             return (is_rustprone(obj) && !obj->oerodeproof) ? DOGFOOD : ACCFOOD;
+        if (magicvorous(mptr) && is_obj_edible_by_magicvore(obj))
+            return eschewed ? APPORT : starving ? DOGFOOD : ACCFOOD;
         if (!obj->cursed && obj->oclass != BALL_CLASS && obj->oclass != CHAIN_CLASS)
             return APPORT;
         return UNDEF;
@@ -1898,7 +1928,7 @@ boolean thrown;
                 pline_ex(ATR_NONE, CLR_MSG_WARNING, "However, %d other head%s still remain %s.", mtmp->heads_left - headnum, plur(mtmp->heads_left - headnum), is_peaceful(mtmp) ? "untamed" : "hostile");
             place_object(obj, mtmp->mx, mtmp->my); /* put on floor */
             /* devour the food (might grow into larger, genocided monster) */
-            Sprintf(priority_debug_buf_2, "tamedog: %d", obj->otyp);
+            debugprint("tamedog: %d", obj->otyp);
             useupf(obj, 1L);
         }
         else if (!thrown)

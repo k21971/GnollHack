@@ -426,7 +426,12 @@ register struct monst *mtmp;
                 (void)mongets(mtmp, DOUBLE_HEADED_FLAIL);
             break;
         case PM_FLIND_LORD:
-            (void)mongets(mtmp, FLINDBAR);
+            if (rn2(3))
+                (void)mongets(mtmp, FLINDBAR);
+            else if (!rn2(9))
+                (void)mongets(mtmp, TRIPLE_HEADED_FLAIL);
+            else
+                (void)mongets(mtmp, DOUBLE_HEADED_FLAIL);
             break;
         default:
             break;
@@ -817,7 +822,7 @@ register struct monst *mtmp;
                     else
                     {
                         /* free object */
-                        Sprintf(priority_debug_buf_4, "m_initweap: %d", otmp->otyp);
+                        debugprint("m_initweap: %d", otmp->otyp);
                         obfree(otmp, (struct obj*) 0);
                     }
                 }
@@ -838,7 +843,7 @@ register struct monst *mtmp;
                 else 
                 {
                     (void) mongets(mtmp, rn2(2) ? AXE : DWARVISH_SPEAR);
-                    (void) mongets(mtmp, DWARVISH_ROUNDSHIELD);
+                    (void) mongets(mtmp, rn2(7) ? DWARVISH_ROUNDSHIELD : SPIKED_SHIELD);
                 }
                 (void) mongets(mtmp, DWARVISH_HELM);
                 if (!rn2(3))
@@ -868,7 +873,7 @@ register struct monst *mtmp;
             if (!rn2(3))
                 (void) mongets(mtmp, SCIMITAR);
             if (!rn2(3))
-                (void) mongets(mtmp, ORCISH_SHIELD);
+                (void) mongets(mtmp, rn2(6) ? ORCISH_SHIELD : SPIKED_SHIELD);
             if (!rn2(3))
                 (void) mongets(mtmp, KNIFE);
             if (!rn2(3))
@@ -887,7 +892,7 @@ register struct monst *mtmp;
                 m_initthrow(mtmp, ORCISH_ARROW, 10, 12, TRUE, -1, -1, MAT_NONE);
             }
             if (!rn2(3))
-                (void) mongets(mtmp, GREAT_ORCISH_SHIELD);
+                (void) mongets(mtmp, rn2(6) ? GREAT_ORCISH_SHIELD : SPIKED_SHIELD);
             break;
         case PM_ORC_SHAMAN:
             if (!rn2(2))
@@ -1274,7 +1279,7 @@ int64_t amount;
     struct obj *gold = mksobj(GOLD_PIECE, FALSE, FALSE, FALSE);
 
     gold->quan = amount;
-    add_to_minv(mtmp, gold);
+    (void)add_to_minv(mtmp, gold);
 }
 
 STATIC_OVL void
@@ -1404,10 +1409,9 @@ register struct monst *mtmp;
                 mac += 7 + mongets_return_enchantment(mtmp, PLATE_MAIL);
             else if (mac < 3 && rn2(5))
                 mac +=
-                6 + mongets_return_enchantment(mtmp, (rn2(3)) ? SPLINT_MAIL : BANDED_MAIL);
+                6 + mongets_return_enchantment(mtmp, rn2(3) ? SPLINT_MAIL : BANDED_MAIL);
             else if (rn2(5))
-                mac += 3 + mongets_return_enchantment(mtmp, (rn2(3)) ? RING_MAIL
-                    : STUDDED_LEATHER_ARMOR);
+                mac += 3 + mongets_return_enchantment(mtmp, rn2(3) ? RING_MAIL : STUDDED_LEATHER_ARMOR);
             else
                 mac += 2 + mongets_return_enchantment(mtmp, LEATHER_ARMOR);
 
@@ -1415,17 +1419,27 @@ register struct monst *mtmp;
                 mac += 1 + mongets_return_enchantment(mtmp, HELMET);
             else if (mac < 10 && rn2(2))
                 mac += 1 + mongets_return_enchantment(mtmp, DENTED_POT);
+            
             if (mac < 10 && rn2(3))
                 mac += 1 + mongets_return_enchantment(mtmp, SMALL_SHIELD);
             else if (mac < 10 && rn2(2))
                 mac += 2 + mongets_return_enchantment(mtmp, LARGE_SHIELD);
+            else if (mac < 10 && !rn2(3))
+                mac += 2 + mongets_return_enchantment(mtmp, SPIKED_SHIELD);
+            
             if (mac < 10 && rn2(3))
                 mac += 1 + mongets_return_enchantment(mtmp, LOW_BOOTS);
             else if (mac < 10 && rn2(2))
                 mac += 2 + mongets_return_enchantment(mtmp, HIGH_BOOTS);
+            else if (mac < 10 && !rn2(4))
+                mac += 2 + mongets_return_enchantment(mtmp, SPIKED_BOOTS);
+            
             if (mac < 10 && rn2(3))
-                mac += 1 + mongets_return_enchantment(mtmp, LEATHER_GLOVES);
-            else if (mac < 10 && rn2(2))
+                mac += 1 + mongets_return_enchantment(mtmp, rn2(3) ? LEATHER_GLOVES : GAUNTLETS);
+            else if (mac < 10 && !rn2(5))
+                mac += 2 + mongets_return_enchantment(mtmp, SPIKED_GAUNTLETS);
+
+            if (mac < 10 && !rn2(6))
                 mac += 1 + mongets_return_enchantment(mtmp, LEATHER_CLOAK);
 
             nhUse(mac); /* suppress 'dead increment' from static analyzer */
@@ -1607,7 +1621,7 @@ register struct monst *mtmp;
                     else
                     {
                         /* free object */
-                        Sprintf(priority_debug_buf_4, "m_initweap2: %d", otmp->otyp);
+                        debugprint("m_initweap2: %d", otmp->otyp);
                         obfree(otmp, (struct obj*) 0);
                     }
                 }
@@ -2342,6 +2356,7 @@ boolean origin_at_mon;
         m2->issmith = FALSE;
     if (mon->isnpc)
         m2->isnpc = FALSE;
+    debugprint_pos();
     place_monster(m2, m2->mx, m2->my);
 
     if (emitted_light_range(m2->data))
@@ -2730,7 +2745,9 @@ aligntyp alignment;
 
     uint64_t gpflags = (mmflags & MM_IGNOREWATER) ? MM_IGNOREWATER : 0;
     int origin_x = x, origin_y = y;
-    
+
+    debugprint_pos();
+
     /* if caller wants random location, do it here */
     if (x == 0 && y == 0) 
     {
@@ -2920,9 +2937,10 @@ aligntyp alignment;
     mtmp->gui_glyph = NO_GLYPH;
 
     /* set up stats*/
-    for (int i = 0; i < A_MAX; i++)
+    int i, curscore;
+    for (i = 0; i < A_MAX; i++)
     {
-        int curscore = 0;
+        curscore = 0;
         switch (i)
         {
         case A_STR:
@@ -3022,6 +3040,7 @@ aligntyp alignment;
 
     mtmp->facing_right = (mmflags2 & MM2_FACING_LEFT) ? 0 : (mmflags2 & MM2_FACING_RIGHT) ? 1 : rn2(2);
 
+    debugprint_pos();
     place_monster(mtmp, x, y);
     if (setorigin)
     {
@@ -4550,7 +4569,7 @@ int otyp;
                 set_random_gold_amount(MOBJ(mtmp));
         }
         /* make sure container contents are free'ed */
-        Sprintf(priority_debug_buf_4, "set_mimic_new_mobj: %d", otmp->otyp);
+        debugprint("set_mimic_new_mobj: %d", otmp->otyp);
         //context.suppress_container_deletion_warning = 1;
         obfree(otmp, (struct obj*)0);
         //context.suppress_container_deletion_warning = 0;
@@ -4761,7 +4780,7 @@ register struct monst *mtmp;
                     //    MOBJ(mtmp)->where = OBJ_FLOOR;
                     //}
                     /* make sure container contents are free'ed */
-                    Sprintf(priority_debug_buf_4, "set_mimic_sym: %d", otmp->otyp);
+                    debugprint("set_mimic_sym: %d", otmp->otyp);
                     //context.suppress_container_deletion_warning = 1;
                     obfree(otmp, (struct obj*)0);
                     //context.suppress_container_deletion_warning = 0;

@@ -244,7 +244,7 @@ struct flag {
     schar max_hint_difficulty; /* Maximum difficulty level where hints are shown */
     boolean non_scoring; /* The game has been, for example, loaded from an imported save file and has thereby become non-scoring */
     uchar auto_bag_in_style;
-    boolean no_pets_preference;
+    boolean pets_not_gifted;
 
     uchar right_click_command;
     uchar middle_click_command;
@@ -344,6 +344,8 @@ struct debug_flags {
 #endif
 };
 
+#define MAX_TRACKED_OBJECTS 24
+
 struct instance_flags {
     /* stuff that really isn't option or platform related. They are
      * set and cleared during the game to control the internal
@@ -356,11 +358,17 @@ struct instance_flags {
     boolean invis_goldsym; /* gold symbol is ' '? */
     int failing_untrap;    /* move_into_trap() -> spoteffects() -> dotrap() */
     int in_lava_effects;   /* hack for Boots_off() */
+    int object_tracking_item_index; /* another hack preventing lava_effects from destroying item being removed, which would lead to all sorts of dangling pointer errors */
+    struct obj* tracked_object_obj[MAX_TRACKED_OBJECTS]; /* objects related to above */
+    boolean tracked_object_gone[MAX_TRACKED_OBJECTS];
     int last_msg;          /* indicator of last message player saw */
     int override_ID;       /* true to force full identification of objects */
     int parse_config_file_src;  /* hack for parse_config_line() */
     int purge_monsters;    /* # of dead monsters still on fmon list */
+    int purge_debug_mnum;
+    int purge_debug_isspec;
     int suppress_price;    /* controls doname() for unpaid objects */
+    int64_t payobj_special_quan;
     int terrainmode; /* for getpos()'s autodescribe when #terrain is active */
 #define TER_MAP    0x01
 #define TER_TRP    0x02
@@ -488,6 +496,7 @@ struct instance_flags {
     boolean wizweight;       /* display weight of everything in wizard mode */
     boolean takeoff_uses_all;/* takeoff command is implemented using takeoffall command with a single item */
     boolean autoswap_launchers; /* will attempt to swap launchers on for ranged attack and off for melee attack */
+    boolean autoswap_polearms; /* will attempt to swap polearms off for melee attack */
     boolean show_comparison_stats; /* shows comparison stats of objects when picking them up */
     int run_spot_distance;
 
@@ -588,7 +597,11 @@ struct instance_flags {
     struct monst* spell_target_monster;
     uint64_t found_manuals;
     boolean show_dice_as_ranges;
+    boolean worn_shows_equipment;
     boolean getpos_arrows;
+    char engrave_quicktext[PL_ESIZ + 10];
+    uchar engrave_quickstyle;
+ 
     boolean save_file_secure; /* Is the save file secure (like on Unix servers) */
     boolean save_file_tracking_supported; /* Does this version of GnollHack support save file tracking (= modern GUI) */
     boolean save_file_tracking_needed; /* Does GUI need save file tracking (= is desktop) */
@@ -709,6 +722,7 @@ enum nh_keyfunc {
     NHKF_CLICKLOOK,
     NHKF_CLICKCAST,
     NHKF_CLICKZAP,
+    NHKF_CLICKPOLE,
 
     NHKF_REDRAW,
     NHKF_REDRAW2,
@@ -716,6 +730,7 @@ enum nh_keyfunc {
     NHKF_GETDIR_SELF2,
     NHKF_GETDIR_HELP,
     NHKF_COUNT,
+    NHKF_COUNT2,
     NHKF_GETPOS_SELF,
     NHKF_GETPOS_PICK,
     NHKF_GETPOS_PICK_Q,  /* quick */
@@ -786,10 +801,16 @@ extern NEARDATA struct cmd Cmd;
 struct startup_flags {
     boolean click_action_set;
     boolean click_action_value;
+    boolean metric_system_set;
+    boolean metric_system_value;
     uchar right_click_action;
     uchar middle_click_action;
     boolean dice_as_ranges_set;
     boolean dice_as_ranges_value;
+    boolean worn_shows_equipment_set;
+    boolean worn_shows_equipment_value;
+    boolean no_pets_preference_set;
+    boolean no_pets_preference_value;
     boolean autodig_set;
     boolean autodig_value;
     boolean ignore_stopping_set;
@@ -806,6 +827,9 @@ struct startup_flags {
     boolean save_file_tracking_on_value;
 
     uint64_t found_manuals;
+    boolean engrave_quick_set;
+    char engrave_quicktext[PL_ESIZ + 10];
+    uchar engrave_quickstyle;
 };
 
 extern NEARDATA struct startup_flags initial_flags;

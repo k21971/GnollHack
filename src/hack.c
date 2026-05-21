@@ -246,7 +246,7 @@ moverock()
                 case LANDMINE:
                     if (rn2(10))
                     {
-                        Strcpy(debug_buf_2, "moverock1");
+                        debugprint("moverock1");
                         obj_extract_self(otmp);
                         place_object(otmp, rx, ry);
                         newsym(sx, sy);
@@ -287,7 +287,7 @@ moverock()
                 case SPIKED_PIT:
                 case PIT:
                     play_sfx_sound_at_location(SFX_BOULDER_FILLS_PIT, rx, ry);
-                    Strcpy(debug_buf_2, "moverock2");
+                    debugprint("moverock2");
                     obj_extract_self(otmp);
                     /* vision kludge to get messages right;
                        the pit will temporarily be seen even
@@ -317,7 +317,7 @@ moverock()
                               trap_type_definitions[ttmp->ttyp].name,
                               surface(rx, ry));
                     deltrap(ttmp);
-                    Sprintf(priority_debug_buf_3, "moverock: %d", otmp->otyp);
+                    debugprint("moverock: %d", otmp->otyp);
                     delobj(otmp);
                     bury_objs(rx, ry);
                     levl[rx][ry].wall_info &= ~W_NONDIGGABLE;
@@ -348,7 +348,7 @@ moverock()
                     {
                         (void) rloco(otmp);
                     } else {
-                        Strcpy(debug_buf_2, "moverock3");
+                        debugprint("moverock3");
                         obj_extract_self(otmp);
                         add_to_migration(otmp);
                         get_level(&dest, newlev);
@@ -607,7 +607,7 @@ xchar x, y;
     if (boulder)
     {
         play_occupation_immediate_sound(oss, OCCUPATION_EATING, OCCUPATION_SOUND_TYPE_START);
-        Sprintf(priority_debug_buf_3, "still_chewing: %d", boulder->otyp);
+        debugprint("still_chewing: %d", boulder->otyp);
         delobj(boulder);         /* boulder goes bye-bye */
         You("eat the boulder."); /* yum */
 
@@ -839,18 +839,20 @@ dosinkfall()
     HLevitation++;
     if (uleft && uleft->otyp == RIN_LEVITATION) {
         obj = uleft;
-        Ring_off(obj);
         off_msg(obj);
+        Ring_off(obj);
     }
     if (uright && uright->otyp == RIN_LEVITATION) {
         obj = uright;
-        Ring_off(obj);
         off_msg(obj);
+        Ring_off(obj);
     }
+
+    lev_boots = (uarmf && uarmf->otyp == LEVITATION_BOOTS); /* Have to update as Ring_off might have caused armf to be destroyed */
     if (lev_boots) {
         obj = uarmf;
+        off_msg_with_flags(obj, DONAME_HIDE_WORN);
         (void) Boots_off();
-        off_msg(obj);
     }
     HLevitation--;
     /* probably moot; we're either still levitating or went
@@ -1085,7 +1087,7 @@ int mode;
                         //    (void)dokick_indir(TRUE);
                         //}
                     }
-                    else if ((tmpr->doormask & D_LOCKED) != 0 && tmpr->click_kick_ok && !context.run && !Confusion && !Stunned && !Fumbling)
+                    else if ((tmpr->doormask & D_LOCKED) != 0 && tmpr->click_kick_ok && !context.run && !u.usteed && !Confusion && !Stunned && !Fumbling)
                     {
                         u.dx = dx, u.dy = dy, u.dz = 0;
                         (void)dokick_indir(TRUE);
@@ -2048,6 +2050,7 @@ domove_core()
                         /* it's free to move on next turn */
                         u.ustuck->mfrozen = 1;
                         u.ustuck->msleeping = 0;
+                        refresh_m_tile_gui_info(u.ustuck, TRUE);
                     }
                 /*FALLTHRU*/
                 default:
@@ -2130,8 +2133,10 @@ domove_core()
         {
             /* try to attack; note that it might evade */
             /* also, we don't attack tame when _safepet_ */
+            debugprint("domove_core1: mnum=%d, mx=%d, my=%d", mtmp->mnum, mtmp->mx, mtmp->my);
             if (attack(mtmp))
                 return;
+            debugprint("domove_core2: mnum=%d, mx=%d, my=%d", mtmp->mnum, mtmp->mx, mtmp->my);
         }
     }
 
@@ -2316,6 +2321,9 @@ domove_core()
         play_movement_sound(&youmonst, CLIMBING_TYPE_NONE);
     }
 
+    if (mtmp)
+        debugprint("domove_core3: mnum=%d, mx=%d, my=%d, x=%d, y=%d, ux0=%d, uy0=%d", mtmp->mnum, mtmp->mx, mtmp->my, x, y, u.ux0, u.uy0);
+
     /*
      * If safepet at destination then move the pet to the hero's
      * previous location using the same conditions as in attack().
@@ -2329,7 +2337,7 @@ domove_core()
      * Ceiling-hiding pets are skipped by this section of code, to
      * be caught by the normal falling-monster code.
      */
-    if ((is_safepet(mtmp) || is_displaceable_peaceful(mtmp)) && !(is_hider(mtmp->data) && mtmp->mundetected))
+    if (mtmp && (is_safepet(mtmp) || is_displaceable_peaceful(mtmp)) && !(is_hider(mtmp->data) && mtmp->mundetected))
     {
         /* if trapped, there's a chance the pet goes wild */
         if (mtmp->mtrapped && is_safepet(mtmp))
@@ -2403,6 +2411,7 @@ domove_core()
             /* save its current description in case of polymorph */
             Strcpy(pnambuf, y_monnam(mtmp));
             mtmp->mtrapped = 0;
+            debugprint("domove_core4: mnum=%d, mx=%d, my=%d, x=%d, y=%d, ux0=%d, uy0=%d", mtmp->mnum, mtmp->mx, mtmp->my, x, y, u.ux0, u.uy0);
             remove_monster(x, y);
             place_monster(mtmp, u.ux0, u.uy0);
             newsym(x, y);
@@ -2493,6 +2502,7 @@ finish_move:
         /* Clean old position -- vision_recalc() will print our new one. */
         newsym(u.ux0, u.uy0);
         /* Since the hero has moved, adjust what can be seen/unseen. */
+        debugprint_pos();
         vision_recalc(1); /* Do the work now in the recover time. */
         invocation_message();
         update_hearing_array_and_ambient_sounds();
@@ -2550,7 +2560,7 @@ int x1, y1, x2, y2;
 
 /* combat increases metabolism */
 boolean
-overexertion()
+overexertion(VOID_ARGS)
 {
     /* this used to be part of domove() when moving to a monster's
        position, but is now called by attack() so that it doesn't
@@ -2571,7 +2581,7 @@ overexertion()
 }
 
 void
-invocation_message()
+invocation_message(VOID_ARGS)
 {
     /* a special clue-msg when on the Invocation position */
     if (invocation_pos(u.ux, u.uy) && !On_stairs(u.ux, u.uy)) {
@@ -2588,6 +2598,7 @@ invocation_message()
 
         You_feel_ex(ATR_NONE, CLR_MSG_ATTENTION, "a strange vibration %s.", buf);
         u.uevent.uvibrated = 1;
+        issue_achievement(GUI_ACHIEVEMENT_FOUND_VIBRATING_SQUARE);
         if (otmp && otmp->special_quality == 7 && otmp->lamplit)
             pline_ex(ATR_NONE, CLR_MSG_ATTENTION, "%s %s!", The(xname(otmp)),
                   Blind ? "throbs palpably" : "glows with a strange light");
@@ -2600,7 +2611,7 @@ invocation_message()
    might be going into solid rock, inhibiting levitation or flight,
    or coming back out of such, reinstating levitation/flying */
 void
-switch_terrain()
+switch_terrain(VOID_ARGS)
 {
     boolean blocklev = loc_blocks_flying_and_leviation(u.ux, u.uy),
             was_levitating = !!Levitation, was_flying = !!Flying;
@@ -2670,6 +2681,7 @@ boolean newspot;             /* true if called by spoteffects */
 
             u.uinwater = 0;       /* leave the water */
             if (was_underwater) { /* restore vision */
+                debugprint_pos();
                 docrt();
                 vision_full_recalc = 1;
             }

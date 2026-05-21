@@ -204,12 +204,9 @@ namespace GnollHackX
         }
 
 
-
-        //private readonly object _textRowLock = new object();
         private List<string> _textRows = null;
         private List<string> TextRows
         {
-            //get { lock (_textRowLock) { return _textRows == null ? new string[1] {""} : _textRows; } }
             get 
             { 
                 var res = Interlocked.CompareExchange(ref _textRows, null, null);
@@ -591,7 +588,11 @@ namespace GnollHackX
             float canvaswidth = info.Width; // this.CanvasSize.Width;
             float canvasheight = info.Height; // this.CanvasSize.Height;
             float scale = GHApp.DisplayDensity;
-            float scale2 = this.Width == 0 ? 1.0f : canvaswidth / (float)this.Width;
+            float scale2 = this.Width == 0 || canvaswidth == 0f ? 1.0f : canvaswidth / (float)this.Width;
+            if (canvaswidth == 0f)
+                canvaswidth = 1f;
+            if (canvasheight == 0f)
+                canvasheight = 1f;
 
             if (Interlocked.Exchange(ref _interlockedCanvasHeight, canvasheight) != canvasheight)
             {
@@ -660,10 +661,6 @@ namespace GnollHackX
                     else
                     {
                         usedTextOffset = InterlockedTextScrollOffset;
-                        //lock (_textScrollLock)
-                        //{
-                        //    usedTextOffset = _textScrollOffset;
-                        //}
                     }
 
                     y += usedTextOffset;
@@ -934,6 +931,8 @@ namespace GnollHackX
         {
             float textHeight = TextHeight;
             float canvasheight = InterlockedCanvasHeight;
+            if (canvasheight == 0f)
+                canvasheight = 1f;
             float bottomScrollLimit = Math.Min(0, canvasheight - textHeight);
             switch (e?.ActionType)
             {
@@ -1187,6 +1186,8 @@ namespace GnollHackX
                 float speed = _textScrollSpeed; /* pixels per second */
                 float bottomScrollLimit = 0;
                 float canvasheight = InterlockedCanvasHeight;
+                if (canvasheight == 0.0f)
+                    canvasheight = 1f;
                 bottomScrollLimit = Math.Min(0, canvasheight - TextHeight);
                 int sgn = Math.Sign(_textScrollSpeed);
                 float delta = speed / UIUtils.GetGeneralAnimationFrequency(); /* pixels */
